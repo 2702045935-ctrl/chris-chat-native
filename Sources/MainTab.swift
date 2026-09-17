@@ -52,8 +52,8 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                .font(pf(25, .regular))
-                                .frame(width: 26, height: 26)
+                                .font(pf(23, .regular))
+                                .frame(width: 24, height: 24)
                             if i == 0 && badge > 0 {
                                 Text(badge > 99 ? "99+" : "\(badge)")
                                     .font(pf(11, .semibold))

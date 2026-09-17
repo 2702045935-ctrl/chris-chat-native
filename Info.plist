@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
+  <key>CFBundleExecutable</key><string>CHRIS</string>
+  <key>CFBundleIdentifier</key><string>com.chris.chatnative</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>CHRIS聊天</string>
+  <key>CFBundleDisplayName</key><string>CHRIS聊天</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>MinimumOSVersion</key><string>16.0</string>
+  <key>UIDeviceFamily</key><array><integer>1</integer></array>
+  <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+  <key>UILaunchScreen</key>
+  <dict>
+    <key>UIColorName</key><string></string>
+  </dict>
+  <key>UISupportedInterfaceOrientations</key>
+  <array><string>UIInterfaceOrientationPortrait</string></array>
+  <key>UIViewControllerBasedStatusBarAppearance</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>CHRIS聊天 需要使用麦克风进行语音聊天和语音通话</string>
+  <key>NSCameraUsageDescription</key><string>CHRIS聊天 需要使用摄像头拍照和视频通话</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>CHRIS聊天 需要使用语音识别，让你能跟 AI 助手说话</string>
+  <key>NSPhotoLibraryUsageDescription</key><string>CHRIS聊天 需要访问相册以便发送图片</string>
+  <key>NSPhotoLibraryAddUsageDescription</key><string>CHRIS聊天 需要把图片保存到相册</string>
+  <key>NSLocalNetworkUsageDescription</key><string>CHRIS聊天 需要访问局域网里的聊天服务器</string>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsArbitraryLoads</key><true/>
+    <key>NSAllowsLocalNetworking</key><true/>
+  </dict>
+  <key>CFBundleIcons</key>
+  <dict>
+    <key>CFBundlePrimaryIcon</key>
+    <dict>
+      <key>CFBundleIconFiles</key>
+      <array><string>AppIcon60x60</string></array>
+    </dict>
+  </dict>
+</dict>
+</plist>

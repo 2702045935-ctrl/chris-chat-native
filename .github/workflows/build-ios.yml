@@ -1,0 +1,56 @@
+# ============================================================
+#  GitHub 云端打包（不用 Mac）
+#  推到 GitHub 后，这里会自动编译出 CHRISChat-unsigned.ipa
+#  在仓库的 Actions 页面点进去就能下载，然后用爱思助手签名安装。
+#
+#  仓库要设成 Public（公开）—— 公开仓库的 macOS 机器时间完全免费。
+# ============================================================
+name: build-ios
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 显示环境
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: 编译原生 App
+        run: |
+          set -e
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          APP="Payload/CHRISChat.app"
+          rm -rf Payload
+          mkdir -p "$APP"
+          cp Info.plist "$APP/Info.plist"
+          cp AppIcon60x60@2x.png "$APP/"
+          cp AppIcon60x60@3x.png "$APP/"
+          xcrun --sdk iphoneos swiftc \
+            -sdk "$SDK" \
+            -target arm64-apple-ios16.0 \
+            -swift-version 5 \
+            -parse-as-library \
+            -O \
+            -F "$SDK/System/Library/Frameworks" \
+            -o "$APP/CHRIS" \
+            Sources/*.swift \
+            -framework SwiftUI -framework UIKit -framework Foundation
+          echo "编译完成，体积："
+          ls -lh "$APP/CHRIS"
+          zip -qry CHRISChat-unsigned.ipa Payload
+          ls -lh CHRISChat-unsigned.ipa
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: CHRISChat-unsigned-ipa
+          path: CHRISChat-unsigned.ipa
+          if-no-files-found: error

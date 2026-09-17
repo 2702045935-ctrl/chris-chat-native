@@ -110,6 +110,10 @@ enum C {
     static let searchBorder = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(hex: 0xF0F0F0)
     })
+    /// 微信页那条白框：浅色下没有描边（就是一块纯白），深色下才有一条很淡的亮边
+    static let searchBorderChats = Color(UIColor { t in
+        t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor.clear
+    })
     static let name        = Color.dyn(0x1C1C1E, 0xF2F2F7)
     static let label       = Color.dyn(0x191919, 0xF2F2F7)
     static let preview     = Color.dyn(0xB2B2B2, 0xB2B2B2)

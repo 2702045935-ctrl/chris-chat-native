@@ -152,7 +152,7 @@ struct SearchBoxCenter: View {
     private var centered: Bool { text.isEmpty && !focused }
 
     var body: some View {
-        HStack(spacing: centered ? 3 : 6) {
+        HStack(spacing: centered ? 3 : 5) {
             SVGIcon(markup: I.searchSmall, size: 16, color: C.searchIcon)
 
             ZStack(alignment: centered ? .center : .leading) {
@@ -169,16 +169,17 @@ struct SearchBoxCenter: View {
             }
             .frame(maxWidth: centered ? 46 : .infinity)
         }
+        .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
         .padding(.leading, centered ? 28 : 9)
         .padding(.trailing, centered ? 18 : 9)
         .frame(height: L.searchBoxH)
         .background(
-            RoundedRectangle(cornerRadius: centered ? 5 : 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .fill(C.searchBg)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: centered ? 5 : 6, style: .continuous)
-                .stroke(C.searchBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(C.searchBorderChats, lineWidth: 1)
         )
     }
 }
@@ -200,7 +201,9 @@ struct SearchBoxLeft: View {
                     .font(.system(size: 15))
                     .foregroundColor(C.label)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
         .frame(height: L.searchBoxH)
         .background(

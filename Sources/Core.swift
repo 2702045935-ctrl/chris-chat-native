@@ -306,6 +306,15 @@ enum TimeFmt {
         return abs(Int(d2.timeIntervalSince(d1) / 60))
     }
 
+    /// 账单里的时间：2026年9月13日 13:11:57（不带前导 0）
+    static func bill(_ s: String?) -> String {
+        guard let d = date(s) else { return "" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy年M月d日 H:mm:ss"
+        return f.string(from: d)
+    }
+
     static func ago(_ s: String?) -> String {
         guard let d = date(s) else { return "" }
         let mins = Int(Date().timeIntervalSince(d) / 60)

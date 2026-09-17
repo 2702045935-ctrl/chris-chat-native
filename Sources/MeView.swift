@@ -15,7 +15,7 @@ struct MeView: View {
 
                     GroupCard {
                         MenuRow(icon: I.wallet, iconColor: Color(hex: 0x59C47E),
-                                title: "服务", onTap: { path.append("soon:服务") })
+                                title: "服务", onTap: { path.append("service") })
                     }
 
                     gap
@@ -54,6 +54,10 @@ struct MeView: View {
                     SettingsView()
                 } else if key == "moments" {
                     MomentsView()
+                } else if key == "profile" {
+                    ProfileEditView()
+                } else if key == "service" {
+                    ServiceView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -73,6 +77,9 @@ struct MeView: View {
 
     private var profileTop: some View {
         VStack(spacing: 0) {
+            Button {
+                path.append("profile")
+            } label: {
             HStack(alignment: .center, spacing: 0) {
                 Avatar(path: app.me?.avatarPath ?? "", size: L.v(58, 15.6, 66), circle: true)
                     .frame(width: L.v(58, 15.6, 66), height: L.v(58, 15.6, 66))
@@ -104,6 +111,8 @@ struct MeView: View {
             .padding(.leading, L.v(20, 6.4, 28))
             .padding(.trailing, L.v(14, 4, 18))
             .padding(.bottom, L.v(6, 2, 10))
+            }
+            .buttonStyle(.plain)
 
             HStack(spacing: L.v(8, 2.6, 11)) {
                 chip {

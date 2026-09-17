@@ -5,6 +5,7 @@ import UIKit
 
 struct User: Decodable, Identifiable, Hashable {
     var id: String
+    var requestId: String?
     var username: String?
     var nickname: String?
     var avatar: String?
@@ -390,6 +391,46 @@ final class API {
     func contacts() async throws -> [User] {
         let payload: ContactsPayload = try await get("/api/contacts", as: ContactsPayload.self)
         return payload.friends
+    }
+
+    func contactsFull() async throws -> (friends: [User], incoming: [User]) {
+        let payload: ContactsPayload = try await get("/api/contacts", as: ContactsPayload.self)
+        return (payload.friends, payload.incoming ?? [])
+    }
+
+    func respondFriend(_ requestId: String, accept: Bool) async {
+        _ = try? await request("POST", "/api/friends/respond",
+                               body: ["requestId": requestId, "accept": accept])
+    }
+
+    func createGroup(name: String, memberIds: [String]) async throws -> Chat? {
+        let payload: ChatPayload = try await post("/api/chats/group",
+                                                  ["name": name, "memberIds": memberIds],
+                                                  as: ChatPayload.self)
+        return payload.chat
+    }
+
+    func recharge(_ amount: Double) async throws -> Double {
+        struct RechargePayload: Decodable { var balance: Double? }
+        let payload: RechargePayload = try await post("/api/me/recharge",
+                                                      ["amount": amount],
+                                                      as: RechargePayload.self)
+        return payload.balance ?? 0
+    }
+
+    func claimTransfer(_ id: String) async {
+        _ = try? await request("POST", "/api/transfers/\(id)/claim", body: [:])
+    }
+
+    func favorites() async -> [[String: Any]] {
+        guard let any = try? await request("GET", "/api/favorites"),
+              let dict = any as? [String: Any],
+              let list = dict["favorites"] as? [[String: Any]] else { return [] }
+        return list
+    }
+
+    func changeBackground(_ path: String) async {
+        await updateMe(["chatBackground": path])
     }
 
     func moments(limit: Int = 20, userId: String? = nil) async throws -> [Moment] {

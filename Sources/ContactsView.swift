@@ -47,7 +47,7 @@ struct ContactsView: View {
             VStack(spacing: 0) {
                 NavBar(title: "通讯录") {
                     Button {
-                        app.show("加好友排在下一批")
+                        path.append("addFriend")
                     } label: {
                         Text("＋")
                             .font(.system(size: 19))
@@ -114,6 +114,10 @@ struct ContactsView: View {
                 if key.hasPrefix("moments:") {
                     let uid = String(key.dropFirst(8))
                     MomentsView(target: app.contacts.first { $0.id == uid })
+                } else if key == "newFriends" {
+                    NewFriendsView()
+                } else if key == "addFriend" {
+                    AddFriendView()
                 } else {
                     ComingSoonView(title: key)
                 }
@@ -126,7 +130,14 @@ struct ContactsView: View {
 
     private func funcRow(_ item: (String, String, Color, String)) -> some View {
         Button {
-            app.show(item.0 + " 排在下一批")
+            switch item.3 {
+            case "newFriends": path.append("newFriends")
+            case "chatOnly": app.show("仅聊天的朋友：只有聊天记录、没加好友的人会出现在这里")
+            case "tags": app.show("标签：还没建过标签")
+            case "service": app.show("服务号：暂时没有关注的服务号")
+            case "work": app.show("企业微信联系人：还没绑定微信企业")
+            default: app.show("我的企业：还没创建企业")
+            }
         } label: {
             HStack(spacing: L.ctGap) {
                 FuncIcon(markup: item.1, bg: item.2, size: L.avatar)

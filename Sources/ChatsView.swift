@@ -45,6 +45,7 @@ struct ChatsView: View {
     @State private var confirmHide: Chat?
     @State private var confirmDelete: Chat?
     @State private var path = NavigationPath()
+    @State private var plusMenu = false
 
     private var list: [Chat] {
         guard !keyword.isEmpty else { return app.chats }
@@ -58,7 +59,7 @@ struct ChatsView: View {
             VStack(spacing: 0) {
                 NavBar(title: "微信") {
                     Button {
-                        app.show("发起群聊 / 加好友排在下一批")
+                        plusMenu = true
                     } label: {
                         SVGIcon(markup: I.plusRing, size: 30, color: C.ringInk)
                             .padding(.leading, 2)
@@ -121,6 +122,22 @@ struct ChatsView: View {
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
             }
+            .navigationDestination(for: String.self) { key in
+                if key == "newGroup" {
+                    GroupCreateView { chat in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { path.append(chat) }
+                    }
+                } else if key == "addFriend" {
+                    AddFriendView()
+                } else {
+                    ComingSoonView(title: key)
+                }
+            }
+        }
+        .confirmationDialog("", isPresented: $plusMenu, titleVisibility: .hidden) {
+            Button("发起群聊") { path.append("newGroup") }
+            Button("加好友") { path.append("addFriend") }
+            Button("取消", role: .cancel) { }
         }
         .confirmationDialog("不显示该聊天？", isPresented: Binding(
             get: { confirmHide != nil },

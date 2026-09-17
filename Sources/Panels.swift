@@ -1,0 +1,282 @@
+import SwiftUI
+
+var panelH: CGFloat { L.v(198, 53, 240) }
+
+/* ============================================================ 表情面板 */
+
+let emojiAll: [String] = [
+    "😄", "😖", "😍", "😳", "😎", "😭", "😚", "🤐",
+    "😴", "😢", "😅", "😡", "😛", "😁", "😲", "😔",
+    "😎", "😰", "😫", "🤢", "🤭", "😊", "🙄", "😤",
+    "🤤", "😪", "😱", "😅", "😃", "🫡", "💪", "🤬",
+
+    "🤔", "🤫", "😵", "😩", "😞", "💀", "🔨", "👋",
+    "😅", "🤧", "👏", "😳", "😏", "😤", "😤", "🥱",
+    "😒", "🥺", "😢", "😏", "😘", "😨", "🥺", "🔪",
+    "🍉", "🍺", "🏀", "🏓", "☕", "🍚", "🐷", "🌹",
+
+    "🥀", "😘", "❤️", "💔", "🎂", "⚡", "💣", "🗡️",
+    "⚽", "🐞", "💩", "🌙", "☀️", "🎁", "🤗", "👍",
+    "👎", "🤝", "✌️", "🙏", "😉", "👊", "👌", "🕺",
+    "🥶", "😤", "🌀", "🙇", "🔄", "🏃", "👋", "🤩",
+
+    "👍", "👏", "🙏", "✌️", "❤️", "🌹", "🎁", "🎉",
+    "🔥", "⭐", "🌈", "🎵", "☕", "🎂", "🧧", "☀️",
+    "🌙", "☁️", "🌧️", "❄️", "🐱", "🐶", "🐼", "🐰",
+    "🐷", "🐵", "🐯", "🐟", "🍎", "🍓", "🍉", "🍺"
+]
+
+struct EmojiPanel: View {
+    @Binding var draft: String
+    var onSend: () -> Void
+    var onDelete: () -> Void
+
+    @State private var page = 0
+
+    private let perPage = 32
+    private var pages: [[String]] {
+        stride(from: 0, to: emojiAll.count, by: perPage).map { start in
+            Array(emojiAll[start..<min(start + perPage, emojiAll.count)])
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $page) {
+                ForEach(pages.indices, id: \.self) { p in
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 8), spacing: 0) {
+                        ForEach(pages[p].indices, id: \.self) { i in
+                            Button {
+                                draft += pages[p][i]
+                            } label: {
+                                Text(pages[p][i])
+                                    .font(.system(size: L.v(23, 6.6, 28)))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: panelH * 0.80 / 4)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, L.v(6, 2, 10))
+                    .padding(.top, L.v(6, 2, 10))
+                    .tag(p)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            HStack(spacing: 0) {
+                HStack(spacing: L.v(5, 1.6, 7)) {
+                    ForEach(pages.indices, id: \.self) { i in
+                        Circle()
+                            .fill(i == page ? Color.dyn(0xBFBFBF, 0xB8B8B8) : Color.dyn(0xCFCFCF, 0x4A4A4A))
+                            .frame(width: L.v(5, 1.5, 7), height: L.v(5, 1.5, 7))
+                    }
+                }
+                Spacer()
+                Button(action: onDelete) {
+                    SVGIcon(markup: I.deleteKey, size: L.v(22, 6.4, 26), color: C.iconGray)
+                        .frame(width: L.v(36, 10, 42), height: L.v(26, 7.4, 30))
+                }
+                .buttonStyle(.plain)
+                Button(action: onSend) {
+                    Text("发送")
+                        .font(.system(size: 15))
+                        .foregroundColor(draft.isEmpty ? C.subLabel : Color(hex: 0x0D0D0D))
+                        .padding(.horizontal, 14)
+                        .frame(height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(draft.isEmpty ? Color.dyn(0xE8E8E8, 0x3A3A3C) : C.green)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, L.v(12, 3.8, 16))
+            .frame(height: L.v(38, 10.4, 46))
+        }
+        .frame(height: panelH)
+        .background(C.tabBg)
+    }
+}
+
+/* ============================================================ ＋ 面板 */
+
+struct PlusPanel: View {
+    let items: [PlusItem]
+    var onTap: (PlusItem) -> Void
+
+    @State private var page = 0
+    private let perPage = 8
+
+    private var pages: [[PlusItem]] {
+        stride(from: 0, to: max(1, items.count), by: perPage).map { start in
+            Array(items[start..<min(start + perPage, items.count)])
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $page) {
+                ForEach(pages.indices, id: \.self) { p in
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: L.v(8, 2.8, 13)), count: 4),
+                              spacing: L.v(8, 2.8, 13)) {
+                        ForEach(pages[p].indices, id: \.self) { i in
+                            let item = pages[p][i]
+                            Button {
+                                onTap(item)
+                            } label: {
+                                VStack(spacing: L.v(4, 1.6, 7)) {
+                                    SVGIcon(markup: I.plus(item.icon),
+                                            size: L.v(24, 7, 29),
+                                            color: C.label)
+                                    Text(item.label ?? "")
+                                        .font(.system(size: L.v(10.5, 3, 12)))
+                                        .foregroundColor(C.subLabel)
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: (panelH - L.v(22, 6, 26) - L.v(24, 7.6, 32)) / 2)
+                                .background(RoundedRectangle(cornerRadius: L.v(6, 2, 9), style: .continuous).fill(C.cardBg))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, L.v(10, 3.2, 14))
+                    .padding(.top, L.v(10, 3.2, 14))
+                    .tag(p)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            HStack(spacing: L.v(5, 1.6, 7)) {
+                ForEach(pages.indices, id: \.self) { i in
+                    Circle()
+                        .fill(i == page ? Color.dyn(0xBFBFBF, 0xB8B8B8) : Color.dyn(0xCFCFCF, 0x4A4A4A))
+                        .frame(width: L.v(5, 1.5, 7), height: L.v(5, 1.5, 7))
+                }
+            }
+            .frame(height: L.v(22, 6, 26))
+        }
+        .frame(height: panelH)
+        .background(C.tabBg)
+    }
+}
+
+/* ============================================================ 礼物面板 */
+
+struct GiftPanel: View {
+    let gifts: [Gift]
+    var onTap: (Gift) -> Void
+
+    @State private var page = 0
+    private let perPage = 8
+
+    private var pages: [[Gift]] {
+        stride(from: 0, to: max(1, gifts.count), by: perPage).map { start in
+            Array(gifts[start..<min(start + perPage, gifts.count)])
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if gifts.isEmpty {
+                Text("礼物还没配")
+                    .font(.system(size: 14))
+                    .foregroundColor(C.subLabel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                TabView(selection: $page) {
+                    ForEach(pages.indices, id: \.self) { p in
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: L.v(8, 2.8, 13)), count: 4),
+                                  spacing: L.v(8, 2.8, 13)) {
+                            ForEach(pages[p].indices, id: \.self) { i in
+                                let g = pages[p][i]
+                                Button {
+                                    onTap(g)
+                                } label: {
+                                    VStack(spacing: L.v(3, 1.2, 5)) {
+                                        Text(g.icon ?? "🎁").font(.system(size: L.v(22, 6.4, 27)))
+                                        Text(g.name ?? "礼物")
+                                            .font(.system(size: L.v(10.5, 3, 12)))
+                                            .foregroundColor(C.subLabel)
+                                            .lineLimit(1)
+                                        Text("¥\(Int(g.price ?? 0))")
+                                            .font(.system(size: L.v(10, 2.8, 11.5)))
+                                            .foregroundColor(C.red)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: (panelH - L.v(22, 6, 26) - L.v(24, 7.6, 32)) / 2)
+                                    .background(RoundedRectangle(cornerRadius: L.v(6, 2, 9), style: .continuous).fill(C.cardBg))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, L.v(10, 3.2, 14))
+                        .padding(.top, L.v(10, 3.2, 14))
+                        .tag(p)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+
+                HStack(spacing: L.v(5, 1.6, 7)) {
+                    ForEach(pages.indices, id: \.self) { i in
+                        Circle()
+                            .fill(i == page ? Color.dyn(0xBFBFBF, 0xB8B8B8) : Color.dyn(0xCFCFCF, 0x4A4A4A))
+                            .frame(width: L.v(5, 1.5, 7), height: L.v(5, 1.5, 7))
+                    }
+                }
+                .frame(height: L.v(22, 6, 26))
+            }
+        }
+        .frame(height: panelH)
+        .background(C.tabBg)
+    }
+}
+
+/* ============================================================ 位置 */
+
+struct LocationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    var onSend: (String) -> Void
+
+    @State private var name = "我的位置"
+    @State private var lat = "31.491200"
+    @State private var lng = "120.311900"
+    @State private var addr = ""
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("位置名称")) {
+                    TextField("我的位置", text: $name)
+                }
+                Section(header: Text("经纬度（北纬 / 东经）")) {
+                    HStack {
+                        Text("纬度").foregroundColor(.secondary)
+                        TextField("31.4912", text: $lat).keyboardType(.numbersAndPunctuation)
+                    }
+                    HStack {
+                        Text("经度").foregroundColor(.secondary)
+                        TextField("120.3119", text: $lng).keyboardType(.numbersAndPunctuation)
+                    }
+                    if !addr.isEmpty {
+                        Text(addr).font(.system(size: 13)).foregroundColor(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("发送位置")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("发送") {
+                        let payload = "{\"lat\":\(Double(lat) ?? 0),\"lng\":\(Double(lng) ?? 0),\"name\":\"\(name)\",\"addr\":\"\(addr)\"}"
+                        onSend(payload)
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}

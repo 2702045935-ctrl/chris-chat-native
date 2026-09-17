@@ -104,6 +104,9 @@ enum I {
     static let speaker = """
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.6h3.1L12 5.5v13L7.5 14.4H4.4z"/><path d="M15.6 9.7a3.5 3.5 0 0 1 0 4.6"/><path d="M18.2 7.5a7.1 7.1 0 0 1 0 9"/></svg>
     """
+    static let deleteKey = """
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 5.4h9.3a2.6 2.6 0 0 1 2.6 2.6v8a2.6 2.6 0 0 1-2.6 2.6H9.2L2.9 12z"/><path d="M12.7 9.6l4.8 4.8M17.5 9.6l-4.8 4.8"/></svg>
+    """
 
     // ---------------- 朋友圈 ----------------
     static let backCover = """
@@ -122,6 +125,34 @@ enum I {
     static let coke = """
     <svg viewBox="0 0 40 60"><path d="M14 6h12v6H14z" fill="#8e1c1c"/><path d="M11 12h18c2.2 0 4 1.8 4 4v34c0 2.2-1.8 4-4 4H11c-2.2 0-4-1.8-4-4V16c0-2.2 1.8-4 4-4z" fill="#e02020"/><path d="M7 30c6 3 20 3 26 0v10c-6 3-20 3-26 0z" fill="#fff"/><path d="M12 33c5 2 11 2 16 0v5c-5 2-11 2-16 0z" fill="#e02020"/></svg>
     """
+
+    // ---------------- 「＋」面板 / 礼物面板 ----------------
+    static let plusIcons: [String: String] = [
+        "photo": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.8" width="17.6" height="14.4" rx="2.4"/><circle cx="8.6" cy="9.8" r="1.7"/><path d="M3.6 16.6l4.6-4.2 3.5 3.1 3-2.7 5.7 5"/></svg>"#,
+        "camera": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 8.6a2.2 2.2 0 0 1 2.2-2.2h2.1l1.4-2.1h6.2l1.4 2.1h2.1a2.2 2.2 0 0 1 2.2 2.2v8.4a2.2 2.2 0 0 1-2.2 2.2H5.4a2.2 2.2 0 0 1-2.2-2.2z"/><circle cx="12" cy="12.6" r="3.6"/></svg>"#,
+        "video": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="6" width="12.6" height="12" rx="2.6"/><path d="M15.4 12.2l5.8-3.6v6.8l-5.8-3.2z"/></svg>"#,
+        "location": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.2s6.6-5.9 6.6-10.4A6.6 6.6 0 0 0 5.4 10.8c0 4.5 6.6 10.4 6.6 10.4z"/><circle cx="12" cy="10.6" r="2.5"/></svg>"#,
+        "redpacket": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7.6" width="16" height="11.6" rx="2.2"/><path d="M4 7.6h16L12 13z"/><path d="M11 15.6h2M12 15.6v1.6"/></svg>"#,
+        "gift": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="9.6" width="16.8" height="10.8" rx="2.2"/><path d="M3.6 13.6h16.8M12 9.6v10.8"/><path d="M9.4 9.6c-1.9 0-2.9-1-2.9-2.2S7.6 5 9.1 5c1.9 0 2.9 2 2.9 4.6.1-2.6 1.1-4.6 3-4.6 1.5 0 2.6.6 2.6 1.8s-1 2.2-2.9 2.2z"/></svg>"#,
+        "transfer": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 9.6h13.2l-3.2-3.4M20.4 14.4H7.2l3.2 3.4"/></svg>"#,
+        "voice": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.2" y="3.4" width="5.6" height="10.4" rx="2.8"/><path d="M5.8 11.4a6.2 6.2 0 0 0 12.4 0M12 17.8v2.8"/></svg>"#,
+        "favorite": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.4l2.4 4.9 5.4.8-3.9 3.8.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.9-3.8 5.4-.8z"/></svg>"#,
+        "card": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2.4"/><circle cx="9.2" cy="10.6" r="2"/><path d="M6.2 16.4c.5-1.7 1.7-2.6 3-2.6s2.5.9 3 2.6M14.6 10h3.6M14.6 13.4h3.6"/></svg>"#,
+        "file": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6h7.2l4.4 4.4v12.4H6.4z"/><path d="M13.4 3.8v4.4h4.4"/></svg>"#,
+        "music": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 17.4V6.2l9.2-1.8v11"/><circle cx="6.9" cy="17.8" r="2.3"/><circle cx="16.1" cy="15.6" r="2.3"/></svg>"#,
+        "coupon": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 7.6h16.8v3a2.4 2.4 0 0 0 0 4.8v3H3.6v-3a2.4 2.4 0 0 0 0-4.8z"/><path d="M9.6 8.4v9.2"/></svg>"#,
+        "chain": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.2 13.8a3.6 3.6 0 0 0 5.1 0l3-3a3.6 3.6 0 0 0-5.1-5.1l-1 1"/><path d="M13.8 10.2a3.6 3.6 0 0 0-5.1 0l-3 3a3.6 3.6 0 0 0 5.1 5.1l1-1"/></svg>"#,
+        "vote": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.4 19.6V10M12 19.6V4.8M18.6 19.6v-6.2"/></svg>"#,
+        "screen": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2.2"/><path d="M9 20h6"/></svg>"#,
+        "star": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.4l2.4 4.9 5.4.8-3.9 3.8.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.9-3.8 5.4-.8z"/></svg>"#,
+        "heart": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7.2-4.4-7.2-9.4A4.2 4.2 0 0 1 12 7.8a4.2 4.2 0 0 1 7.2 2.8C19.2 15.6 12 20 12 20z"/></svg>"#,
+        "link": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 13.4a4 4 0 0 0 5.6 0l2.4-2.4a4 4 0 0 0-5.6-5.6"/><path d="M13.4 10.6a4 4 0 0 0-5.6 0l-2.4 2.4a4 4 0 0 0 5.6 5.6"/></svg>"#,
+        "none": #"<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.4"/><path d="M8.6 12h6.8"/></svg>"#
+    ]
+
+    static func plus(_ name: String?) -> String {
+        plusIcons[name ?? ""] ?? plusIcons["star"] ?? ""
+    }
 }
 
 /// 通讯录顶部那 6 个彩色方块

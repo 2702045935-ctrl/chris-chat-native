@@ -1,12 +1,15 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 微信气泡：圆角 6 + 左上/右上那个 5px 小尖角
 struct BubbleShape: Shape {
     let mine: Bool
     var radius: CGFloat = 6
+    var tail: Bool = true
 
     func path(in rect: CGRect) -> Path {
         var p = Path(roundedRect: rect, cornerRadius: radius)
+        guard tail else { return p }
         var t = Path()
         if mine {
             t.move(to: CGPoint(x: rect.maxX + 4, y: rect.minY + 11))
@@ -23,6 +26,8 @@ struct BubbleShape: Shape {
     }
 }
 
+enum PanelKind { case none, emoji, plus, gift }
+
 struct ChatDetailView: View {
     let chat: Chat
 
@@ -32,6 +37,17 @@ struct ChatDetailView: View {
     @State private var messages: [Message] = []
     @State private var input = ""
     @State private var loading = true
+    @State private var panel: PanelKind = .none
+    @State private var plusItems: [PlusItem] = []
+    @State private var gifts: [Gift] = []
+
+    @State private var showPhoto = false
+    @State private var showCamera = false
+    @State private var showLocation = false
+    @State private var showTransfer = false
+    @State private var showFile = false
+    @State private var uploading = false
+
     @FocusState private var focused: Bool
 
     private var myId: String { app.me?.id ?? "" }
@@ -64,15 +80,42 @@ struct ChatDetailView: View {
 
                 messageList
             }
+
+            if uploading {
+                ZStack {
+                    Color.black.opacity(0.18).ignoresSafeArea()
+                    ProgressView("正在上传…")
+                        .padding(18)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(C.cardBg))
+                }
+            }
         }
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showPhoto) {
+            PhotoPicker { image in sendImage(image) }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPicker { image in sendImage(image) }
+        }
+        .sheet(isPresented: $showLocation) {
+            LocationSheet { payload in send(kind: "location", content: payload) }
+        }
+        .sheet(isPresented: $showTransfer) {
+            TransferSheet(chat: chat) { amount, note, method, password in
+                doTransfer(amount: amount, note: note, method: method, password: password)
+            }
+        }
+        .fileImporter(isPresented: $showFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first { sendFile(url) }
+        }
         .task(id: chat.id) {
             await load(initial: true)
             await API.shared.markRead(chatId: chat.id)
             await app.loadChats()
+            if plusItems.isEmpty { plusItems = (try? await API.shared.plusPanel()) ?? [] }
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 if Task.isCancelled { break }
@@ -99,6 +142,21 @@ struct ChatDetailView: View {
                             }
                             MessageRow(message: message, mine: message.senderId == myId)
                                 .padding(.bottom, 15)
+                                .contextMenu {
+                                    if message.senderId == myId {
+                                        Button(role: .destructive) {
+                                            recall(message)
+                                        } label: {
+                                            Label("撤回", systemImage: "arrow.uturn.backward")
+                                        }
+                                    }
+                                    Button {
+                                        UIPasteboard.general.string = message.body
+                                        app.show("已复制")
+                                    } label: {
+                                        Label("复制", systemImage: "doc.on.doc")
+                                    }
+                                }
                         }
                         .id(message.id)
                     }
@@ -129,72 +187,77 @@ struct ChatDetailView: View {
         return TimeFmt.minutesBetween(messages[index - 1].createdAt, message.createdAt) >= 5
     }
 
-    private func senderPath(_ message: Message) -> String {
-        if let p = message.senderAvatar, !p.isEmpty { return p }
-        return app.contact(for: message.senderId ?? "")?.avatarPath ?? ""
-    }
-
     /* ---------------------------------------------------------- 输入栏 */
 
     private var composer: some View {
-        HStack(spacing: 6) {
-            Button {
-                app.show("发语音排在下一批")
-            } label: {
-                SVGIcon(markup: I.voice, size: L.composerIcon, color: C.iconGray)
-                    .frame(width: L.composerIconBox, height: L.composerIconBox)
-            }
-            .buttonStyle(.plain)
-
-            HStack(spacing: 0) {
-                TextField("", text: $input)
-                    .focused($focused)
-                    .font(.system(size: 17))
-                    .foregroundColor(C.label)
-                SVGIcon(markup: I.speaker, size: 22, color: C.iconGray)
-                    .padding(.leading, 6)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: L.inputH)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x2C2C2E)))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.dyn(0xE8E8E8, 0x3A3A3C), lineWidth: 0.5)
-            )
-
-            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
                 Button {
-                    app.show("表情 / 图片 / 转账面板排在下一批")
+                    app.show("按住说话排在下一批")
                 } label: {
-                    SVGIcon(markup: I.smile, size: L.composerIcon, color: C.iconGray)
+                    SVGIcon(markup: I.voice, size: L.composerIcon, color: C.iconGray)
                         .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
                 .buttonStyle(.plain)
 
-                Button {
-                    app.show("图片 / 转账 / 位置面板排在下一批")
-                } label: {
-                    SVGIcon(markup: I.plusCircle, size: L.composerIcon, color: C.iconGray)
-                        .frame(width: L.composerIconBox, height: L.composerIconBox)
+                HStack(spacing: 0) {
+                    TextField("", text: $input)
+                        .focused($focused)
+                        .font(.system(size: 17))
+                        .foregroundColor(C.label)
+                        .onTapGesture { panel = .none }
+                    SVGIcon(markup: I.speaker, size: 22, color: C.iconGray)
+                        .padding(.leading, 6)
                 }
-                .buttonStyle(.plain)
-            } else {
-                Button {
-                    send()
-                } label: {
-                    Text("发送")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 13)
-                        .frame(height: 32)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.green))
+                .padding(.horizontal, 8)
+                .frame(height: L.inputH)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x2C2C2E)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.dyn(0xE8E8E8, 0x3A3A3C), lineWidth: 0.5)
+                )
+
+                if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button {
+                        focused = false
+                        panel = (panel == .emoji) ? .none : .emoji
+                    } label: {
+                        SVGIcon(markup: I.smile, size: L.composerIcon, color: C.iconGray)
+                            .frame(width: L.composerIconBox, height: L.composerIconBox)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        focused = false
+                        panel = (panel == .plus) ? .none : .plus
+                        if panel == .plus && plusItems.isEmpty {
+                            Task { plusItems = (try? await API.shared.plusPanel()) ?? [] }
+                        }
+                    } label: {
+                        SVGIcon(markup: I.plusCircle, size: L.composerIcon, color: C.iconGray)
+                            .frame(width: L.composerIconBox, height: L.composerIconBox)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        sendText()
+                    } label: {
+                        Text("发送")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 13)
+                            .frame(height: 32)
+                            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.green))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.leading, 10)
+            .padding(.trailing, 11)
+            .padding(.vertical, 8)
+
+            panelView
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 11)
-        .padding(.vertical, 8)
         .background(
             ZStack {
                 C.tabBg.ignoresSafeArea(edges: .bottom)
@@ -204,6 +267,143 @@ struct ChatDetailView: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private var panelView: some View {
+        switch panel {
+        case .emoji:
+            EmojiPanel(draft: $input,
+                       onSend: { sendText(); panel = .none },
+                       onDelete: { if !input.isEmpty { input.removeLast() } })
+        case .plus:
+            PlusPanel(items: plusItems) { item in handlePlus(item) }
+        case .gift:
+            GiftPanel(gifts: gifts) { gift in
+                let payload = "{\"id\":\"\(gift.id)\",\"name\":\"\(gift.name ?? "礼物")\",\"icon\":\"\(gift.icon ?? "🎁")\",\"price\":\(Int(gift.price ?? 0))}"
+                send(kind: "gift", content: payload)
+                panel = .none
+            }
+        case .none:
+            EmptyView()
+        }
+    }
+
+    /* ---------------------------------------------------------- 各个动作 */
+
+    private func handlePlus(_ item: PlusItem) {
+        switch item.action ?? "none" {
+        case "photo":
+            panel = .none
+            showPhoto = true
+        case "camera":
+            panel = .none
+            showCamera = true
+        case "location":
+            panel = .none
+            showLocation = true
+        case "gift":
+            panel = .gift
+            if gifts.isEmpty { Task { gifts = (try? await API.shared.gifts()) ?? [] } }
+        case "transfer":
+            panel = .none
+            showTransfer = true
+        case "file":
+            panel = .none
+            showFile = true
+        case "videocall":
+            panel = .none
+            app.show("视频通话排在下一批")
+        case "voice":
+            panel = .none
+            app.show("语音输入排在下一批")
+        default:
+            app.show("\(item.label ?? "")排在下一批")
+        }
+    }
+
+    private func sendText() {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { return }
+        input = ""
+        send(kind: "text", content: text)
+    }
+
+    private func send(kind: String, content: String) {
+        Task {
+            do {
+                if let message = try await API.shared.send(chatId: chat.id, kind: kind, content: content) {
+                    messages.append(message)
+                }
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "发送失败")
+            }
+            await app.loadChats()
+        }
+    }
+
+    private func sendImage(_ image: UIImage) {
+        uploading = true
+        Task {
+            do {
+                let url = try await API.shared.upload(image: image)
+                if let message = try await API.shared.send(chatId: chat.id, kind: "image", content: url) {
+                    messages.append(message)
+                }
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "图片发送失败")
+            }
+            uploading = false
+            await app.loadChats()
+        }
+    }
+
+    private func sendFile(_ url: URL) {
+        let name = url.lastPathComponent
+        Task {
+            uploading = true
+            defer { uploading = false }
+            let ok = url.startAccessingSecurityScopedResource()
+            defer { if ok { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else {
+                app.show("读不到这个文件")
+                return
+            }
+            let b64 = data.base64EncodedString()
+            let payload: [String: Any] = ["dataUrl": "data:application/octet-stream;base64," + b64,
+                                          "filename": name]
+            do {
+                let bytes = try await API.shared.rawUpload(payload)
+                let content = "{\"url\":\"\(bytes.url)\",\"name\":\"\(name)\",\"bytes\":\(data.count)}"
+                if let message = try await API.shared.send(chatId: chat.id, kind: "file", content: content) {
+                    messages.append(message)
+                }
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "文件发送失败")
+            }
+            await app.loadChats()
+        }
+    }
+
+    private func doTransfer(amount: Double, note: String, method: String, password: String) {
+        Task {
+            do {
+                try await API.shared.transfer(chatId: chat.id, amount: amount, note: note,
+                                              method: method, password: password)
+                await load(initial: true)
+                await app.loadChats()
+                app.show("已转账 ¥\(String(format: "%.2f", amount))")
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "转账失败")
+            }
+        }
+    }
+
+    private func recall(_ message: Message) {
+        Task {
+            await API.shared.recall(chatId: chat.id, messageId: message.id)
+            await load(initial: true)
+        }
     }
 
     /* ---------------------------------------------------------- 数据 */
@@ -220,22 +420,6 @@ struct ChatDetailView: View {
             if initial { app.show("聊天记录加载失败") }
         }
         loading = false
-    }
-
-    private func send() {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty { return }
-        input = ""
-        Task {
-            do {
-                if let message = try await API.shared.send(chatId: chat.id, text: text) {
-                    messages.append(message)
-                }
-            } catch {
-                app.show((error as? APIError)?.errorDescription ?? "发送失败")
-            }
-            await app.loadChats()
-        }
     }
 }
 
@@ -288,14 +472,22 @@ struct MessageRow: View {
             RemoteImage(path: message.body, icon: "photo")
                 .frame(width: 140, height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+        case "location":
+            locationBubble
+
+        case "transfer":
+            transferBubble
+
+        case "gift":
+            giftBubble
+
+        case "file":
+            fileBubble
+
         case "audio":
             card(icon: I.speaker, title: "语音", detail: "点击播放")
-        case "transfer":
-            card(icon: I.wallet, title: "转账", detail: message.body)
-        case "gift":
-            card(icon: I.star, title: "礼物", detail: message.body)
-        case "location":
-            card(icon: I.nearby, title: "位置", detail: message.body)
+
         default:
             Text(message.body)
                 .font(.system(size: 17))
@@ -309,26 +501,138 @@ struct MessageRow: View {
         }
     }
 
+    private func dict(_ json: String) -> [String: Any] {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    private var locationBubble: some View {
+        let o = dict(message.body)
+        let lat = (o["lat"] as? Double) ?? 0
+        let lng = (o["lng"] as? Double) ?? 0
+        let name = (o["name"] as? String) ?? "位置"
+        let addr = (o["addr"] as? String) ?? ""
+        return VStack(spacing: 0) {
+            RemoteImage(path: Tiles.url(lat: lat, lng: lng), icon: "map")
+                .frame(width: 216, height: 136)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 15)).foregroundColor(C.bubbleText).lineLimit(1)
+                Text(addr.isEmpty ? "点击查看地图" : addr)
+                    .font(.system(size: 12)).foregroundColor(C.subLabel).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+        }
+        .frame(width: 216)
+        .background(C.bubbleOther)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private var transferBubble: some View {
+        let o = dict(message.body)
+        let amount = (o["amount"] as? Double) ?? 0
+        let note = (o["note"] as? String) ?? ""
+        let status = (o["status"] as? String) ?? "pending"
+        let state = status == "received" ? "已收款" : (status == "refunded" ? "已退回" : "待对方确认收款")
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "yensign.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundColor(Color(hex: 0xFFFFFF))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("¥\(String(format: "%.2f", amount))")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundColor(.white)
+                    Text(note.isEmpty ? (mine ? "你发起了一笔转账" : "转账给你") : note)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color.white.opacity(0.88))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            Text(state)
+                .font(.system(size: 11))
+                .foregroundColor(Color.white.opacity(0.8))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(width: 216, alignment: .leading)
+        .background(Color(hex: 0xFA9D3C))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private var giftBubble: some View {
+        let o = dict(message.body)
+        let icon = (o["icon"] as? String) ?? "🎁"
+        let name = (o["name"] as? String) ?? "礼物"
+        let price = (o["price"] as? Double) ?? 0
+        return HStack(spacing: 10) {
+            Text(icon).font(.system(size: 30))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 15, weight: .medium)).foregroundColor(C.bubbleText)
+                Text("¥\(String(format: "%.0f", price))").font(.system(size: 12)).foregroundColor(C.red)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
+        )
+    }
+
+    private var fileBubble: some View {
+        let o = dict(message.body)
+        let name = (o["name"] as? String) ?? "文件"
+        let bytes = (o["bytes"] as? Int) ?? 0
+        return HStack(spacing: 10) {
+            SVGIcon(markup: I.plusIcons["file"] ?? "", size: 26, color: C.bubbleText)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 14)).foregroundColor(C.bubbleText).lineLimit(1)
+                Text(byteText(bytes)).font(.system(size: 11)).foregroundColor(C.subLabel)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(width: 216, alignment: .leading)
+        .background(
+            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
+        )
+    }
+
+    private func byteText(_ n: Int) -> String {
+        if n > 1024 * 1024 { return String(format: "%.1f MB", Double(n) / 1024 / 1024) }
+        if n > 1024 { return "\(n / 1024) KB" }
+        return "\(n) B"
+    }
+
     private func card(icon: String, title: String, detail: String) -> some View {
         HStack(spacing: 10) {
             SVGIcon(markup: icon, size: 20, color: mine ? C.bubbleText : C.green)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(C.bubbleText)
+                Text(title).font(.system(size: 15, weight: .medium)).foregroundColor(C.bubbleText)
                 if !detail.isEmpty {
-                    Text(detail)
-                        .font(.system(size: 12))
-                        .foregroundColor(C.subLabel)
-                        .lineLimit(2)
+                    Text(detail).font(.system(size: 12)).foregroundColor(C.subLabel).lineLimit(2)
                 }
             }
         }
         .padding(.horizontal, L.bubblePadH)
         .padding(.vertical, L.bubblePadV)
         .background(
-            BubbleShape(mine: mine)
-                .fill(mine ? C.bubbleMine : C.bubbleOther)
+            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
         )
+    }
+}
+
+/* ============================================================ 地图小图 */
+
+enum Tiles {
+    static func url(lat: Double, lng: Double, z: Int = 15) -> String {
+        let n = pow(2.0, Double(z))
+        let x = Int(floor((lng + 180) / 360 * n))
+        let rad = lat * .pi / 180
+        let y = Int(floor((1 - log(tan(rad) + 1 / cos(rad)) / .pi) / 2 * n))
+        return "https://tile.openstreetmap.org/\(z)/\(x)/\(y).png"
     }
 }

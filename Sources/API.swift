@@ -126,6 +126,31 @@ struct BrandInfo: Decodable, Hashable {
     var logo: String?
 }
 
+struct PlusItem: Decodable, Identifiable, Hashable {
+    var id: String?
+    var label: String?
+    var icon: String?
+    var action: String?
+    var enabled: Bool?
+}
+
+struct Gift: Decodable, Identifiable, Hashable {
+    var id: String
+    var name: String?
+    var icon: String?
+    var price: Double?
+    var category: String?
+}
+
+private struct PlusPayload: Decodable { var items: [PlusItem]? }
+private struct GiftsPayload: Decodable { var gifts: [Gift]? }
+private struct UploadPayload: Decodable {
+    var url: String?
+    var name: String?
+    var bytes: Int?
+    var image: Bool?
+}
+
 /* ============================================================ 网络 */
 
 enum APIError: LocalizedError {
@@ -370,5 +395,102 @@ final class API {
     func moments(limit: Int = 20) async throws -> [Moment] {
         let payload: MomentsPayload = try await get("/api/moments?limit=\(limit)", as: MomentsPayload.self)
         return payload.moments
+    }
+
+    /* ---------------------------------------------------------- 更多接口 */
+
+    func plusPanel() async throws -> [PlusItem] {
+        let payload: PlusPayload = try await get("/api/plus-panel", as: PlusPayload.self)
+        return (payload.items ?? []).filter { $0.enabled != false }
+    }
+
+    func gifts() async throws -> [Gift] {
+        let payload: GiftsPayload = try await get("/api/gifts", as: GiftsPayload.self)
+        return payload.gifts ?? []
+    }
+
+    /// 图片压完再传：返回服务器上的 /uploads/xxx.jpg
+    func upload(image: UIImage) async throws -> String {
+        guard let data = image.resizedJPEG(maxSide: 1600, quality: 0.82) else {
+            throw APIError.message("图片处理失败")
+        }
+        let b64 = data.base64EncodedString()
+        let payload: UploadPayload = try await post("/api/upload",
+                                                    ["dataUrl": "data:image/jpeg;base64," + b64,
+                                                     "filename": "photo.jpg"],
+                                                    as: UploadPayload.self)
+        guard let url = payload.url else { throw APIError.message("上传失败") }
+        return url
+    }
+
+    func send(chatId: String, kind: String, content: String) async throws -> Message? {
+        let payload: MessagePayload = try await post("/api/chats/\(chatId)/messages",
+                                                     ["kind": kind, "content": content],
+                                                     as: MessagePayload.self)
+        return payload.message
+    }
+
+    func recall(chatId: String, messageId: String) async {
+        _ = try? await request("POST", "/api/messages/\(messageId)/recall", body: ["chatId": chatId])
+    }
+
+    func likeMoment(id: String) async {
+        _ = try? await request("POST", "/api/moments/\(id)/like", body: [:])
+    }
+
+    func commentMoment(id: String, text: String) async {
+        _ = try? await request("POST", "/api/moments/\(id)/comments", body: ["content": text])
+    }
+
+    func deleteMoment(id: String) async {
+        _ = try? await request("DELETE", "/api/moments/\(id)")
+    }
+
+    func postMoment(content: String, images: [String]) async throws {
+        _ = try await request("POST", "/api/moments", body: ["content": content, "images": images])
+    }
+
+    func updateMe(_ fields: [String: Any]) async {
+        _ = try? await request("PATCH", "/api/me", body: fields)
+    }
+
+    func addFriend(username: String) async throws {
+        _ = try await request("POST", "/api/friends/request", body: ["username": username])
+    }
+
+    func rawUpload(_ body: [String: Any]) async throws -> (url: String, name: String, bytes: Int) {
+        let payload: UploadPayload = try await post("/api/upload", body, as: UploadPayload.self)
+        guard let url = payload.url else { throw APIError.message("上传失败") }
+        return (url, payload.name ?? "", payload.bytes ?? 0)
+    }
+
+    func transfer(chatId: String, amount: Double, note: String,
+                  method: String, password: String) async throws {
+        _ = try await request("POST", "/api/pay/transfer", body: [
+            "chatId": chatId,
+            "amount": amount,
+            "note": note,
+            "method": method,
+            "password": password
+        ])
+    }
+}
+
+extension UIImage {
+    /// 上传前压一下：长边最多 maxSide，JPEG 质量 quality
+    func resizedJPEG(maxSide: CGFloat, quality: CGFloat) -> Data? {
+        let long = max(size.width, size.height)
+        var target = size
+        if long > maxSide {
+            let k = maxSide / long
+            target = CGSize(width: size.width * k, height: size.height * k)
+        }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
+        let out = renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: target))
+        }
+        return out.jpegData(compressionQuality: quality)
     }
 }

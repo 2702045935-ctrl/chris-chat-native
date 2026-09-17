@@ -603,6 +603,16 @@ final class API {
               let has = dict["has"] as? Bool else { return false }
         return has
     }
+
+    /// 举报某人（后台「举报处理」里能看到）
+    func report(userId: String, chatId: String, reason: String, content: String) async {
+        _ = try? await request("POST", "/api/reports", body: [
+            "targetUserId": userId,
+            "chatId": chatId,
+            "reason": reason,
+            "content": content
+        ])
+    }
 }
 
 extension UIImage {

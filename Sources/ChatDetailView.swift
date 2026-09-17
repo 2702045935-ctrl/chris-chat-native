@@ -178,6 +178,11 @@ struct ChatDetailView: View {
                                     } label: {
                                         Label("复制", systemImage: "doc.on.doc")
                                     }
+                                    Button(role: .destructive) {
+                                        report(message)
+                                    } label: {
+                                        Label("举报", systemImage: "exclamationmark.bubble")
+                                    }
                                 }
                         }
                         .id(message.id)
@@ -438,6 +443,17 @@ struct ChatDetailView: View {
         Task {
             await API.shared.recall(chatId: chat.id, messageId: message.id)
             await load(initial: true)
+        }
+    }
+
+    private func report(_ message: Message) {
+        let target = message.senderId ?? ""
+        guard !target.isEmpty else { return }
+        Task {
+            await API.shared.report(userId: target, chatId: chat.id,
+                                    reason: "聊天内容举报",
+                                    content: String(message.body.prefix(200)))
+            app.show("已举报，管理员会处理")
         }
     }
 

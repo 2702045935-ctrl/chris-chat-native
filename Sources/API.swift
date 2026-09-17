@@ -197,8 +197,12 @@ final class API {
         if let saved = UserDefaults.standard.string(forKey: "chris.server"), !saved.isEmpty {
             server = saved
         }
-        if let saved = UserDefaults.standard.string(forKey: "chris.token") {
+        // 令牌优先从钥匙串读（重装 App 也不掉），读不到再看老地方
+        if let saved = Keychain.get("token") {
             token = saved
+        } else if let saved = UserDefaults.standard.string(forKey: "chris.token") {
+            token = saved
+            Keychain.set(saved, for: "token")
         }
     }
 
@@ -218,11 +222,13 @@ final class API {
     func setToken(_ value: String) {
         token = value
         UserDefaults.standard.set(value, forKey: "chris.token")
+        Keychain.set(value, for: "token")
     }
 
     func clearToken() {
         token = ""
         UserDefaults.standard.removeObject(forKey: "chris.token")
+        Keychain.remove("token")
     }
 
     /// /uploads/xxx.png、http://…、data:… 都能转成可加载的地址
@@ -305,6 +311,14 @@ final class API {
     func branding() async -> BrandInfo? {
         guard let payload: BrandingPayload = try? await get("/api/branding", as: BrandingPayload.self) else { return nil }
         return payload.branding
+    }
+
+    /// 服务器上的界面配置（data/ui.json）
+    func uiConfig() async -> [String: Any] {
+        guard let any = try? await request("GET", "/api/ui"),
+              let dict = any as? [String: Any],
+              let ui = dict["ui"] as? [String: Any] else { return [:] }
+        return ui
     }
 
     func login(username: String, password: String) async throws -> User {

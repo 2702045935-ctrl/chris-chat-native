@@ -145,7 +145,7 @@ struct ChatDetailView: View {
                         VStack(spacing: 0) {
                             if showTime(for: message) {
                                 Text(TimeFmt.bubble(message.createdAt))
-                                    .font(pf(14))
+                                    .font(pf(L.msgTimeSize))
                                     .foregroundColor(C.msgTime)
                                     .frame(maxWidth: .infinity)
                                     .padding(.top, 12)
@@ -522,7 +522,7 @@ struct MessageRow: View {
 
         default:
             Text(message.body)
-                .font(pf(17))
+                .font(pf(L.chatFontSize))
                 .foregroundColor(C.bubbleText)
                 .padding(.horizontal, L.bubblePadH)
                 .padding(.vertical, L.bubblePadV)

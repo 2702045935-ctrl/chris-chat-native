@@ -2,6 +2,41 @@ import SwiftUI
 import UIKit
 
 /* ============================================================
+   界面配置：服务器上 data/ui.json 里能改字号、行高、头像大小、颜色。
+   改完把 App 从后台划掉重新打开就生效 —— 不用重新装包。
+   ============================================================ */
+enum UIConfig {
+    private static var numbers: [String: CGFloat] = [:]
+    private static var strings: [String: String] = [:]
+    static var scale: CGFloat = 0.94
+
+    static func num(_ key: String, _ def: CGFloat) -> CGFloat { numbers[key] ?? def }
+
+    static func color(_ key: String, _ light: UInt32, _ dark: UInt32) -> Color {
+        guard let raw = strings[key] else { return Color.dyn(light, dark) }
+        let parts = raw.split(separator: "|").map { String($0).trimmingCharacters(in: .whitespaces) }
+        func hex(_ s: String) -> UInt32? { UInt32(s.replacingOccurrences(of: "#", with: ""), radix: 16) }
+        let l = parts.count > 0 ? (hex(parts[0]) ?? light) : light
+        let d = parts.count > 1 ? (hex(parts[1]) ?? l) : l
+        return Color.dyn(l, d)
+    }
+
+    static func apply(_ json: [String: Any]) {
+        var n: [String: CGFloat] = [:]
+        var s: [String: String] = [:]
+        for (k, v) in json {
+            if let d = v as? Double { n[k] = CGFloat(d) }
+            else if let i = v as? Int { n[k] = CGFloat(i) }
+            else if let b = v as? Bool { n[k] = b ? 1 : 0 }
+            else if let t = v as? String { s[k] = t }
+        }
+        numbers = n
+        strings = s
+        if let sc = n["fontScale"], sc > 0.5, sc < 1.6 { scale = sc }
+    }
+}
+
+/* ============================================================
    尺寸：照网页版 m.css 里的 clamp(min, vw, max) 一条条搬过来，
    所以任何机型宽度下都和网页版算出来的一样。
    ============================================================ */
@@ -19,6 +54,9 @@ enum L {
         min(max(lo, width * vw / 100), hi)
     }
 
+    /// 服务器上 data/ui.json 里的覆盖值（改这个文件 + 重开 App 就生效，不用重装）
+    static func o(_ key: String, _ def: CGFloat) -> CGFloat { UIConfig.num(key, def) }
+
     static var safeTop: CGFloat {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
             .windows.first?.safeAreaInsets.top ?? 20
@@ -30,56 +68,70 @@ enum L {
 
     // 导航栏：网页里 398~425 宽时固定 48，其余走 clamp
     static var navH: CGFloat {
-        if width >= 398 && width <= 425 { return 48 }
-        return v(42, 11.4, 50)
+        let def: CGFloat = (width >= 398 && width <= 425) ? 48 : v(42, 11.4, 50)
+        return o("navH", def)
     }
-    static let tabH: CGFloat = 56
+    static var tabH: CGFloat { o("tabH", 56) }
+    static var tabIcon: CGFloat { o("tabIcon", 23) }
+    static var tabIconBox: CGFloat { o("tabIconBox", 24) }
+    static var tabLabel: CGFloat { o("tabLabel", 11) }
 
     // 会话列表（微信页）：12 + 48 + 12 = 72
-    static let rowH: CGFloat = 72
-    static var avatar: CGFloat { v(44, 12.3, 48) }
-    static let rowPadL: CGFloat = 16
-    static let rowPadR: CGFloat = 17
-    static let rowGap: CGFloat = 13
-    static let searchBoxH: CGFloat = 36
-    static let searchPad: CGFloat = 8
+    static var rowH: CGFloat { o("chatRowH", 72) }
+    static var avatar: CGFloat { o("chatAvatar", v(44, 12.3, 48)) }
+    static var rowPadL: CGFloat { o("chatPadL", 16) }
+    static var rowPadR: CGFloat { o("chatPadR", 17) }
+    static var rowGap: CGFloat { o("chatGap", 13) }
+    static var rowNameSize: CGFloat { o("chatNameSize", 17) }
+    static var rowPreviewSize: CGFloat { o("chatPreviewSize", 14) }
+    static var rowTimeSize: CGFloat { o("chatTimeSize", 12) }
+    static var searchBoxH: CGFloat { o("searchBoxH", 36) }
+    static var searchPad: CGFloat { o("searchPad", 8) }
     /// 参考图量出来：会话行分隔线从 x=76 开始
-    static let dividerLeft: CGFloat = 76
+    static var dividerLeft: CGFloat { o("dividerLeft", 76) }
 
     // 通讯录（按 vx 参考图：行 56、头像 40、左 16、间距 12、文字 x=68）
-    static let ctRowH: CGFloat = 56
-    static let ctAvatar: CGFloat = 40
-    static let ctPadL: CGFloat = 16
-    static let ctGap: CGFloat = 12
-    static let ctIcon: CGFloat = 40
+    static var ctRowH: CGFloat { o("ctRowH", 56) }
+    static var ctAvatar: CGFloat { o("ctAvatar", 40) }
+    static var ctPadL: CGFloat { o("ctPadL", 16) }
+    static var ctGap: CGFloat { o("ctGap", 12) }
+    static var ctIcon: CGFloat { o("ctIcon", 40) }
+    static var ctNameSize: CGFloat { o("ctNameSize", 16) }
+    static var ctHeadH: CGFloat { o("ctHeadH", 28) }
+    static var ctHeadSize: CGFloat { o("ctHeadSize", 15) }
+    static var ctIdxSize: CGFloat { o("ctIdxSize", 12.5) }
+    static var ctIdxItemH: CGFloat { o("ctIdxItemH", 16.5) }
     static var ctTextX: CGFloat { ctPadL + ctAvatar + ctGap }
 
     // 发现页 / 我页（按 vx 参考图：行 56、图标 x18、文字 x58、组间线从 x56 开始）
-    static let menuH: CGFloat = 56
-    static let menuPadL: CGFloat = 18
-    static let menuPadR: CGFloat = 16
-    static let menuGap: CGFloat = 18
-    static let menuIcon: CGFloat = 22
-    static let groupGap: CGFloat = 8
+    static var menuH: CGFloat { o("menuH", 56) }
+    static var menuPadL: CGFloat { o("menuPadL", 18) }
+    static var menuPadR: CGFloat { o("menuPadR", 16) }
+    static var menuGap: CGFloat { o("menuGap", 18) }
+    static var menuIcon: CGFloat { o("menuIcon", 22) }
+    static var menuTextSize: CGFloat { o("menuTextSize", 17) }
+    static var groupGap: CGFloat { o("groupGap", 8) }
     static var menuTextX: CGFloat { menuPadL + menuIcon + menuGap }
     /// 我页/发现页行内那条细线的左端
-    static let menuLineInset: CGFloat = 56
+    static var menuLineInset: CGFloat { o("menuLineInset", 56) }
 
     // 聊天页
     static var msgPad: CGFloat { v(10, 2.8, 12) }
     static var chatAvatar: CGFloat { v(38, 9.8, 42) }
     static var bubblePadH: CGFloat { v(11, 3, 12.6) }
     static var bubblePadV: CGFloat { v(9, 2.3, 9.8) }
-    static let composerH: CGFloat = 56
-    static let composerIconBox: CGFloat = 33
-    static let composerIcon: CGFloat = 28
-    static let inputH: CGFloat = 39
+    static var composerH: CGFloat { o("composerH", 56) }
+    static var composerIconBox: CGFloat { o("composerIconBox", 33) }
+    static var composerIcon: CGFloat { o("composerIcon", 28) }
+    static var inputH: CGFloat { o("inputH", 39) }
+    static var chatFontSize: CGFloat { o("chatFontSize", 17) }
+    static var msgTimeSize: CGFloat { o("msgTimeSize", 14) }
 
     // 朋友圈
-    static let coverH: CGFloat = 380
+    static var coverH: CGFloat { o("coverH", 380) }
     static var coverAvatar: CGFloat { v(52, 17.1, 72) }
-    static let momentPadH: CGFloat = 22
-    static let momentAvatar: CGFloat = 44
+    static var momentPadH: CGFloat { o("momentPadH", 22) }
+    static var momentAvatar: CGFloat { o("momentAvatar", 44) }
 }
 
 /* ============================================================ 颜色 */
@@ -107,15 +159,16 @@ extension Color {
 
 /// 逐个色号对着网页版量出来的（浅色 / 深色）
 enum C {
-    static let pageBg      = Color.dyn(0xEDEDED, 0x0B0B0D)
-    static let navBg       = Color.dyn(0xEDEDED, 0x18181A)
-    static let tabBg       = Color.dyn(0xF7F7F7, 0x18181A)
-    static let cardBg      = Color.dyn(0xFFFFFF, 0x1C1C1E)
-    static let chatRowBg   = Color.dyn(0xFFFFFF, 0x2A2A2A)
-    static let pinnedBg    = Color.dyn(0xF2F2F2, 0x333335)
-    static let searchBg    = Color.dyn(0xFFFFFF, 0x2A2A2C)
-    static let searchIcon  = Color.dyn(0xB2B2B2, 0x9A9A9E)
-    static let searchIcon2 = Color.dyn(0x8C8C8C, 0x9A9A9E)
+    // 颜色也能在 data/ui.json 里改（写成 "#浅色|#深色"）
+    static var pageBg      : Color { UIConfig.color("pageBg", 0xEDEDED, 0x0B0B0D) }
+    static var navBg       : Color { UIConfig.color("navBg", 0xEDEDED, 0x18181A) }
+    static var tabBg       : Color { UIConfig.color("tabBg", 0xF7F7F7, 0x18181A) }
+    static var cardBg      : Color { UIConfig.color("cardBg", 0xFFFFFF, 0x1C1C1E) }
+    static var chatRowBg   : Color { UIConfig.color("chatRowBg", 0xFFFFFF, 0x2A2A2A) }
+    static var pinnedBg    : Color { UIConfig.color("pinnedBg", 0xF2F2F2, 0x333335) }
+    static var searchBg    : Color { UIConfig.color("searchBg", 0xFFFFFF, 0x2A2A2C) }
+    static var searchIcon  : Color { UIConfig.color("searchIcon", 0xB2B2B2, 0x9A9A9E) }
+    static var searchIcon2 : Color { UIConfig.color("searchIcon2", 0x8C8C8C, 0x9A9A9E) }
     static let searchBorder = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor(hex: 0xF0F0F0)
     })
@@ -123,17 +176,17 @@ enum C {
     static let searchBorderChats = Color(UIColor { t in
         t.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.12) : UIColor.clear
     })
-    static let name        = Color.dyn(0x1C1C1E, 0xF2F2F7)
-    static let label       = Color.dyn(0x191919, 0xF2F2F7)
-    static let preview     = Color.dyn(0xB2B2B2, 0xB2B2B2)
-    static let time        = Color.dyn(0xC7C7CC, 0xC7C7CC)
-    static let subLabel    = Color.dyn(0x999999, 0x8F8F8F)
-    static let hairline    = Color.dyn(0xE5E5E5, 0x333335)
-    static let navLine     = Color.dyn(0xE8E8E8, 0x2C2C2E)
-    static let green       = Color.dyn(0x07C160, 0x3EB575)
-    static let red         = Color(hex: 0xFA5151)
-    static let orange      = Color(hex: 0xFF9500)
-    static let tabInk      = Color.dyn(0x191919, 0xB5B5B5)
+    static var name        : Color { UIConfig.color("nameColor", 0x1C1C1E, 0xF2F2F7) }
+    static var label       : Color { UIConfig.color("labelColor", 0x191919, 0xF2F2F7) }
+    static var preview     : Color { UIConfig.color("previewColor", 0xB2B2B2, 0xB2B2B2) }
+    static var time        : Color { UIConfig.color("timeColor", 0xC7C7CC, 0xC7C7CC) }
+    static var subLabel    : Color { UIConfig.color("subLabelColor", 0x999999, 0x8F8F8F) }
+    static var hairline    : Color { UIConfig.color("lineColor", 0xE5E5E5, 0x333335) }
+    static var navLine     : Color { UIConfig.color("navLineColor", 0xE8E8E8, 0x2C2C2E) }
+    static var green       : Color { UIConfig.color("greenColor", 0x07C160, 0x3EB575) }
+    static var red         : Color { UIConfig.color("redColor", 0xFA5151, 0xFA5151) }
+    static var orange      : Color { UIConfig.color("orangeColor", 0xFF9500, 0xFF9500) }
+    static var tabInk      : Color { UIConfig.color("tabInkColor", 0x191919, 0xB5B5B5) }
     static let bubbleMine  = Color.dyn(0x95EC69, 0x3EB575)
     static let bubbleOther = Color.dyn(0xFFFFFF, 0x2D2D30)
     static let bubbleText  = Color.dyn(0x191919, 0xEDEDED)
@@ -163,7 +216,7 @@ enum C {
    万一系统里没有苹方，自动退回系统字体，不会变成方框。
    ============================================================ */
 /// 全站字号统一小一号（用户要求）：17→16、15→14、14→13、12→11
-let fontScale: CGFloat = 0.94
+var fontScale: CGFloat { UIConfig.scale }
 
 func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     let scaled = max(9, (size * fontScale).rounded())

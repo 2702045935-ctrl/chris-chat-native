@@ -81,12 +81,12 @@ struct ContactsView: View {
                                     // 字母分组头（A/B/C…，参考图里就在左边 x16，一行 28 高）
                                     HStack(spacing: 0) {
                                         Text(section.letter)
-                                            .font(pf(15))
+                                            .font(pf(L.ctHeadSize))
                                             .foregroundColor(Color(hex: 0x737373))
                                         Spacer(minLength: 0)
                                     }
                                     .padding(.leading, 16)
-                                    .frame(height: 28)
+                                    .frame(height: L.ctHeadH)
                                     .background(C.cardBg)
                                     .id("letter-\(section.letter)")
 
@@ -157,7 +157,7 @@ struct ContactsView: View {
             HStack(spacing: L.ctGap) {
                 FuncIcon(markup: item.1, bg: item.2, size: L.ctIcon)
                 Text(item.0)
-                    .font(pf(16))
+                    .font(pf(L.ctNameSize))
                     .foregroundColor(C.label)
                 Spacer(minLength: 0)
             }
@@ -173,7 +173,7 @@ struct ContactsView: View {
         HStack(spacing: L.ctGap) {
             Avatar(path: user.avatarPath, size: L.ctAvatar, radius: 6)
             Text(user.name)
-                .font(pf(16))
+                .font(pf(L.ctNameSize))
                 .foregroundColor(C.label)
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -194,9 +194,9 @@ struct ContactsView: View {
                     }
                 } label: {
                     Text(section.letter)
-                        .font(pf(12.5))
+                        .font(pf(L.ctIdxSize))
                         .foregroundColor(Color(hex: 0x555555))
-                        .frame(width: 22, height: 16.5)
+                        .frame(width: 22, height: L.ctIdxItemH)
                 }
                 .buttonStyle(.plain)
             }

@@ -13,11 +13,11 @@ struct ChatRow: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(chat.name)
-                    .font(pf(17, .medium))
+                    .font(pf(L.rowNameSize, .medium))
                     .foregroundColor(C.name)
                     .lineLimit(1)
                 Text(chat.lastMessage?.preview ?? "")
-                    .font(pf(14))
+                    .font(pf(L.rowPreviewSize))
                     .foregroundColor(C.preview)
                     .lineLimit(1)
                     .padding(.top, 3)
@@ -26,7 +26,7 @@ struct ChatRow: View {
             Spacer(minLength: 6)
 
             Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
-                .font(pf(12))
+                .font(pf(L.rowTimeSize))
                 .foregroundColor(C.time)
                 .padding(.top, 2)
                 .fixedSize()

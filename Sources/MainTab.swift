@@ -52,8 +52,8 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                .font(pf(23, .regular))
-                                .frame(width: 24, height: 24)
+                                .font(pf(L.tabIcon, .regular))
+                                .frame(width: L.tabIconBox, height: L.tabIconBox)
                             if i == 0 && badge > 0 {
                                 Text(badge > 99 ? "99+" : "\(badge)")
                                     .font(pf(11, .semibold))
@@ -65,7 +65,7 @@ struct TabBar: View {
                             }
                         }
                         Text(items[i].2)
-                            .font(pf(11))
+                            .font(pf(L.tabLabel))
                     }
                     .foregroundColor(selection == i ? C.green : C.tabInk)
                     .frame(maxWidth: .infinity)
@@ -242,7 +242,7 @@ struct MenuRow: View {
                     .frame(width: L.menuIcon, height: L.menuIcon)
 
                 Text(title)
-                    .font(pf(17))
+                    .font(pf(L.menuTextSize))
                     .foregroundColor(C.label)
 
                 Spacer(minLength: 0)

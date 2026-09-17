@@ -13,6 +13,9 @@ final class AppState: ObservableObject {
     @Published var toast: String?
     @Published var loadingChats = false
     @Published var loadError: String?
+    /// 服务器上的界面配置变了就 +1，整个界面重建一次（不用重装 App）
+    @Published var uiVersion = 0
+    private var lastUIConfig = ""
 
     private var toastTask: Task<Void, Never>?
 
@@ -26,6 +29,7 @@ final class AppState: ObservableObject {
     }
 
     func boot() async {
+        await refreshUI(force: true)
         if API.shared.token.isEmpty {
             booting = false
             return
@@ -42,6 +46,17 @@ final class AppState: ObservableObject {
             // 连不上（不在家 / 电脑没开）时先留着登录状态
         }
         booting = false
+    }
+
+    /// 拉服务器上的 data/ui.json：改了数字/颜色，App 重开或回到前台就生效
+    func refreshUI(force: Bool = false) async {
+        let ui = await API.shared.uiConfig()
+        let stamp = String(describing: ui.sorted { $0.key < $1.key })
+        if force || stamp != lastUIConfig {
+            lastUIConfig = stamp
+            UIConfig.apply(ui)
+            uiVersion += 1
+        }
     }
 
     func login(username: String, password: String) async throws {
@@ -135,12 +150,18 @@ struct RootView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .id(app.uiVersion)
             .onAppear { L.width = geo.size.width }
             .onChange(of: geo.size.width) { w in L.width = w }
         }
         .task { await app.boot() }
         .onChange(of: scenePhase) { phase in
-            if phase == .active && app.me != nil { Task { await app.loadChats() } }
+            if phase == .active && app.me != nil {
+                Task {
+                    await app.refreshUI()
+                    await app.loadChats()
+                }
+            }
         }
     }
 }

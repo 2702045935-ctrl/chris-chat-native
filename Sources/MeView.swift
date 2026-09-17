@@ -84,7 +84,8 @@ struct MeView: View {
     private var profileTop: some View {
         VStack(spacing: 0) {
             // 白色的顶：从状态栏最上面就开始铺白（和微信一样）
-            Spacer().frame(height: L.safeTop + 8)
+            // 网页版量出来：头像离内容顶部 67px（.me-profile padding-top: 67px）
+            Spacer().frame(height: L.safeTop + 67)
 
             Button {
                 path.append("profile")

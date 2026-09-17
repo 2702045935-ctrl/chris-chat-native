@@ -8,7 +8,11 @@ import UIKit
 
 enum L {
     /// 屏幕逻辑宽度（根视图量到以后会写进来，等价于网页的 100vw）
-    static var width: CGFloat = 393
+    static var width: CGFloat = {
+        if let w = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .windows.first?.bounds.width, w > 0 { return w }
+        return UIScreen.main.bounds.width
+    }()
 
     /// clamp(min, vw%, max)
     static func v(_ lo: CGFloat, _ vw: CGFloat, _ hi: CGFloat) -> CGFloat {
@@ -153,7 +157,11 @@ enum C {
    数字和英文也走苹方，不再落到 SF Pro 上，和手机微信一模一样。
    万一系统里没有苹方，自动退回系统字体，不会变成方框。
    ============================================================ */
+/// 全站字号统一小一号（用户要求）：17→16、15→14、14→13、12→11
+let fontScale: CGFloat = 0.94
+
 func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    let scaled = max(9, (size * fontScale).rounded())
     var name = "PingFangSC-Regular"
     if weight == .medium {
         name = "PingFangSC-Medium"
@@ -162,10 +170,10 @@ func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     } else if weight == .light || weight == .thin || weight == .ultraLight {
         name = "PingFangSC-Light"
     }
-    if UIFont(name: name, size: size) != nil {
-        return .custom(name, size: size)
+    if UIFont(name: name, size: scaled) != nil {
+        return .custom(name, size: scaled)
     }
-    return .system(size: size, weight: weight)
+    return .system(size: scaled, weight: weight)
 }
 
 enum AppIconImage {

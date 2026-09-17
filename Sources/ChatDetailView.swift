@@ -47,6 +47,7 @@ struct ChatDetailView: View {
     @State private var showTransfer = false
     @State private var showFile = false
     @State private var showCall = false
+    @State private var billInfo: TransferInfo?
     @State private var uploading = false
 
     @FocusState private var focused: Bool
@@ -116,6 +117,14 @@ struct ChatDetailView: View {
         }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)
+        }
+        .sheet(isPresented: Binding(
+            get: { billInfo != nil },
+            set: { if !$0 { billInfo = nil } }
+        )) {
+            if let info = billInfo {
+                BillDetailView(chat: chat, info: info)
+            }
         }
         .fileImporter(isPresented: $showFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { sendFile(url) }
@@ -517,6 +526,9 @@ struct MessageRow: View {
 
         case "transfer":
             transferBubble
+                .onTapGesture {
+                    if let info = TransferInfo(json: message.body) { billInfo = info }
+                }
 
         case "gift":
             giftBubble

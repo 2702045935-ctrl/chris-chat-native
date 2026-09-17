@@ -415,6 +415,8 @@ struct ServiceView: View {
     @State private var loading = true
     @State private var rechargeAmount = ""
     @State private var showRecharge = false
+    @State private var detailChat: Chat?
+    @State private var detailInfo: TransferInfo?
 
     struct BillItem: Identifiable {
         let id: String
@@ -422,6 +424,8 @@ struct ServiceView: View {
         let amount: Double
         let date: String
         let status: String
+        var chat: Chat? = nil
+        var info: TransferInfo? = nil
     }
 
     var body: some View {
@@ -474,25 +478,35 @@ struct ServiceView: View {
                             .padding(.vertical, 30)
                     } else {
                         ForEach(bills) { bill in
-                            VStack(spacing: 0) {
-                                HStack(spacing: 12) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(bill.title).font(pf(16)).foregroundColor(C.label)
-                                        Text(bill.date).font(pf(12.5)).foregroundColor(C.subLabel)
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 3) {
-                                        Text("¥\(String(format: "%.2f", bill.amount))")
-                                            .font(pf(16, .medium))
-                                            .foregroundColor(C.label)
-                                        Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
-                                    }
+                            Button {
+                                if let chat = bill.chat, let info = bill.info {
+                                    detailChat = chat
+                                    detailInfo = info
                                 }
-                                .padding(.horizontal, 16)
-                                .frame(height: 66)
-                                .background(C.cardBg)
-                                HairLine(inset: 16)
+                            } label: {
+                                VStack(spacing: 0) {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(bill.title).font(pf(16)).foregroundColor(C.label)
+                                            Text(bill.date).font(pf(12.5)).foregroundColor(C.subLabel)
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 3) {
+                                            Text("¥\(String(format: "%.2f", bill.amount))")
+                                                .font(pf(16, .medium))
+                                                .foregroundColor(C.label)
+                                            Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
+                                        }
+                                        Chevron(size: 9, line: 1.6)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(height: 66)
+                                    .background(C.cardBg)
+                                    HairLine(inset: 16)
+                                }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -504,6 +518,14 @@ struct ServiceView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .sheet(isPresented: Binding(
+            get: { detailInfo != nil },
+            set: { if !$0 { detailInfo = nil; detailChat = nil } }
+        )) {
+            if let c = detailChat, let i = detailInfo {
+                BillDetailView(chat: c, info: i)
+            }
+        }
         .alert("充值", isPresented: $showRecharge) {
             TextField("金额", text: $rechargeAmount).keyboardType(.decimalPad)
             Button("充值") { doRecharge() }
@@ -544,7 +566,9 @@ struct ServiceView: View {
                                       title: mine ? "转账给 \(chat.name)" : "\(chat.name) 转账给你",
                                       amount: amount,
                                       date: TimeFmt.bill(o["createdAt"] as? String ?? m.createdAt),
-                                      status: state))
+                                      status: state,
+                                      chat: chat,
+                                      info: TransferInfo(json: m.body)))
             }
         }
         bills = found.sorted { $0.date > $1.date }

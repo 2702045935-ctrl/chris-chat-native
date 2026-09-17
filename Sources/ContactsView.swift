@@ -81,8 +81,8 @@ struct ContactsView: View {
                                     // 字母分组头（A/B/C…，参考图里就在左边 x16，一行 28 高）
                                     HStack(spacing: 0) {
                                         Text(section.letter)
-                                            .font(pf(14))
-                                            .foregroundColor(C.subLabel)
+                                            .font(pf(15))
+                                            .foregroundColor(Color(hex: 0x737373))
                                         Spacer(minLength: 0)
                                     }
                                     .padding(.leading, 16)
@@ -186,9 +186,7 @@ struct ContactsView: View {
     /* ---------------------------------------------------------- 右侧 A-Z */
 
     private func indexBar(_ proxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 1) {
-            SVGIcon(markup: I.searchRow, size: 13, color: C.arrow)
-                .padding(.bottom, 3)
+        VStack(spacing: 0) {
             ForEach(sections) { section in
                 Button {
                     withAnimation(.easeOut(duration: 0.18)) {
@@ -197,13 +195,14 @@ struct ContactsView: View {
                 } label: {
                     Text(section.letter)
                         .font(pf(12.5))
-                        .foregroundColor(C.arrow)
-                        .frame(width: 22, height: 14)
+                        .foregroundColor(Color(hex: 0x555555))
+                        .frame(width: 22, height: 16.5)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.trailing, 2)
+        .padding(.trailing, 5.7)
+        .frame(maxHeight: .infinity, alignment: .center)
     }
 }
 

@@ -43,6 +43,14 @@ struct TabBar: View {
         ("person.crop.circle", "person.crop.circle.fill", "我")
     ]
 
+    /// 每个图标能单独调大小：ui.json 里写 tabIcon0 / tabIcon1 / tabIcon2 / tabIcon3
+    /// （0=微信 1=通讯录 2=发现 3=我）。SF Symbols 各图标自带的留白不一样，
+    /// 微信和通讯录那两个本来就更满，所以默认给小一号。
+    private func iconFont(_ i: Int) -> Font {
+        let def = (i == 0 || i == 1) ? L.tabIcon - 2 : L.tabIcon
+        return pf(UIConfig.num("tabIcon\(i)", def))
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
@@ -52,7 +60,7 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                .font(pf(L.tabIcon, .regular))
+                                .font(iconFont(i))
                                 .frame(width: L.tabIconBox, height: L.tabIconBox)
                             if i == 0 && badge > 0 {
                                 Text(badge > 99 ? "99+" : "\(badge)")

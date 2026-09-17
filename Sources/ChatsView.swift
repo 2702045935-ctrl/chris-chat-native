@@ -78,7 +78,11 @@ struct ChatsView: View {
                 } else {
                     List {
                         ForEach(list) { chat in
-                            NavigationLink(value: chat) {
+                            // 用 Button + path 跳转：List 里的 NavigationLink 会自动带一个「›」，
+                            // 微信的会话行是没有箭头的
+                            Button {
+                                path.append(chat)
+                            } label: {
                                 ChatRow(chat: chat)
                             }
                             .buttonStyle(.plain)

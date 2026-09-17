@@ -187,8 +187,7 @@ struct MeView: View {
             }
             .padding(.leading, L.v(16, 5, 19))
             .padding(.trailing, L.v(14, 4, 16))
-            .padding(.vertical, L.v(6, 2, 9))
-            .frame(minHeight: L.v(58, 15.6, 66))
+            .frame(height: L.menuH)
             .background(C.cardBg)
             .contentShape(Rectangle())
         }

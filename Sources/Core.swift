@@ -167,16 +167,22 @@ let fontScale: CGFloat = 0.94
 
 func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     let scaled = max(9, (size * fontScale).rounded())
-    var name = "PingFangSC-Regular"
+    var want = "PingFangSC-Regular"
     if weight == .medium {
-        name = "PingFangSC-Medium"
+        want = "PingFangSC-Medium"
     } else if weight == .semibold || weight == .bold || weight == .heavy || weight == .black {
-        name = "PingFangSC-Semibold"
+        want = "PingFangSC-Semibold"
     } else if weight == .light || weight == .thin || weight == .ultraLight {
-        name = "PingFangSC-Light"
+        want = "PingFangSC-Light"
     }
-    if UIFont(name: name, size: scaled) != nil {
-        return .custom(name, size: scaled)
+    if UIFont(name: want, size: scaled) != nil {
+        return .custom(want, size: scaled)
+    }
+    // 兜底：把系统里所有苹方字体列出来，按想要的字重挑一个
+    for family in UIFont.familyNames where family.lowercased().contains("pingfang") {
+        let names = UIFont.fontNames(forFamilyName: family)
+        if names.contains(want) { return .custom(want, size: scaled) }
+        if let fallback = names.first { return .custom(fallback, size: scaled) }
     }
     return .system(size: scaled, weight: weight)
 }

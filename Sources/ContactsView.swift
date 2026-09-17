@@ -78,6 +78,18 @@ struct ContactsView: View {
                                 }
 
                                 ForEach(sections) { section in
+                                    // 字母分组头（A/B/C…，参考图里就在左边 x16，一行 28 高）
+                                    HStack(spacing: 0) {
+                                        Text(section.letter)
+                                            .font(pf(14))
+                                            .foregroundColor(C.subLabel)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.leading, 16)
+                                    .frame(height: 28)
+                                    .background(C.cardBg)
+                                    .id("letter-\(section.letter)")
+
                                     ForEach(section.users.indices, id: \.self) { i in
                                         let user = section.users[i]
                                         VStack(spacing: 0) {
@@ -88,7 +100,7 @@ struct ContactsView: View {
                                             .buttonStyle(.plain)
                                         }
                                         .background(C.cardBg)
-                                        .id(i == 0 ? "letter-\(section.letter)" : user.id)
+                                        .id(user.id)
                                     }
                                 }
                             }

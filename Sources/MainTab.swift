@@ -293,3 +293,14 @@ struct GroupCard<Content: View>: View {
             .background(C.cardBg)
     }
 }
+
+/// 组与组之间的缝：参考图里是「细线 + 8px 灰缝 + 细线」三条，不是只有一条
+struct GroupGap: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            HairLine()
+            Rectangle().fill(C.pageBg).frame(height: L.groupGap)
+            HairLine()
+        }
+    }
+}

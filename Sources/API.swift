@@ -321,6 +321,19 @@ final class API {
         return ui
     }
 
+    /// 把真实量到的尺寸报回服务器（只用来对着参考图校准，不影响使用）
+    func reportMeasure(_ items: [[String: Any]]) async {
+        _ = try? await request("POST", "/api/measure", body: [
+            "screen": Double(L.width),
+            "safeTop": Double(L.safeTop),
+            "safeBottom": Double(L.safeBottom),
+            "menuH": Double(L.menuH),
+            "chatRowH": Double(L.rowH),
+            "ctRowH": Double(L.ctRowH),
+            "items": items
+        ])
+    }
+
     func login(username: String, password: String) async throws -> User {
         let payload: LoginPayload = try await post("/api/login",
                                                    ["username": username, "password": password],

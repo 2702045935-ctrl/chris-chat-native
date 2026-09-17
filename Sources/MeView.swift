@@ -11,14 +11,14 @@ struct MeView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     profileTop
-                    gap
+                    GroupGap()
 
                     GroupCard {
                         MenuRow(icon: I.wallet, iconColor: Color(hex: 0x59C47E),
                                 title: "服务", onTap: { path.append("service") })
                     }
 
-                    gap
+                    GroupGap()
 
                     GroupCard {
                         MenuRow(icon: I.star, iconColor: Color(hex: 0x4489EA),
@@ -31,12 +31,17 @@ struct MeView: View {
                                 title: "作品", onTap: { path.append("works") })
                         rowLine
                         promoRow
-                        rowLine
+                    }
+
+                    GroupGap()
+
+                    // 参考图里「表情」是单独一组
+                    GroupCard {
                         MenuRow(icon: I.sticker, iconColor: Color(hex: 0xF5C144),
                                 title: "表情", onTap: { path.append("stickers") })
                     }
 
-                    gap
+                    GroupGap()
 
                     GroupCard {
                         MenuRow(icon: I.gear, iconColor: Color(hex: 0x3D83E7),
@@ -177,7 +182,7 @@ struct MeView: View {
                         .foregroundColor(Color.dyn(0xE0393B, 0xFF8A8D))
                         .padding(.horizontal, L.v(5, 1.6, 7))
                         .background(RoundedRectangle(cornerRadius: 4).fill(Color.dyn(0xFFECEB, 0x4A1F20)))
-                    Text("可口可乐碳酸饮料")
+                    Text("添加第1个作品")
                         .font(pf(L.v(14, 3.9, 15.5)))
                         .foregroundColor(C.label)
                         .lineLimit(1)

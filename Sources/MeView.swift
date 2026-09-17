@@ -29,8 +29,10 @@ struct MeView: View {
                         rowLine
                         MenuRow(icon: I.works, iconColor: Color(hex: 0x3D83E7),
                                 title: "作品", onTap: { path.append("works") })
-                        rowLine
-                        promoRow
+                        if UIConfig.num("showPromo", 0) > 0 {
+                            rowLine
+                            promoRow
+                        }
                     }
 
                     GroupGap()

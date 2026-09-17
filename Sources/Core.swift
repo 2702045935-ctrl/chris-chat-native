@@ -373,12 +373,14 @@ func pinyinInitial(_ text: String) -> String {
 /// 网页里是 1 个设备像素的发丝线
 struct HairLine: View {
     var inset: CGFloat = 0
+    var trailingInset: CGFloat = 0
     var color: Color = C.hairline
     var body: some View {
         Rectangle()
             .fill(color)
             .frame(height: 0.5)
             .padding(.leading, inset)
+            .padding(.trailing, trailingInset)
     }
 }
 

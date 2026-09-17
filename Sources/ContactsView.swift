@@ -64,32 +64,40 @@ struct ContactsView: View {
 
                 ScrollViewReader { proxy in
                     ZStack(alignment: .trailing) {
-                        List {
-                            if keyword.isEmpty {
-                                ForEach(funcs.indices, id: \.self) { i in
-                                    funcRow(funcs[i])
-                                        .listRowInsets(EdgeInsets())
-                                        .listRowSeparator(.hidden)
-                                        .listRowBackground(Color.clear)
-                                }
-                            }
-
-                            ForEach(sections) { section in
-                                ForEach(section.users) { user in
-                                    NavigationLink(value: user) {
-                                        contactRow(user)
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                if keyword.isEmpty {
+                                    VStack(spacing: 0) {
+                                        ForEach(funcs.indices, id: \.self) { i in
+                                            funcRow(funcs[i])
+                                            if i < funcs.count - 1 {
+                                                HairLine(inset: 16, trailingInset: 16)
+                                            }
+                                        }
                                     }
-                                    .buttonStyle(.plain)
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowSeparator(.hidden)
-                                    .listRowBackground(C.cardBg)
-                                    .id(user.id == section.users.first?.id ? "letter-\(section.letter)" : user.id)
+                                    .background(C.cardBg)
+
+                                    // 功能块和下面的好友列表之间留 8px 灰缝
+                                    Rectangle().fill(C.pageBg).frame(height: 8)
+                                }
+
+                                ForEach(sections) { section in
+                                    ForEach(section.users.indices, id: \.self) { i in
+                                        let user = section.users[i]
+                                        VStack(spacing: 0) {
+                                            // 组内每一行上面一条发丝线（从名字左边开始，和微信一样）
+                                            if i > 0 { HairLine(inset: 76) }
+                                            NavigationLink(value: user) {
+                                                contactRow(user)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        .background(C.cardBg)
+                                        .id(i == 0 ? "letter-\(section.letter)" : user.id)
+                                    }
                                 }
                             }
                         }
-                        .listStyle(.plain)
-                        .environment(\.defaultMinListRowHeight, 0)
-                        .scrollContentBackground(.hidden)
                         .background(C.cardBg)
                         .refreshable { await app.loadContacts() }
 
@@ -145,8 +153,6 @@ struct ContactsView: View {
                     .font(pf(17))
                     .foregroundColor(C.label)
                 Spacer(minLength: 0)
-                Chevron(size: 9, line: 1.6)
-                    .padding(.trailing, 3)
             }
             .padding(.horizontal, L.ctPadH)
             .frame(height: L.ctRowH)

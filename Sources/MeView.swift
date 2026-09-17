@@ -76,13 +76,16 @@ struct MeView: View {
     }
 
     private var rowLine: some View {
-        HairLine(inset: L.menuTextX)
+        HairLine()
     }
 
     /* ---------------------------------------------------------- 顶部资料卡 */
 
     private var profileTop: some View {
         VStack(spacing: 0) {
+            // 白色的顶：从状态栏最上面就开始铺白（和微信一样）
+            Spacer().frame(height: L.safeTop + 8)
+
             Button {
                 path.append("profile")
             } label: {
@@ -113,10 +116,9 @@ struct MeView: View {
                 .padding(.top, 2)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
-            .padding(.top, L.v(14, 4.4, 20))
             .padding(.leading, L.v(20, 6.4, 28))
             .padding(.trailing, L.v(14, 4, 18))
-            .padding(.bottom, L.v(6, 2, 10))
+            .padding(.bottom, 4)
             }
             .buttonStyle(.plain)
 
@@ -140,10 +142,9 @@ struct MeView: View {
             }
             .padding(.leading, L.v(92, 28, 113))
             .padding(.trailing, L.v(14, 4, 18))
-            .padding(.bottom, L.v(12, 3.6, 16))
+            .padding(.bottom, 22)
         }
         .background(C.cardBg)
-        .padding(.top, L.safeTop)
     }
 
     private func chip<Content: View>(@ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {

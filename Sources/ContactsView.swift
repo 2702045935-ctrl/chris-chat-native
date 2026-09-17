@@ -120,7 +120,10 @@ struct ContactsView: View {
                                     }
                                     showBubble(L)
                                 },
-                                onSearch: { focusSearch = true }
+                                onSearch: {
+                                    keyword = ""
+                                    searchFocused = true
+                                }
                             )
                             .padding(.trailing, 8)
                             .frame(maxHeight: .infinity, alignment: .center)

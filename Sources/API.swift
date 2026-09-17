@@ -113,6 +113,7 @@ private struct ContactsPayload: Decodable {
 private struct MePayload: Decodable { var user: User? }
 private struct LoginPayload: Decodable { var user: User? }
 private struct SessionPayload: Decodable { var authenticated: Bool?; var user: User? }
+private struct PhoneCodePayload: Decodable { var sent: Bool?; var devCode: String?; var nickname: String? }
 private struct MomentsPayload: Decodable {
     var moments: [Moment]
     var hasMore: Bool?
@@ -283,6 +284,22 @@ final class API {
     func login(username: String, password: String) async throws -> User {
         let payload: LoginPayload = try await post("/api/login",
                                                    ["username": username, "password": password],
+                                                   as: LoginPayload.self)
+        guard let user = payload.user else { throw APIError.message("登录失败") }
+        return user
+    }
+
+    /// 本地没接短信通道，服务器会直接把验证码给回来
+    func phoneCode(phone: String) async throws -> String? {
+        let payload: PhoneCodePayload = try await post("/api/login/phone-code",
+                                                       ["phone": phone],
+                                                       as: PhoneCodePayload.self)
+        return payload.devCode
+    }
+
+    func loginPhone(phone: String, code: String) async throws -> User {
+        let payload: LoginPayload = try await post("/api/login/phone",
+                                                   ["phone": phone, "code": code],
                                                    as: LoginPayload.self)
         guard let user = payload.user else { throw APIError.message("登录失败") }
         return user

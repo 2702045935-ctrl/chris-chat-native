@@ -6,97 +6,170 @@ struct ContactSection: Identifiable {
     let users: [User]
 }
 
-struct ContactRow: View {
-    let user: User
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Avatar(path: user.avatarPath, size: 40, radius: 4)
-            Text(user.name)
-                .font(.system(size: 17))
-                .foregroundColor(Brand.label)
-                .lineLimit(1)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .contentShape(Rectangle())
-    }
-}
-
 struct ContactsView: View {
     @EnvironmentObject var app: AppState
 
     @State private var keyword = ""
     @State private var path = NavigationPath()
 
+    private let funcs: [(String, String, Color, String)] = [
+        ("新的朋友", I.newFriends, Color(hex: 0xF0A75C), "newFriends"),
+        ("仅聊天的朋友", I.chatOnly, Color(hex: 0x9A9AA0), "chatOnly"),
+        ("标签", I.tag, Color(hex: 0x6D9ED6), "tags"),
+        ("服务号", I.service, Color(hex: 0x6D9ED6), "service"),
+        ("企业微信联系人", I.workMate, Color(hex: 0x4FA383), "work"),
+        ("我的企业", I.myWork, Color(hex: 0x4FA383), "myWork")
+    ]
+
     private var filtered: [User] {
-        guard !keyword.isEmpty else { return app.contacts }
-        return app.contacts.filter { $0.name.contains(keyword) || ($0.username ?? "").contains(keyword) }
+        let sorted = app.contacts.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+        guard !keyword.isEmpty else { return sorted }
+        return sorted.filter { $0.name.contains(keyword) || ($0.username ?? "").contains(keyword) }
     }
 
     private var sections: [ContactSection] {
-        var buckets: [String: [User]] = [:]
-        for user in filtered {
-            buckets[pinyinInitial(user.name), default: []].append(user)
+        var order: [String] = []
+        var map: [String: [User]] = [:]
+        for u in filtered {
+            let k = pinyinInitial(u.name)
+            if map[k] == nil { order.append(k) }
+            map[k, default: []].append(u)
         }
-        return buckets.keys.sorted { a, b in
+        return order.sorted { a, b in
             if a == "#" { return false }
             if b == "#" { return true }
             return a < b
-        }.map { key in
-            ContactSection(letter: key, users: (buckets[key] ?? []).sorted { $0.name < $1.name })
-        }
+        }.map { ContactSection(letter: $0, users: map[$0] ?? []) }
     }
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 8) {
-                SearchBar(text: $keyword)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
+            VStack(spacing: 0) {
+                NavBar(title: "通讯录") {
+                    Button {
+                        app.show("加好友排在下一批")
+                    } label: {
+                        Text("＋")
+                            .font(.system(size: 19))
+                            .foregroundColor(C.label)
+                            .frame(width: 44, height: L.navH)
+                    }
+                    .buttonStyle(.plain)
+                }
 
-                List {
-                    ForEach(sections) { section in
-                        Section {
-                            ForEach(section.users) { user in
-                                NavigationLink(value: user) {
-                                    ContactRow(user: user)
+                SearchBoxLeft(text: $keyword)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(C.pageBg)
+
+                ScrollViewReader { proxy in
+                    ZStack(alignment: .trailing) {
+                        List {
+                            if keyword.isEmpty {
+                                ForEach(funcs.indices, id: \.self) { i in
+                                    funcRow(funcs[i])
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                        .listRowBackground(Color.clear)
                                 }
-                                .buttonStyle(.plain)
-                                .listRowInsets(EdgeInsets())
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Brand.cellBg)
                             }
-                        } header: {
-                            Text(section.letter)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(Brand.subLabel)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 4)
-                                .background(Brand.pageBg)
+
+                            ForEach(sections) { section in
+                                ForEach(section.users) { user in
+                                    NavigationLink(value: user) {
+                                        contactRow(user)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(C.cardBg)
+                                    .id(user.id == section.users.first?.id ? "letter-\(section.letter)" : user.id)
+                                }
+                            }
+                        }
+                        .listStyle(.plain)
+                        .environment(\.defaultMinListRowHeight, 0)
+                        .scrollContentBackground(.hidden)
+                        .background(C.cardBg)
+                        .refreshable { await app.loadContacts() }
+
+                        if keyword.isEmpty && !sections.isEmpty {
+                            indexBar(proxy)
                         }
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(Brand.cellBg)
-                .refreshable { await app.loadContacts() }
             }
-            .background(Brand.cellBg)
-            .navigationTitle("通讯录")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+            .background(C.navBg.ignoresSafeArea(edges: .top))
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: User.self) { user in
-                ContactCardView(user: user) { chat in
-                    path.append(chat)
-                }
+                ContactCardView(user: user) { chat in path.append(chat) }
             }
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
             }
         }
         .task { await app.loadContacts() }
+    }
+
+    /* ---------------------------------------------------------- 顶部功能行 */
+
+    private func funcRow(_ item: (String, String, Color, String)) -> some View {
+        Button {
+            app.show(item.0 + " 排在下一批")
+        } label: {
+            HStack(spacing: L.ctGap) {
+                FuncIcon(markup: item.1, bg: item.2, size: L.avatar)
+                Text(item.0)
+                    .font(.system(size: 17))
+                    .foregroundColor(C.label)
+                Spacer(minLength: 0)
+                Chevron(size: 9, line: 1.6)
+                    .padding(.trailing, 3)
+            }
+            .padding(.horizontal, L.ctPadH)
+            .frame(height: L.ctRowH)
+            .background(C.cardBg)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuPressStyle())
+    }
+
+    private func contactRow(_ user: User) -> some View {
+        HStack(spacing: L.ctGap) {
+            Avatar(path: user.avatarPath, size: L.avatar, radius: 8)
+            Text(user.name)
+                .font(.system(size: 17))
+                .foregroundColor(C.label)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, L.ctPadH)
+        .frame(height: L.ctRowH)
+        .contentShape(Rectangle())
+    }
+
+    /* ---------------------------------------------------------- 右侧 A-Z */
+
+    private func indexBar(_ proxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 1) {
+            SVGIcon(markup: I.searchRow, size: 13, color: C.arrow)
+                .padding(.bottom, 3)
+            ForEach(sections) { section in
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        proxy.scrollTo("letter-\(section.letter)", anchor: .top)
+                    }
+                } label: {
+                    Text(section.letter)
+                        .font(.system(size: 12.5))
+                        .foregroundColor(C.arrow)
+                        .frame(width: 22, height: 14)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.trailing, 2)
     }
 }
 
@@ -110,84 +183,80 @@ struct ContactCardView: View {
     @State private var busy = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                VStack(spacing: 10) {
-                    Avatar(path: user.avatarPath, size: 64, radius: 8)
-                    HStack(spacing: 6) {
-                        Text(user.name)
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(Brand.label)
-                        if user.gender == "male" {
-                            Image(systemName: "mustache.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(Color(hex: 0x10AEFF))
-                        } else if user.gender == "female" {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(Color(hex: 0xFA6E9A))
+        VStack(spacing: 0) {
+            NavBar(title: "", back: nil) {
+                EmptyView()
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 10) {
+                        Avatar(path: user.avatarPath, size: 64, radius: 8)
+                        HStack(spacing: 6) {
+                            Text(user.name)
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(C.label)
+                            if user.gender == "male" {
+                                Circle().fill(Color(hex: 0x10AEFF)).frame(width: 14, height: 14)
+                                    .overlay(Image(systemName: "person.fill").font(.system(size: 8)).foregroundColor(.white))
+                            } else if user.gender == "female" {
+                                Circle().fill(Color(hex: 0xFA6E9A)).frame(width: 14, height: 14)
+                                    .overlay(Image(systemName: "person.fill").font(.system(size: 8)).foregroundColor(.white))
+                            }
+                        }
+                        if let bio = user.bio, !bio.isEmpty {
+                            Text(bio).font(.system(size: 14)).foregroundColor(C.subLabel)
                         }
                     }
-                    if let bio = user.bio, !bio.isEmpty {
-                        Text(bio)
-                            .font(.system(size: 14))
-                            .foregroundColor(Brand.subLabel)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 26)
-                .background(Brand.cellBg)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 26)
+                    .background(C.cardBg)
 
-                GroupCard {
-                    row("微信号", user.username ?? "-")
-                    HairLine(inset: 16)
-                    row("地区", (user.region?.isEmpty == false) ? user.region! : "未设置")
-                    if let phone = user.phone, !phone.isEmpty {
+                    Spacer().frame(height: 8)
+
+                    GroupCard {
+                        infoRow("微信号", user.username ?? "-")
                         HairLine(inset: 16)
-                        row("电话", phone)
+                        infoRow("地区", (user.region?.isEmpty == false) ? user.region! : "未设置")
+                        if let phone = user.phone, !phone.isEmpty {
+                            HairLine(inset: 16)
+                            infoRow("电话", phone)
+                        }
                     }
-                }
 
-                Button {
-                    openChat()
-                } label: {
-                    Text(busy ? "打开中…" : "发消息")
-                        .font(.system(size: 17))
-                        .foregroundColor(Brand.green)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Brand.cellBg))
-                }
-                .disabled(busy)
-                .padding(.horizontal, 16)
+                    Spacer().frame(height: 8)
 
-                Spacer().frame(height: 30)
+                    Button {
+                        openChat()
+                    } label: {
+                        Text(busy ? "打开中…" : "发消息")
+                            .font(.system(size: 17))
+                            .foregroundColor(C.green)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(C.cardBg)
+                    }
+                    .disabled(busy)
+
+                    Spacer().frame(height: 30)
+                }
             }
+            .background(C.pageBg)
         }
-        .background(Brand.pageBg)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
     }
 
-    private func row(_ title: String, _ value: String) -> some View {
+    private func infoRow(_ title: String, _ value: String) -> some View {
         HStack {
-            Text(title)
-                .font(.system(size: 16))
-                .foregroundColor(Brand.label)
+            Text(title).font(.system(size: 16)).foregroundColor(C.label)
             Spacer()
-            Text(value)
-                .font(.system(size: 16))
-                .foregroundColor(Brand.subLabel)
+            Text(value).font(.system(size: 16)).foregroundColor(C.subLabel)
         }
         .padding(.horizontal, 16)
         .frame(height: 48)
     }
 
     private func openChat() {
-        if user.id == app.me?.id, let first = app.chats.first(where: { $0.title == user.name }) {
-            onOpenChat(first)
-            return
-        }
         busy = true
         Task {
             if let chat = try? await API.shared.openDirect(userId: user.id) {
@@ -199,4 +268,3 @@ struct ContactCardView: View {
         }
     }
 }
-

@@ -4,35 +4,36 @@ struct ChatRow: View {
     let chat: Chat
 
     var body: some View {
-        HStack(spacing: 12) {
-            Avatar(path: chat.avatar ?? "", size: 48, radius: 5)
+        HStack(alignment: .top, spacing: L.rowGap) {
+            Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 6)
                 .overlay(alignment: .topTrailing) {
-                    UnreadBadge(count: chat.unreadCount).offset(x: 6, y: -6)
+                    UnreadBadge(count: chat.unreadCount)
+                        .offset(x: 12, y: -8)
                 }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(chat.name)
-                    .font(.system(size: 17))
-                    .foregroundColor(Brand.label)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(C.name)
                     .lineLimit(1)
                 Text(chat.lastMessage?.preview ?? "")
                     .font(.system(size: 14))
-                    .foregroundColor(Brand.subLabel)
+                    .foregroundColor(C.preview)
                     .lineLimit(1)
+                    .padding(.top, 3)
             }
 
             Spacer(minLength: 6)
 
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
-                    .font(.system(size: 12))
-                    .foregroundColor(Brand.timeLabel)
-                Spacer(minLength: 0)
-            }
-            .frame(height: 46)
+            Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
+                .font(.system(size: 12))
+                .foregroundColor(C.time)
+                .padding(.top, 2)
+                .fixedSize()
         }
-        .padding(.horizontal, 16)
-        .frame(height: 72)
+        .padding(.leading, L.rowPadL)
+        .padding(.trailing, L.rowPadR)
+        .frame(height: L.rowH)
         .contentShape(Rectangle())
     }
 }
@@ -43,6 +44,7 @@ struct ChatsView: View {
     @State private var keyword = ""
     @State private var confirmHide: Chat?
     @State private var confirmDelete: Chat?
+    @State private var path = NavigationPath()
 
     private var list: [Chat] {
         guard !keyword.isEmpty else { return app.chats }
@@ -52,11 +54,23 @@ struct ChatsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 8) {
-                SearchBar(text: $keyword)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
+        NavigationStack(path: $path) {
+            VStack(spacing: 0) {
+                NavBar(title: "微信") {
+                    Button {
+                        app.show("发起群聊 / 加好友排在下一批")
+                    } label: {
+                        SVGIcon(markup: I.plusRing, size: 30, color: C.ringInk)
+                            .padding(.leading, 2)
+                            .padding(.trailing, 7)
+                            .frame(height: L.navH)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                SearchBoxCenter(text: $keyword)
+                    .padding(L.searchPad)
+                    .background(C.pageBg)
 
                 if app.chats.isEmpty {
                     emptyView
@@ -69,51 +83,41 @@ struct ChatsView: View {
                             .buttonStyle(.plain)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
-                            .listRowBackground(chat.pinned == true
-                                               ? Color.dyn(0xF2F2F2, 0x2C2C2E)
-                                               : Brand.cellBg)
+                            .listRowBackground(chat.pinned == true ? C.pinnedBg : C.chatRowBg)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     confirmDelete = chat
                                 } label: {
                                     Text("删除")
                                 }
-                                .tint(Brand.red)
+                                .tint(C.red)
 
                                 Button {
                                     confirmHide = chat
                                 } label: {
                                     Text("不显示")
                                 }
-                                .tint(Brand.orange)
+                                .tint(C.orange)
 
                                 Button {
                                     markUnread(chat)
                                 } label: {
                                     Text("标为未读")
                                 }
-                                .tint(Brand.green)
+                                .tint(C.green)
                             }
                         }
                     }
                     .listStyle(.plain)
+                    .environment(\.defaultMinListRowHeight, 0)
                     .scrollContentBackground(.hidden)
-                    .background(Brand.cellBg)
+                    .background(C.chatRowBg)
                     .refreshable { await app.loadChats() }
                 }
             }
-            .background(Brand.cellBg)
-            .navigationTitle("微信")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        app.show("发起群聊 / 加好友排在下一批")
-                    } label: {
-                        Image(systemName: "plus").font(.system(size: 17))
-                    }
-                }
-            }
+            .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+            .background(C.navBg.ignoresSafeArea(edges: .top))
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
             }
@@ -148,21 +152,18 @@ struct ChatsView: View {
     private var emptyView: some View {
         VStack(spacing: 10) {
             Spacer()
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 34))
-                .foregroundColor(Brand.subLabel)
             Text(app.loadError ?? "正在加载会话…")
                 .font(.system(size: 14))
-                .foregroundColor(Brand.subLabel)
+                .foregroundColor(C.subLabel)
             if app.loadError != nil {
                 Button("重试") { Task { await app.loadChats() } }
                     .font(.system(size: 15))
-                    .foregroundColor(Brand.green)
+                    .foregroundColor(C.green)
             }
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .background(Brand.cellBg)
+        .background(C.chatRowBg)
     }
 
     private func markUnread(_ chat: Chat) {
@@ -189,4 +190,3 @@ struct ChatsView: View {
         }
     }
 }
-

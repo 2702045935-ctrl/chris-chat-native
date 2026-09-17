@@ -1,5 +1,28 @@
 import SwiftUI
 
+/// 微信气泡：圆角 6 + 左上/右上那个 5px 小尖角
+struct BubbleShape: Shape {
+    let mine: Bool
+    var radius: CGFloat = 6
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path(roundedRect: rect, cornerRadius: radius)
+        var t = Path()
+        if mine {
+            t.move(to: CGPoint(x: rect.maxX + 4, y: rect.minY + 11))
+            t.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + 16))
+            t.addLine(to: CGPoint(x: rect.maxX + 4, y: rect.minY + 21))
+        } else {
+            t.move(to: CGPoint(x: rect.minX - 4, y: rect.minY + 11))
+            t.addLine(to: CGPoint(x: rect.minX, y: rect.minY + 16))
+            t.addLine(to: CGPoint(x: rect.minX - 4, y: rect.minY + 21))
+        }
+        t.closeSubpath()
+        p.addPath(t)
+        return p
+    }
+}
+
 struct ChatDetailView: View {
     let chat: Chat
 
@@ -21,40 +44,31 @@ struct ChatDetailView: View {
 
     var body: some View {
         ZStack {
-            Brand.pageBg.ignoresSafeArea()
+            C.pageBg.ignoresSafeArea()
             if !backgroundPath.isEmpty {
                 RemoteImage(path: backgroundPath).ignoresSafeArea()
             }
 
             VStack(spacing: 0) {
+                NavBar(title: chat.name, back: { dismiss() }) {
+                    Button {
+                        app.show("聊天设置排在下一批")
+                    } label: {
+                        Text("⋯")
+                            .font(.system(size: 22))
+                            .foregroundColor(C.label)
+                            .frame(width: 44, height: L.navH)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 messageList
-                inputBar
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
+        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                }
-            }
-            ToolbarItem(placement: .principal) {
-                Text(chat.name)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(Brand.label)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    app.show("聊天设置排在下一批")
-                } label: {
-                    Image(systemName: "ellipsis").font(.system(size: 17))
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .task(id: chat.id) {
             await load(initial: true)
             await API.shared.markRead(chatId: chat.id)
@@ -72,32 +86,30 @@ struct ChatDetailView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 14) {
-                    if loading && messages.isEmpty {
-                        ProgressView().padding(.top, 40)
-                    }
+                LazyVStack(spacing: 0) {
                     ForEach(messages) { message in
-                        VStack(spacing: 14) {
+                        VStack(spacing: 0) {
                             if showTime(for: message) {
                                 Text(TimeFmt.bubble(message.createdAt))
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Color.dyn(0xC0C0C0, 0x8E8E93))
+                                    .font(.system(size: 14))
+                                    .foregroundColor(C.msgTime)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 16)
                             }
-                            MessageRow(message: message,
-                                       mine: message.senderId == myId,
-                                       avatar: avatarPath(message),
-                                       name: displayName(message))
+                            MessageRow(message: message, mine: message.senderId == myId)
+                                .padding(.bottom, 15)
                         }
                         .id(message.id)
                     }
+                    if loading && messages.isEmpty {
+                        ProgressView().padding(.top, 40)
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 14)
+                .padding(L.msgPad)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.count) { _ in
-                scrollToEnd(proxy, animated: true)
-            }
+            .onChange(of: messages.count) { _ in scrollToEnd(proxy, animated: true) }
             .onAppear { scrollToEnd(proxy, animated: false) }
         }
     }
@@ -117,70 +129,81 @@ struct ChatDetailView: View {
         return TimeFmt.minutesBetween(messages[index - 1].createdAt, message.createdAt) >= 5
     }
 
-    private func avatarPath(_ message: Message) -> String {
+    private func senderPath(_ message: Message) -> String {
         if let p = message.senderAvatar, !p.isEmpty { return p }
         return app.contact(for: message.senderId ?? "")?.avatarPath ?? ""
     }
 
-    private func displayName(_ message: Message) -> String {
-        if let n = message.senderName, !n.isEmpty { return n }
-        return app.contact(for: message.senderId ?? "")?.name ?? ""
-    }
-
     /* ---------------------------------------------------------- 输入栏 */
 
-    private var inputBar: some View {
-        HStack(spacing: 8) {
+    private var composer: some View {
+        HStack(spacing: 6) {
             Button {
                 app.show("发语音排在下一批")
             } label: {
-                Image(systemName: "mic")
-                    .font(.system(size: 19))
-                    .foregroundColor(Brand.label)
-                    .frame(width: 30, height: 30)
+                SVGIcon(markup: I.voice, size: L.composerIcon, color: C.iconGray)
+                    .frame(width: L.composerIconBox, height: L.composerIconBox)
             }
+            .buttonStyle(.plain)
 
-            TextField("", text: $input)
-                .focused($focused)
-                .font(.system(size: 16))
-                .foregroundColor(Brand.label)
-                .padding(.horizontal, 10)
-                .frame(height: 36)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Brand.cellBg))
-
-            Button {
-                app.show("表情面板排在下一批")
-            } label: {
-                Image(systemName: "face.smiling")
-                    .font(.system(size: 22))
-                    .foregroundColor(Brand.label)
+            HStack(spacing: 0) {
+                TextField("", text: $input)
+                    .focused($focused)
+                    .font(.system(size: 17))
+                    .foregroundColor(C.label)
+                SVGIcon(markup: I.speaker, size: 22, color: C.iconGray)
+                    .padding(.leading, 6)
             }
+            .padding(.horizontal, 8)
+            .frame(height: L.inputH)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x2C2C2E)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.dyn(0xE8E8E8, 0x3A3A3C), lineWidth: 0.5)
+            )
 
             if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button {
+                    app.show("表情 / 图片 / 转账面板排在下一批")
+                } label: {
+                    SVGIcon(markup: I.smile, size: L.composerIcon, color: C.iconGray)
+                        .frame(width: L.composerIconBox, height: L.composerIconBox)
+                }
+                .buttonStyle(.plain)
+
+                Button {
                     app.show("图片 / 转账 / 位置面板排在下一批")
                 } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 22))
-                        .foregroundColor(Brand.label)
+                    SVGIcon(markup: I.plusCircle, size: L.composerIcon, color: C.iconGray)
+                        .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
+                .buttonStyle(.plain)
             } else {
                 Button {
                     send()
                 } label: {
                     Text("发送")
-                        .font(.system(size: 16))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .padding(.horizontal, 13)
                         .frame(height: 32)
-                        .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Brand.green))
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.green))
                 }
+                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Brand.barBg)
-        .overlay(alignment: .top) { HairLine() }
+        .padding(.leading, 10)
+        .padding(.trailing, 11)
+        .padding(.vertical, 8)
+        .background(
+            ZStack {
+                C.tabBg.ignoresSafeArea(edges: .bottom)
+                VStack(spacing: 0) {
+                    Rectangle().fill(C.navLine).frame(height: 0.5)
+                    Spacer()
+                }
+            }
+        )
     }
 
     /* ---------------------------------------------------------- 数据 */
@@ -221,32 +244,39 @@ struct ChatDetailView: View {
 struct MessageRow: View {
     let message: Message
     let mine: Bool
-    let avatar: String
-    let name: String
+
+    @EnvironmentObject var app: AppState
+
+    private var avatarPath: String {
+        if let p = message.senderAvatar, !p.isEmpty { return p }
+        return app.contact(for: message.senderId ?? "")?.avatarPath ?? ""
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            if mine { Spacer(minLength: 56) }
+        HStack(alignment: .top, spacing: 0) {
+            if mine { Spacer(minLength: 60) }
 
             if !mine {
-                Avatar(path: avatar, size: 40, radius: 4)
+                Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
+                Spacer().frame(width: 9)
             }
 
             if message.isRecalled {
-                Text(mine ? "你撤回了一条消息" : "\(name)撤回了一条消息")
+                Text(mine ? "你撤回了一条消息" : "对方撤回了一条消息")
                     .font(.system(size: 12))
-                    .foregroundColor(Color.dyn(0xB0B0B0, 0x8E8E93))
+                    .foregroundColor(C.msgTime)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.dyn(0xF0F0F0, 0x2C2C2E)))
+                    .background(RoundedRectangle(cornerRadius: 5).fill(C.bubbleOther))
             } else {
                 bubble
             }
 
-            if !mine { Spacer(minLength: 56) }
+            if !mine { Spacer(minLength: 60) }
 
             if mine {
-                Avatar(path: avatar, size: 40, radius: 4)
+                Spacer().frame(width: 9)
+                Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
             }
         }
     }
@@ -257,50 +287,48 @@ struct MessageRow: View {
         case "image":
             RemoteImage(path: message.body, icon: "photo")
                 .frame(width: 140, height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         case "audio":
-            card(icon: "mic.fill", title: "语音", detail: "点击播放")
+            card(icon: I.speaker, title: "语音", detail: "点击播放")
         case "transfer":
-            card(icon: "yensign.circle.fill", title: "转账", detail: message.body)
+            card(icon: I.wallet, title: "转账", detail: message.body)
         case "gift":
-            card(icon: "gift.fill", title: "礼物", detail: message.body)
+            card(icon: I.star, title: "礼物", detail: message.body)
         case "location":
-            card(icon: "location.fill", title: "位置", detail: message.body)
+            card(icon: I.nearby, title: "位置", detail: message.body)
         default:
             Text(message.body)
-                .font(.system(size: 16))
-                .foregroundColor(Color.dyn(0x000000, 0xEDEDED))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .font(.system(size: 17))
+                .foregroundColor(C.bubbleText)
+                .padding(.horizontal, L.bubblePadH)
+                .padding(.vertical, L.bubblePadV)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(mine ? Brand.bubbleMine : Brand.bubbleOther)
+                    BubbleShape(mine: mine)
+                        .fill(mine ? C.bubbleMine : C.bubbleOther)
                 )
         }
     }
 
     private func card(icon: String, title: String, detail: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(mine ? Color.dyn(0x2E7D32, 0xFFFFFF) : Brand.green)
+            SVGIcon(markup: icon, size: 20, color: mine ? C.bubbleText : C.green)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color.dyn(0x181818, 0xEDEDED))
+                    .foregroundColor(C.bubbleText)
                 if !detail.isEmpty {
                     Text(detail)
                         .font(.system(size: 12))
-                        .foregroundColor(Brand.subLabel)
+                        .foregroundColor(C.subLabel)
                         .lineLimit(2)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, L.bubblePadH)
+        .padding(.vertical, L.bubblePadV)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(mine ? Brand.bubbleMine : Brand.bubbleOther)
+            BubbleShape(mine: mine)
+                .fill(mine ? C.bubbleMine : C.bubbleOther)
         )
     }
 }

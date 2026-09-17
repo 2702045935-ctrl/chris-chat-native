@@ -161,7 +161,8 @@ struct ChatDetailView: View {
                             MessageRow(message: message,
                                        mine: message.senderId == myId,
                                        senderName: (!isGroup || message.senderId == myId)
-                                           ? "" : displayName(message))
+                                           ? "" : displayName(message),
+                                       onTapTransfer: { info in billInfo = info })
                                 .padding(.bottom, 15)
                                 .contextMenu {
                                     if message.senderId == myId {
@@ -463,6 +464,8 @@ struct MessageRow: View {
     let message: Message
     let mine: Bool
     var senderName: String = ""
+    /// 点转账卡片 → 打开账单详情
+    var onTapTransfer: ((TransferInfo) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
 
@@ -527,7 +530,7 @@ struct MessageRow: View {
         case "transfer":
             transferBubble
                 .onTapGesture {
-                    if let info = TransferInfo(json: message.body) { billInfo = info }
+                    if let info = TransferInfo(json: message.body) { onTapTransfer?(info) }
                 }
 
         case "gift":

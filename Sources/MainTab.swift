@@ -147,9 +147,25 @@ extension NavBar where Right == EmptyView {
 /// 微信页：纯白、圆角 5、没输入时「放大镜 + 搜索」整组居中（和手机微信一样）
 struct SearchBoxCenter: View {
     @Binding var text: String
-    @FocusState private var focused: Bool
+    var externalFocus: FocusState<Bool>.Binding? = nil
+    @FocusState private var localFocus: Bool
+
+    private var focused: Bool { externalFocus?.wrappedValue ?? localFocus }
 
     private var centered: Bool { text.isEmpty && !focused }
+
+    @ViewBuilder
+    private var field: some View {
+        let tf = TextField("", text: $text)
+            .font(pf(16))
+            .foregroundColor(C.label)
+            .multilineTextAlignment(centered ? .center : .leading)
+        if let externalFocus = externalFocus {
+            tf.focused(externalFocus)
+        } else {
+            tf.focused($localFocus)
+        }
+    }
 
     var body: some View {
         HStack(spacing: centered ? 3 : 5) {
@@ -161,11 +177,7 @@ struct SearchBoxCenter: View {
                         .font(pf(16))
                         .foregroundColor(C.searchIcon)
                 }
-                TextField("", text: $text)
-                    .focused($focused)
-                    .font(pf(16))
-                    .foregroundColor(C.label)
-                    .multilineTextAlignment(centered ? .center : .leading)
+                field
             }
             .frame(maxWidth: centered ? 46 : .infinity)
         }

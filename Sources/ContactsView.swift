@@ -11,6 +11,9 @@ struct ContactsView: View {
 
     @State private var keyword = ""
     @State private var path = NavigationPath()
+    @State private var bubble: String?
+    @State private var bubbleTask: Task<Void, Never>?
+    @FocusState private var searchFocused: Bool
 
     private let funcs: [(String, String, Color, String)] = [
         ("新的朋友", I.newFriends, Color(hex: 0xF0A75C), "newFriends"),
@@ -57,7 +60,7 @@ struct ContactsView: View {
                     .buttonStyle(.plain)
                 }
 
-                SearchBoxCenter(text: $keyword)
+                SearchBoxCenter(text: $keyword, externalFocus: $searchFocused)
                     .padding(L.searchPad)
                     .background(C.pageBg)
 
@@ -109,7 +112,24 @@ struct ContactsView: View {
                         .refreshable { await app.loadContacts() }
 
                         if keyword.isEmpty && !sections.isEmpty {
-                            indexBar(proxy)
+                            ContactIndexBar(
+                                available: Set(sections.map { $0.letter }),
+                                onPick: { L in
+                                    withAnimation(.easeOut(duration: 0.12)) {
+                                        proxy.scrollTo("letter-\(L)", anchor: .top)
+                                    }
+                                    showBubble(L)
+                                },
+                                onSearch: { focusSearch = true }
+                            )
+                            .padding(.trailing, 8)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                        }
+
+                        if let b = bubble {
+                            LetterBubble(letter: b)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                                .offset(y: -56)
                         }
                     }
                 }
@@ -139,6 +159,15 @@ struct ContactsView: View {
             }
         }
         .task { await app.loadContacts() }
+    }
+
+    private func showBubble(_ letter: String) {
+        bubble = letter
+        bubbleTask?.cancel()
+        bubbleTask = Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            if !Task.isCancelled { bubble = nil }
+        }
     }
 
     /* ---------------------------------------------------------- 顶部功能行 */

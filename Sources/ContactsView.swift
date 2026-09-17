@@ -103,10 +103,20 @@ struct ContactsView: View {
             .background(C.navBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: User.self) { user in
-                ContactCardView(user: user) { chat in path.append(chat) }
+                ContactCardView(user: user,
+                                onOpenChat: { chat in path.append(chat) },
+                                onOpenMoments: { id in path.append("moments:" + id) })
             }
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
+            }
+            .navigationDestination(for: String.self) { key in
+                if key.hasPrefix("moments:") {
+                    let uid = String(key.dropFirst(8))
+                    MomentsView(target: app.contacts.first { $0.id == uid })
+                } else {
+                    ComingSoonView(title: key)
+                }
             }
         }
         .task { await app.loadContacts() }
@@ -178,9 +188,11 @@ struct ContactsView: View {
 struct ContactCardView: View {
     let user: User
     var onOpenChat: (Chat) -> Void
+    var onOpenMoments: (String) -> Void
 
     @EnvironmentObject var app: AppState
     @State private var busy = false
+    @State private var thumbs: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -221,6 +233,29 @@ struct ContactCardView: View {
                             HairLine(inset: 16)
                             infoRow("电话", phone)
                         }
+                        if !thumbs.isEmpty {
+                            HairLine(inset: 16)
+                            Button {
+                                onOpenMoments(user.id)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text("朋友圈").font(.system(size: 16)).foregroundColor(C.label)
+                                    Spacer()
+                                    HStack(spacing: 4) {
+                                        ForEach(thumbs.prefix(4), id: \.self) { p in
+                                            RemoteImage(path: p)
+                                                .frame(width: 44, height: 44)
+                                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                        }
+                                    }
+                                    Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 64)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
 
                     Spacer().frame(height: 8)
@@ -244,6 +279,11 @@ struct ContactCardView: View {
         }
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
+        .task {
+            if let list = try? await API.shared.moments(userId: user.id) {
+                thumbs = list.flatMap { $0.images ?? [] }
+            }
+        }
     }
 
     private func infoRow(_ title: String, _ value: String) -> some View {

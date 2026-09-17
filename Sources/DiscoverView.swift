@@ -141,10 +141,26 @@ struct MomentsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 
+    var target: User? = nil
+
     @State private var offset: CGFloat = 0
+    @State private var moments: [Moment] = []
+    @State private var cameraMenu = false
+    @State private var showPhoto = false
+    @State private var showCamera = false
+    @State private var showCoverPhoto = false
+    @State private var composerPick = false
+    @State private var posting = false
+    @State private var draft = ""
+    @State private var picked: [UIImage] = []
+    @State private var uploading = false
+    @State private var commenting: Moment?
+    @State private var commentText = ""
+    @State private var actionMoment: Moment?
 
     private var solid: Bool { offset < -(L.coverH - L.navH - 50) }
-    private var cover: String { app.me?.momentCover ?? "" }
+    private var owner: User? { target ?? app.me }
+    private var cover: String { owner?.momentCover ?? "" }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -169,7 +185,57 @@ struct MomentsView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .task { await app.loadMoments() }
+        .task { await reload() }
+        .confirmationDialog("发表", isPresented: $cameraMenu, titleVisibility: .visible) {
+            Button("拍摄") { showCamera = true }
+            Button("从相册选择") { showPhoto = true }
+            if target == nil { Button("换封面") { showCoverPhoto = true } }
+            Button("取消", role: .cancel) { }
+        }
+        .sheet(isPresented: $showPhoto) {
+            PhotoPicker { image in
+                picked = [image]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { posting = true }
+            }
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPicker { image in
+                picked = [image]
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { posting = true }
+            }
+        }
+        .sheet(isPresented: $showCoverPhoto) {
+            PhotoPicker { image in changeCover(image) }
+        }
+        .sheet(isPresented: $posting) { publishSheet }
+        .alert("评论", isPresented: Binding(
+            get: { commenting != nil },
+            set: { if !$0 { commenting = nil } }
+        )) {
+            TextField("说点什么", text: $commentText)
+            Button("发送") { submitComment() }
+            Button("取消", role: .cancel) { commenting = nil }
+        }
+        .confirmationDialog("这条动态", isPresented: Binding(
+            get: { actionMoment != nil },
+            set: { if !$0 { actionMoment = nil } }
+        ), titleVisibility: .visible) {
+            if let m = actionMoment {
+                if m.likedByMe == true {
+                    Button("取消赞") { like(m) }
+                } else {
+                    Button("赞") { like(m) }
+                }
+                Button("评论") {
+                    commentText = ""
+                    commenting = m
+                }
+                if m.mine == true {
+                    Button("删除", role: .destructive) { remove(m) }
+                }
+            }
+            Button("取消", role: .cancel) { actionMoment = nil }
+        }
     }
 
     /* ---------------------------------------------------------- 封面 */
@@ -210,14 +276,16 @@ struct MomentsView: View {
 
     private var momentList: some View {
         VStack(spacing: 0) {
-            if app.moments.isEmpty {
+            if moments.isEmpty {
                 Text("正在加载朋友圈…")
                     .font(.system(size: 14))
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 40)
             }
-            ForEach(app.moments) { moment in
-                MomentRow(moment: moment)
+            ForEach(moments) { moment in
+                MomentRow(moment: moment) {
+                    actionMoment = moment
+                }
             }
         }
         .padding(.top, 60)
@@ -252,7 +320,7 @@ struct MomentsView: View {
 
             Spacer()
 
-            Button { app.show("发表 / 换封面排在下一批") } label: {
+            Button { cameraMenu = true } label: {
                 SVGIcon(markup: I.camera, size: 26, color: .white)
                     .frame(width: 36, height: 36)
                     .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
@@ -273,10 +341,132 @@ struct MomentsView: View {
             .ignoresSafeArea(edges: .top)
         )
     }
+
+    /* ---------------------------------------------------------- 发表 / 评论 / 点赞 */
+
+    private var publishSheet: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 12) {
+                TextEditor(text: $draft)
+                    .frame(minHeight: 110)
+                    .font(.system(size: 17))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.gray.opacity(0.2))
+                    )
+                if !picked.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(picked.indices, id: \.self) { i in
+                            Image(uiImage: picked[i])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 74, height: 74)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        Spacer()
+                    }
+                }
+                Button {
+                    composerPick = true
+                } label: {
+                    Label("添加图片", systemImage: "photo.on.rectangle")
+                        .font(.system(size: 15))
+                }
+                Spacer()
+            }
+            .padding(16)
+            .navigationTitle("发表")
+            .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $composerPick) {
+                PhotoPicker { image in picked.append(image) }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { posting = false }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("发表") { publish() }
+                        .disabled(uploading || (draft.isEmpty && picked.isEmpty))
+                }
+            }
+        }
+    }
+
+    private func reload() async {
+        if let list = try? await API.shared.moments(userId: target?.id) {
+            moments = list
+        } else {
+            moments = app.moments
+        }
+    }
+
+    private func publish() {
+        uploading = true
+        Task {
+            var urls: [String] = []
+            for image in picked {
+                if let url = try? await API.shared.upload(image: image) { urls.append(url) }
+            }
+            do {
+                try await API.shared.postMoment(content: draft, images: urls)
+                app.show("已发表")
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "发表失败")
+            }
+            draft = ""
+            picked = []
+            uploading = false
+            posting = false
+            await reload()
+            await app.loadMoments()
+        }
+    }
+
+    private func changeCover(_ image: UIImage) {
+        Task {
+            uploading = true
+            if let url = try? await API.shared.upload(image: image) {
+                await API.shared.updateMe(["momentCover": url])
+                if let me = try? await API.shared.me() {
+                    app.me = me
+                }
+                app.show("封面换好了")
+            }
+            uploading = false
+        }
+    }
+
+    private func like(_ moment: Moment) {
+        Task {
+            await API.shared.likeMoment(id: moment.id)
+            await reload()
+        }
+    }
+
+    private func submitComment() {
+        guard let moment = commenting else { return }
+        let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        commenting = nil
+        if text.isEmpty { return }
+        Task {
+            await API.shared.commentMoment(id: moment.id, text: text)
+            await reload()
+        }
+    }
+
+    private func remove(_ moment: Moment) {
+        Task {
+            await API.shared.deleteMoment(id: moment.id)
+            await reload()
+            await app.loadMoments()
+            app.show("已删除")
+        }
+    }
 }
 
 struct MomentRow: View {
     let moment: Moment
+    var onMore: (() -> Void)? = nil
 
     private var images: [String] { moment.images ?? [] }
     private var cols: Int {
@@ -316,15 +506,20 @@ struct MomentRow: View {
 
                     Spacer()
 
-                    HStack(spacing: 2.6) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Circle()
-                                .fill((moment.likedByMe == true) ? Color(hex: 0xFF6B6B) : Color.dyn(0x7F7F7F, 0xD8D8D8))
-                                .frame(width: 3.4, height: 3.4)
+                    Button {
+                        onMore?()
+                    } label: {
+                        HStack(spacing: 2.6) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle()
+                                    .fill((moment.likedByMe == true) ? Color(hex: 0xFF6B6B) : Color.dyn(0x7F7F7F, 0xD8D8D8))
+                                    .frame(width: 3.4, height: 3.4)
+                            }
                         }
+                        .frame(width: 28, height: 19)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color.dyn(0xF0F0F0, 0x3A3A3C)))
                     }
-                    .frame(width: 28, height: 19)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.dyn(0xF0F0F0, 0x3A3A3C)))
+                    .buttonStyle(.plain)
                 }
                 .padding(.top, 10)
 

@@ -392,8 +392,10 @@ final class API {
         return payload.friends
     }
 
-    func moments(limit: Int = 20) async throws -> [Moment] {
-        let payload: MomentsPayload = try await get("/api/moments?limit=\(limit)", as: MomentsPayload.self)
+    func moments(limit: Int = 20, userId: String? = nil) async throws -> [Moment] {
+        var path = "/api/moments?limit=\(limit)"
+        if let userId = userId, !userId.isEmpty { path += "&userId=\(userId)" }
+        let payload: MomentsPayload = try await get(path, as: MomentsPayload.self)
         return payload.moments
     }
 

@@ -187,10 +187,10 @@ struct ChatsView: View {
                     Button {
                         plusMenu = true
                     } label: {
-                        SVGIcon(markup: I.plusRing, size: 30, color: C.ringInk)
-                            .padding(.leading, 2)
-                            .padding(.trailing, 7)
-                            .frame(height: L.navH)
+                        Image(systemName: "plus")
+                            .font(.system(size: UIConfig.num("navPlusSize", 20), weight: .regular))
+                            .foregroundColor(C.label)
+                            .frame(width: 44, height: L.navH)
                     }
                     .buttonStyle(.plain)
                 }

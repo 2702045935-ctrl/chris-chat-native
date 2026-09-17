@@ -46,8 +46,7 @@ final class AppState: ObservableObject {
                 API.shared.clearToken()
             }
         } catch {
-            // 网络不通时也让他进登录页
-            API.shared.clearToken()
+            // 只是连不上（不在家 / 电脑关机）时先留着登录状态，回到登录页等他重试
         }
         booting = false
     }

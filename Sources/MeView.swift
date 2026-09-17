@@ -131,15 +131,15 @@ struct MeView: View {
         .padding(.top, L.safeTop)
     }
 
-    private func chip<C: View>(@ViewBuilder content: () -> C, action: @escaping () -> Void) -> some View {
+    private func chip<Content: View>(@ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: L.v(2, 1, 4)) { content() }
                 .font(.system(size: L.v(12.5, 3.4, 13.5)))
-                .foregroundColor(C.label)
+                .foregroundColor(Color.dyn(0x191919, 0xF2F2F7))
                 .padding(.horizontal, L.v(10, 3.2, 13))
                 .frame(height: L.v(28, 8, 32))
                 .overlay(
-                    Capsule().stroke(C.hairline, lineWidth: 0.5)
+                    Capsule().stroke(Color.dyn(0xE5E5E5, 0x333335), lineWidth: 0.5)
                 )
         }
         .buttonStyle(.plain)

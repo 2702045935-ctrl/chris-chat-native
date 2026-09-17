@@ -75,36 +75,60 @@ struct StickerView: View {
 
     @State private var picking = false
     @State private var pending = ""
+    @State private var pendingImage = ""
+    @State private var packs: [StickerPack] = []
+    @State private var tab = -1
 
-    private let perPage = 32
-    private var pages: [[String]] {
-        stride(from: 0, to: emojiAll.count, by: perPage).map { start in
-            Array(emojiAll[start..<min(start + perPage, emojiAll.count)])
+    /// 当前这一页要显示的表情：-1 = 全部；否则是某一个表情包
+    private var list: [String] {
+        if tab >= 0 && tab < packs.count {
+            return packs[tab].stickers ?? []
         }
+        var all: [String] = []
+        packs.forEach { all.append(contentsOf: $0.stickers ?? []) }
+        return all.isEmpty ? emojiAll : all
     }
 
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: "表情", back: { dismiss() })
-            Text("点一个表情，挑个好友发过去")
-                .font(pf(13))
-                .foregroundColor(C.subLabel)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+
+            // 表情包分类（网页版：全部 + 后台配的每个包）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    tabButton(-1, "🙂", "全部")
+                    ForEach(packs.indices, id: \.self) { i in
+                        tabButton(i, packs[i].icon ?? "😀", packs[i].name ?? "表情包")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
 
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 6), spacing: 6) {
-                    ForEach(emojiAll.indices, id: \.self) { i in
+                    ForEach(list.indices, id: \.self) { i in
+                        let s = list[i]
                         Button {
-                            pending = emojiAll[i]
+                            if s.hasPrefix("http") || s.hasPrefix("/uploads") {
+                                pendingImage = s
+                                pending = ""
+                            } else {
+                                pending = s
+                                pendingImage = ""
+                            }
                             picking = true
                         } label: {
-                            Text(emojiAll[i])
-                                .font(pf(30))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 54)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(C.cardBg))
+                            Group {
+                                if s.hasPrefix("http") || s.hasPrefix("/uploads") {
+                                    RemoteImage(path: s)
+                                } else {
+                                    Text(s).font(pf(30))
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(C.cardBg))
                         }
                         .buttonStyle(.plain)
                     }
@@ -117,6 +141,9 @@ struct StickerView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .task {
+            packs = (try? await API.shared.stickerPacks()) ?? []
+        }
         .confirmationDialog("发给谁？", isPresented: $picking, titleVisibility: .visible) {
             ForEach(app.chats.prefix(12)) { chat in
                 Button("发给 \(chat.name)") {
@@ -128,13 +155,147 @@ struct StickerView: View {
     }
 
     private func send(to chatId: String) {
-        guard !pending.isEmpty else { return }
         let text = pending
+        let img = pendingImage
         pending = ""
+        pendingImage = ""
+        guard !text.isEmpty || !img.isEmpty else { return }
         Task {
-            _ = try? await API.shared.send(chatId: chatId, kind: "text", content: text)
+            _ = try? await API.shared.send(chatId: chatId,
+                                           kind: img.isEmpty ? "text" : "image",
+                                           content: img.isEmpty ? text : img)
             await app.loadChats()
             app.show("表情已发出")
+        }
+    }
+
+    private func tabButton(_ index: Int, _ icon: String, _ name: String) -> some View {
+        Button {
+            tab = index
+        } label: {
+            HStack(spacing: 4) {
+                Text(icon).font(pf(15))
+                Text(name).font(pf(13))
+            }
+            .foregroundColor(tab == index ? .white : C.label)
+            .padding(.horizontal, 11)
+            .frame(height: 30)
+            .background(
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(tab == index ? C.green : C.cardBg)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/* ============================================================ 状态（我 → ＋状态） */
+
+struct StatusView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var cats: [StatusCategory] = []
+    @State private var cat = 0
+
+    private var items: [StatusItem] {
+        guard cat < cats.count else { return [] }
+        return cats[cat].items ?? []
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: "状态", back: { dismiss() })
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(cats.indices, id: \.self) { i in
+                        Button {
+                            cat = i
+                        } label: {
+                            Text(cats[i].name ?? "分类")
+                                .font(pf(13.5))
+                                .foregroundColor(cat == i ? .white : C.label)
+                                .padding(.horizontal, 12)
+                                .frame(height: 30)
+                                .background(RoundedRectangle(cornerRadius: 15)
+                                    .fill(cat == i ? C.green : C.cardBg))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    ForEach(items.indices, id: \.self) { i in
+                        let it = items[i]
+                        Button {
+                            pick(it)
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(it.icon ?? "🙂").font(pf(30))
+                                Text(it.label ?? "状态")
+                                    .font(pf(13))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 96)
+                            .background(
+                                LinearGradient(colors: [Color(hex: it.color ?? "#6F8A38"),
+                                                        Color(hex: it.color2 ?? it.color ?? "#6F8A38")],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+
+                Button {
+                    clear()
+                } label: {
+                    Text("取消当前状态")
+                        .font(pf(15))
+                        .foregroundColor(C.red)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(C.cardBg)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 30)
+            }
+            .background(C.pageBg)
+        }
+        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .task {
+            cats = (try? await API.shared.statusCategories()) ?? []
+        }
+    }
+
+    private func pick(_ item: StatusItem) {
+        Task {
+            await API.shared.setMood(item)
+            app.me = try? await API.shared.me()
+            app.show("状态更新了")
+            dismiss()
+        }
+    }
+
+    private func clear() {
+        Task {
+            await API.shared.setMood(nil)
+            app.me = try? await API.shared.me()
+            app.show("状态已取消")
+            dismiss()
         }
     }
 }

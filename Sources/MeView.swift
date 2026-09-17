@@ -71,6 +71,8 @@ struct MeView: View {
                     StickerView()
                 } else if key == "works" {
                     WorksView()
+                } else if key == "status" {
+                    StatusView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -132,10 +134,15 @@ struct MeView: View {
 
             HStack(spacing: L.v(8, 2.6, 11)) {
                 chip {
-                    Text("＋").foregroundColor(C.subLabel)
-                    Text("状态")
+                    if let mood = app.me?.moodText, !mood.isEmpty {
+                        Text(app.me?.moodIcon ?? "")
+                        Text(mood)
+                    } else {
+                        Text("＋").foregroundColor(C.subLabel)
+                        Text("状态")
+                    }
                 } action: {
-                    app.show("状态排在下一批")
+                    path.append("status")
                 }
                 chip {
                     Text("朋友圈")

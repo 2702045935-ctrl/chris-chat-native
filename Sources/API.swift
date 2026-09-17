@@ -6,6 +6,10 @@ import UIKit
 struct User: Decodable, Identifiable, Hashable {
     var id: String
     var requestId: String?
+    var moodText: String?
+    var moodIcon: String?
+    var moodColor: String?
+    var moodColor2: String?
     var username: String?
     var nickname: String?
     var avatar: String?
@@ -142,6 +146,30 @@ struct Gift: Decodable, Identifiable, Hashable {
     var price: Double?
     var category: String?
 }
+
+struct StickerPack: Decodable, Hashable {
+    var id: String?
+    var name: String?
+    var icon: String?
+    var stickers: [String]?
+}
+
+struct StatusItem: Decodable, Hashable {
+    var id: String?
+    var icon: String?
+    var label: String?
+    var color: String?
+    var color2: String?
+}
+
+struct StatusCategory: Decodable, Hashable {
+    var id: String?
+    var name: String?
+    var items: [StatusItem]?
+}
+
+private struct StickersPayload: Decodable { var packs: [StickerPack]? }
+private struct StatusesPayload: Decodable { var categories: [StatusCategory]? }
 
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
 private struct GiftsPayload: Decodable { var gifts: [Gift]? }
@@ -477,6 +505,30 @@ final class API {
     func gifts() async throws -> [Gift] {
         let payload: GiftsPayload = try await get("/api/gifts", as: GiftsPayload.self)
         return payload.gifts ?? []
+    }
+
+    func stickerPacks() async throws -> [StickerPack] {
+        let payload: StickersPayload = try await get("/api/stickers", as: StickersPayload.self)
+        return payload.packs ?? []
+    }
+
+    func statusCategories() async throws -> [StatusCategory] {
+        let payload: StatusesPayload = try await get("/api/statuses", as: StatusesPayload.self)
+        return payload.categories ?? []
+    }
+
+    /// 设置/清除「状态」（对应后台配的那些状态）
+    func setMood(_ item: StatusItem?) async {
+        if let item = item {
+            await updateMe([
+                "moodText": item.label ?? "",
+                "moodIcon": item.icon ?? "",
+                "moodColor": item.color ?? "",
+                "moodColor2": item.color2 ?? ""
+            ])
+        } else {
+            await updateMe(["moodText": "", "moodIcon": "", "moodColor": "", "moodColor2": ""])
+        }
     }
 
     /// 图片压完再传：返回服务器上的 /uploads/xxx.jpg

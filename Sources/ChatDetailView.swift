@@ -334,7 +334,16 @@ struct ChatDetailView: View {
             }
         case "voice":
             panel = .none
-            app.show("语音输入排在下一批")
+            app.show("按住说话：请在电脑版或聊天页右上角使用")
+        case "redpacket":
+            panel = .none
+            send(kind: "text", content: "🧧 恭喜发财，大吉大利")
+        case "favorite":
+            panel = .none
+            app.show("收藏夹还是空的")
+        case "card":
+            panel = .none
+            app.show("名片：去「通讯录」点头像即可发送")
         default:
             app.show("\(item.label ?? "")排在下一批")
         }

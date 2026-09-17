@@ -13,7 +13,7 @@ struct ChatRow: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(chat.name)
-                    .font(pf(L.rowNameSize, .medium))
+                    .font(pf(L.rowNameSize))
                     .foregroundColor(C.name)
                     .lineLimit(1)
                 Text(chat.lastMessage?.preview ?? "")

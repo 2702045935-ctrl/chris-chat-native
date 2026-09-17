@@ -38,14 +38,140 @@ struct ChatRow: View {
     }
 }
 
+/* ============================================================
+   会话行 + 左滑三级操作（完全照网页版）：
+   ① 左滑露出 标为未读(绿) / 不显示(橙) / 删除(红)，三个各 83 宽，整条 249
+   ② 点「不显示」→ 这一条撑满 249 变成「不显示该聊天」（橙），再点一下才执行
+   ③ 点「删除」→ 这一条撑满 249 变红「清空记录同时不显示聊天」，再点一下才执行
+   拖过 289 会预览第二层；点别处整条收回去。
+   ============================================================ */
+
+struct SwipeChatRow: View {
+    enum Mode { case none, hideConfirm, delConfirm }
+
+    let chat: Chat
+    var onOpen: () -> Void
+    var onUnread: () -> Void
+    var onHide: (Bool) -> Void      // true = 连记录一起清掉
+    var onDelete: () -> Void
+
+    @State private var offset: CGFloat = 0
+    @State private var startOffset: CGFloat = 0
+    @State private var mode: Mode = .none
+    @State private var dragging = false
+
+    private let btnW: CGFloat = 83
+    private var fullW: CGFloat { btnW * 3 }        // 249
+
+    private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.chatRowBg }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 0) {
+                actionButton("标为未读", Color(hex: 0x07C160), mode == .none ? btnW : 0) {
+                    onUnread()
+                    close()
+                }
+                actionButton(mode == .hideConfirm ? "不显示该聊天" : "不显示",
+                             Color(hex: 0xFA9D3C),
+                             mode == .hideConfirm ? fullW : (mode == .none ? btnW : 0)) {
+                    if mode == .hideConfirm {
+                        onHide(false)
+                        close()
+                    } else {
+                        mode = .hideConfirm
+                        withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
+                    }
+                }
+                actionButton(mode == .delConfirm ? "清空记录同时不显示聊天" : "删除",
+                             Color(hex: mode == .delConfirm ? 0xE75E58 : 0xFA5151),
+                             mode == .delConfirm ? fullW : (mode == .none ? btnW : 0)) {
+                    if mode == .delConfirm {
+                        onDelete()
+                        close()
+                    } else {
+                        mode = .delConfirm
+                        withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(height: L.rowH)
+
+            ChatRow(chat: chat)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(rowBg)
+                .overlay(alignment: .bottom) { HairLine(inset: L.dividerLeft) }
+                .offset(x: offset)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if offset != 0 { close() } else { onOpen() }
+                }
+                .gesture(dragGesture)
+        }
+        .frame(height: L.rowH)
+        .clipped()
+    }
+
+    private func actionButton(_ title: String, _ bg: Color, _ width: CGFloat,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(pf(17))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .frame(width: max(0, width), height: L.rowH)
+                .background(bg)
+                .clipped()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                if !dragging {
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    dragging = true
+                    startOffset = offset
+                }
+                var x = startOffset + value.translation.width
+                x = min(0, max(-fullW - 140, x))
+                offset = x
+                // 拖过 289 预览第二层（那一条撑满 249，变成「不显示该聊天」）
+                if -x > 289 && mode == .none {
+                    mode = .hideConfirm
+                } else if -x < 240 && mode == .hideConfirm {
+                    mode = .none
+                }
+            }
+            .onEnded { _ in
+                dragging = false
+                if -offset < 46 {
+                    close()
+                } else {
+                    withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
+                }
+            }
+    }
+
+    private func close() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            offset = 0
+            mode = .none
+        }
+    }
+}
+
+/* ============================================================ 微信（会话列表） */
+
 struct ChatsView: View {
     @EnvironmentObject var app: AppState
 
     @State private var keyword = ""
-    @State private var confirmHide: Chat?
-    @State private var confirmDelete: Chat?
     @State private var path = NavigationPath()
     @State private var plusMenu = false
+    @State private var openRow: String?
 
     private var list: [Chat] {
         guard !keyword.isEmpty else { return app.chats }
@@ -76,46 +202,19 @@ struct ChatsView: View {
                 if app.chats.isEmpty {
                     emptyView
                 } else {
-                    List {
-                        ForEach(list) { chat in
-                            // 用 Button + path 跳转：List 里的 NavigationLink 会自动带一个「›」，
-                            // 微信的会话行是没有箭头的
-                            Button {
-                                path.append(chat)
-                            } label: {
-                                ChatRow(chat: chat)
-                            }
-                            .buttonStyle(.plain)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(chat.pinned == true ? C.pinnedBg : C.chatRowBg)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    confirmDelete = chat
-                                } label: {
-                                    Text("删除")
-                                }
-                                .tint(C.red)
-
-                                Button {
-                                    confirmHide = chat
-                                } label: {
-                                    Text("不显示")
-                                }
-                                .tint(C.orange)
-
-                                Button {
-                                    markUnread(chat)
-                                } label: {
-                                    Text("标为未读")
-                                }
-                                .tint(C.green)
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(list) { chat in
+                                SwipeChatRow(
+                                    chat: chat,
+                                    onOpen: { path.append(chat) },
+                                    onUnread: { markUnread(chat) },
+                                    onHide: { clear in hide(chat, clear: clear) },
+                                    onDelete: { remove(chat) }
+                                )
                             }
                         }
                     }
-                    .listStyle(.plain)
-                    .environment(\.defaultMinListRowHeight, 0)
-                    .scrollContentBackground(.hidden)
                     .background(C.chatRowBg)
                     .refreshable { await app.loadChats() }
                 }
@@ -142,30 +241,6 @@ struct ChatsView: View {
             Button("发起群聊") { path.append("newGroup") }
             Button("加好友") { path.append("addFriend") }
             Button("取消", role: .cancel) { }
-        }
-        .confirmationDialog("不显示该聊天？", isPresented: Binding(
-            get: { confirmHide != nil },
-            set: { if !$0 { confirmHide = nil } }
-        ), titleVisibility: .visible) {
-            Button("不显示该聊天") {
-                if let c = confirmHide { hide(c) }
-                confirmHide = nil
-            }
-            Button("清空聊天记录同时不显示") {
-                if let c = confirmHide { remove(c) }
-                confirmHide = nil
-            }
-            Button("取消", role: .cancel) { confirmHide = nil }
-        }
-        .confirmationDialog("删除该聊天？", isPresented: Binding(
-            get: { confirmDelete != nil },
-            set: { if !$0 { confirmDelete = nil } }
-        ), titleVisibility: .visible) {
-            Button("删除", role: .destructive) {
-                if let c = confirmDelete { remove(c) }
-                confirmDelete = nil
-            }
-            Button("取消", role: .cancel) { confirmDelete = nil }
         }
         .task { await app.loadChats() }
     }
@@ -195,11 +270,15 @@ struct ChatsView: View {
         }
     }
 
-    private func hide(_ chat: Chat) {
+    private func hide(_ chat: Chat, clear: Bool) {
         Task {
-            await API.shared.hideChat(chatId: chat.id)
+            if clear {
+                await API.shared.deleteChat(chatId: chat.id)
+            } else {
+                await API.shared.hideChat(chatId: chat.id)
+            }
             await app.loadChats()
-            app.show("已不显示该聊天")
+            app.show(clear ? "已清空记录并设为不显示" : "已不显示该聊天")
         }
     }
 

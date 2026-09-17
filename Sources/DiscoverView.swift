@@ -127,6 +127,7 @@ struct ComingSoonView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .swipeBack { dismiss() }
     }
 }
 
@@ -185,6 +186,7 @@ struct MomentsView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
         .task { await reload() }
         .confirmationDialog("发表", isPresented: $cameraMenu, titleVisibility: .visible) {
             Button("拍摄") { showCamera = true }

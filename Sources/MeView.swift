@@ -230,6 +230,7 @@ struct SettingsView: View {
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
         .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) {
                 busy = true

@@ -279,6 +279,7 @@ struct ContactCardView: View {
         }
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
         .task {
             if let list = try? await API.shared.moments(userId: user.id) {
                 thumbs = list.flatMap { $0.images ?? [] }

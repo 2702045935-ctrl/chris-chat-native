@@ -46,6 +46,7 @@ struct ChatDetailView: View {
     @State private var showLocation = false
     @State private var showTransfer = false
     @State private var showFile = false
+    @State private var showCall = false
     @State private var uploading = false
 
     @FocusState private var focused: Bool
@@ -114,6 +115,9 @@ struct ChatDetailView: View {
             TransferSheet(chat: chat) { amount, note, method, password in
                 doTransfer(amount: amount, note: note, method: method, password: password)
             }
+        }
+        .fullScreenCover(isPresented: $showCall) {
+            AICallView(chat: chat)
         }
         .fileImporter(isPresented: $showFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { sendFile(url) }
@@ -323,7 +327,11 @@ struct ChatDetailView: View {
             showFile = true
         case "videocall":
             panel = .none
-            app.show("视频通话排在下一批")
+            if (chat.botRank ?? 9) < 9 {
+                showCall = true
+            } else {
+                app.show("和真人的实时语音/视频要装 WebRTC 组件（下一版），先用文字或图片聊")
+            }
         case "voice":
             panel = .none
             app.show("语音输入排在下一批")

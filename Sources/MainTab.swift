@@ -125,7 +125,7 @@ struct NavBar<Right: View>: View {
                     .buttonStyle(.plain)
                 }
                 Spacer(minLength: 0)
-                right()
+                right
             }
         }
         .frame(height: L.navH)

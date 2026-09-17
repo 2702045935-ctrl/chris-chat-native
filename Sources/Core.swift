@@ -43,22 +43,27 @@ enum L {
     static let rowGap: CGFloat = 13
     static let searchBoxH: CGFloat = 36
     static let searchPad: CGFloat = 8
-    static var dividerLeft: CGFloat { rowPadL + avatar + rowGap }
+    /// 参考图量出来：会话行分隔线从 x=76 开始
+    static let dividerLeft: CGFloat = 76
 
-    // 通讯录
-    static let ctPadH: CGFloat = 18
-    static let ctPadV: CGFloat = 14
+    // 通讯录（按 vx 参考图：行 56、头像 40、左 16、间距 12、文字 x=68）
+    static let ctRowH: CGFloat = 56
+    static let ctAvatar: CGFloat = 40
+    static let ctPadL: CGFloat = 16
     static let ctGap: CGFloat = 12
-    static var ctRowH: CGFloat { ctPadV * 2 + avatar }
+    static let ctIcon: CGFloat = 40
+    static var ctTextX: CGFloat { ctPadL + ctAvatar + ctGap }
 
-    // 发现页 / 我页
+    // 发现页 / 我页（按 vx 参考图：行 56、图标 x18、文字 x58、组间线从 x56 开始）
     static let menuH: CGFloat = 56
-    static let menuPadL: CGFloat = 17
+    static let menuPadL: CGFloat = 18
     static let menuPadR: CGFloat = 16
     static let menuGap: CGFloat = 18
     static let menuIcon: CGFloat = 22
     static let groupGap: CGFloat = 8
     static var menuTextX: CGFloat { menuPadL + menuIcon + menuGap }
+    /// 我页/发现页行内那条细线的左端
+    static let menuLineInset: CGFloat = 56
 
     // 聊天页
     static var msgPad: CGFloat { v(10, 2.8, 12) }

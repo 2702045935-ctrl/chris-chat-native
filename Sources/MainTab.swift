@@ -224,8 +224,8 @@ struct SearchBoxLeft: View {
 struct MenuRow: View {
     let icon: String
     var iconColor: Color = C.green
-    /// 发现页左边距 17，我页/设置页 19（网页版就是这样，差这 2px 看着就不一样）
-    var padLeading: CGFloat = 17
+    /// 参考图：发现页和我页的行都是左边距 18、图标 22、间距 18 → 文字落在 x=58
+    var padLeading: CGFloat = 18
     let title: String
     var detail: String = ""
     var showArrow: Bool = true

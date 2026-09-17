@@ -15,32 +15,32 @@ struct MeView: View {
 
                     GroupCard {
                         MenuRow(icon: I.wallet, iconColor: Color(hex: 0x59C47E),
-                                padLeading: 19, title: "服务", onTap: { path.append("service") })
+                                title: "服务", onTap: { path.append("service") })
                     }
 
                     gap
 
                     GroupCard {
                         MenuRow(icon: I.star, iconColor: Color(hex: 0x4489EA),
-                                padLeading: 19, title: "收藏", onTap: { path.append("favorites") })
+                                title: "收藏", onTap: { path.append("favorites") })
                         rowLine
                         MenuRow(icon: I.album, iconColor: Color(hex: 0x7275E9),
-                                padLeading: 19, title: "朋友圈", onTap: { path.append("moments") })
+                                title: "朋友圈", onTap: { path.append("moments") })
                         rowLine
                         MenuRow(icon: I.works, iconColor: Color(hex: 0x3D83E7),
-                                padLeading: 19, title: "作品", onTap: { path.append("works") })
+                                title: "作品", onTap: { path.append("works") })
                         rowLine
                         promoRow
                         rowLine
                         MenuRow(icon: I.sticker, iconColor: Color(hex: 0xF5C144),
-                                padLeading: 19, title: "表情", onTap: { path.append("stickers") })
+                                title: "表情", onTap: { path.append("stickers") })
                     }
 
                     gap
 
                     GroupCard {
                         MenuRow(icon: I.gear, iconColor: Color(hex: 0x3D83E7),
-                                padLeading: 19, title: "设置", onTap: { path.append("settings") })
+                                title: "设置", onTap: { path.append("settings") })
                     }
 
                     Spacer().frame(height: 24)
@@ -76,7 +76,7 @@ struct MeView: View {
     }
 
     private var rowLine: some View {
-        HairLine()
+        HairLine(inset: L.menuLineInset)
     }
 
     /* ---------------------------------------------------------- 顶部资料卡 */
@@ -98,12 +98,12 @@ struct MeView: View {
                     Text(app.me?.name ?? "")
                         .font(pf(L.v(17, 4.8, 19.5)))
                         .foregroundColor(C.label)
-                    Text("微信号：\(app.me?.username ?? "-")")
+                Text("微信号：\(app.me?.username ?? "-")")
                         .font(pf(16))
                         .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
                         .padding(.top, L.v(4, 1.8, 8))
                 }
-                .padding(.leading, L.v(14, 5, 21))
+                .padding(.leading, 21.5)
 
                 Spacer(minLength: 0)
 
@@ -117,7 +117,7 @@ struct MeView: View {
                 .padding(.top, 2)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
-            .padding(.leading, L.v(20, 6.4, 28))
+            .padding(.leading, 28)
             .padding(.trailing, L.v(14, 4, 18))
             .padding(.bottom, 4)
             }

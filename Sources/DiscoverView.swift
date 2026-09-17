@@ -25,6 +25,7 @@ struct DiscoverView: View {
                                     thumb: latestThumb,
                                     onTap: { path.append("moments") })
                         }
+                        line
 
                         gap
 
@@ -35,6 +36,7 @@ struct DiscoverView: View {
                             MenuRow(icon: I.live, iconColor: Color(hex: 0xF4525B),
                                     title: "直播", onTap: { path.append("soon:直播") })
                         }
+                        line
 
                         gap
 
@@ -45,6 +47,7 @@ struct DiscoverView: View {
                             MenuRow(icon: I.shake, iconColor: Color(hex: 0x4489EA),
                                     title: "摇一摇", onTap: { path.append("soon:摇一摇") })
                         }
+                        line
 
                         gap
 
@@ -55,6 +58,7 @@ struct DiscoverView: View {
                             MenuRow(icon: I.searchRow, iconColor: Color(hex: 0x59C47E),
                                     title: "搜一搜", onTap: { path.append("soon:搜一搜") })
                         }
+                        line
 
                         gap
 
@@ -62,6 +66,7 @@ struct DiscoverView: View {
                             MenuRow(icon: I.nearby, iconColor: Color(hex: 0x3D83E7),
                                     title: "附近", onTap: { path.append("soon:附近") })
                         }
+                        line
 
                         gap
 
@@ -69,6 +74,7 @@ struct DiscoverView: View {
                             MenuRow(icon: I.game, iconColor: Color(hex: 0x9A6AE8),
                                     title: "游戏", onTap: { path.append("soon:游戏") })
                         }
+                        line
 
                         gap
 
@@ -100,7 +106,12 @@ struct DiscoverView: View {
     }
 
     private var rowLine: some View {
-        HairLine(inset: L.menuTextX)
+        HairLine(inset: L.menuLineInset)
+    }
+
+    /// 参考图：每组最后一行下面还有一条满宽的细线，再往下才是 8px 灰缝
+    private var line: some View {
+        HairLine()
     }
 }
 

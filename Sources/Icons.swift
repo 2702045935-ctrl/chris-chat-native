@@ -159,12 +159,12 @@ enum I {
 struct FuncIcon: View {
     let markup: String
     let bg: Color
-    var size: CGFloat = 48
+    var size: CGFloat = 40
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(bg)
-            SVGIcon(markup: markup, size: 26, color: .white)
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(bg)
+            SVGIcon(markup: markup, size: 22, color: .white)
         }
         .frame(width: size, height: size)
     }

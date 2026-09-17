@@ -57,9 +57,8 @@ struct ContactsView: View {
                     .buttonStyle(.plain)
                 }
 
-                SearchBoxLeft(text: $keyword)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                SearchBoxCenter(text: $keyword)
+                    .padding(L.searchPad)
                     .background(C.pageBg)
 
                 ScrollViewReader { proxy in
@@ -71,22 +70,18 @@ struct ContactsView: View {
                                         ForEach(funcs.indices, id: \.self) { i in
                                             funcRow(funcs[i])
                                             if i < funcs.count - 1 {
-                                                HairLine(inset: 16, trailingInset: 16)
+                                                HairLine(inset: L.ctTextX)
                                             }
                                         }
                                     }
                                     .background(C.cardBg)
-
-                                    // 功能块和下面的好友列表之间留 8px 灰缝
-                                    Rectangle().fill(C.pageBg).frame(height: 8)
                                 }
 
                                 ForEach(sections) { section in
                                     ForEach(section.users.indices, id: \.self) { i in
                                         let user = section.users[i]
                                         VStack(spacing: 0) {
-                                            // 组内每一行上面一条发丝线（从名字左边开始，和微信一样）
-                                            if i > 0 { HairLine(inset: 76) }
+                                            if i > 0 { HairLine(inset: L.ctTextX) }
                                             NavigationLink(value: user) {
                                                 contactRow(user)
                                             }
@@ -148,13 +143,13 @@ struct ContactsView: View {
             }
         } label: {
             HStack(spacing: L.ctGap) {
-                FuncIcon(markup: item.1, bg: item.2, size: L.avatar)
+                FuncIcon(markup: item.1, bg: item.2, size: L.ctIcon)
                 Text(item.0)
-                    .font(pf(17))
+                    .font(pf(16))
                     .foregroundColor(C.label)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, L.ctPadH)
+            .padding(.leading, L.ctPadL)
             .frame(height: L.ctRowH)
             .background(C.cardBg)
             .contentShape(Rectangle())
@@ -164,14 +159,14 @@ struct ContactsView: View {
 
     private func contactRow(_ user: User) -> some View {
         HStack(spacing: L.ctGap) {
-            Avatar(path: user.avatarPath, size: L.avatar, radius: 8)
+            Avatar(path: user.avatarPath, size: L.ctAvatar, radius: 6)
             Text(user.name)
-                .font(pf(17))
+                .font(pf(16))
                 .foregroundColor(C.label)
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, L.ctPadH)
+        .padding(.leading, L.ctPadL)
         .frame(height: L.ctRowH)
         .contentShape(Rectangle())
     }

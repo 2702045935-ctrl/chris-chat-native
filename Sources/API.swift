@@ -596,6 +596,13 @@ final class API {
             "password": password
         ])
     }
+
+    func hasPayPassword() async -> Bool {
+        guard let any = try? await request("GET", "/api/me/paypassword"),
+              let dict = any as? [String: Any],
+              let has = dict["has"] as? Bool else { return false }
+        return has
+    }
 }
 
 extension UIImage {

@@ -112,9 +112,7 @@ struct ChatDetailView: View {
             LocationSheet { payload in send(kind: "location", content: payload) }
         }
         .sheet(isPresented: $showTransfer) {
-            TransferSheet(chat: chat) { amount, note, method, password in
-                doTransfer(amount: amount, note: note, method: method, password: password)
-            }
+            TransferView(chat: chat)
         }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)

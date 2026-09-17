@@ -148,6 +148,26 @@ enum C {
     static let loginGreen  = Color(hex: 0x3EB575)
 }
 
+/* ============================================================
+   字体：全站一律苹方（PingFang SC）。
+   数字和英文也走苹方，不再落到 SF Pro 上，和手机微信一模一样。
+   万一系统里没有苹方，自动退回系统字体，不会变成方框。
+   ============================================================ */
+func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    var name = "PingFangSC-Regular"
+    if weight == .medium {
+        name = "PingFangSC-Medium"
+    } else if weight == .semibold || weight == .bold || weight == .heavy || weight == .black {
+        name = "PingFangSC-Semibold"
+    } else if weight == .light || weight == .thin || weight == .ultraLight {
+        name = "PingFangSC-Light"
+    }
+    if UIFont(name: name, size: size) != nil {
+        return .custom(name, size: size)
+    }
+    return .system(size: size, weight: weight)
+}
+
 enum AppIconImage {
     static var image: UIImage? {
         for name in ["AppIcon60x60@3x", "AppIcon60x60@2x", "AppIcon60x60"] {
@@ -192,7 +212,7 @@ struct RemoteImage: View {
                     ZStack {
                         Color.dyn(0xE9E9E9, 0x2C2C2E)
                         Image(systemName: icon)
-                            .font(.system(size: max(10, min(geo.size.width, geo.size.height) * 0.40)))
+                            .font(pf(max(10, min(geo.size.width, geo.size.height) * 0.40)))
                             .foregroundColor(Color.dyn(0xC4C4C4, 0x636366))
                     }
                 }
@@ -385,7 +405,7 @@ struct UnreadBadge: View {
     var body: some View {
         if count > 0 {
             Text(count > 99 ? "99+" : "\(count)")
-                .font(.system(size: 11, weight: .semibold))
+                .font(pf(11, .semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 3)
                 .frame(minWidth: 16, minHeight: 16)

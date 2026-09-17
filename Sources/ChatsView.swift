@@ -13,11 +13,11 @@ struct ChatRow: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(chat.name)
-                    .font(.system(size: 17, weight: .medium))
+                    .font(pf(17, .medium))
                     .foregroundColor(C.name)
                     .lineLimit(1)
                 Text(chat.lastMessage?.preview ?? "")
-                    .font(.system(size: 14))
+                    .font(pf(14))
                     .foregroundColor(C.preview)
                     .lineLimit(1)
                     .padding(.top, 3)
@@ -26,7 +26,7 @@ struct ChatRow: View {
             Spacer(minLength: 6)
 
             Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
-                .font(.system(size: 12))
+                .font(pf(12))
                 .foregroundColor(C.time)
                 .padding(.top, 2)
                 .fixedSize()
@@ -170,11 +170,11 @@ struct ChatsView: View {
         VStack(spacing: 10) {
             Spacer()
             Text(app.loadError ?? "正在加载会话…")
-                .font(.system(size: 14))
+                .font(pf(14))
                 .foregroundColor(C.subLabel)
             if app.loadError != nil {
                 Button("重试") { Task { await app.loadChats() } }
-                    .font(.system(size: 15))
+                    .font(pf(15))
                     .foregroundColor(C.green)
             }
             Spacer()

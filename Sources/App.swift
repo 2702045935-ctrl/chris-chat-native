@@ -125,7 +125,7 @@ struct RootView: View {
                     VStack {
                         Spacer()
                         Text(text)
-                            .font(.system(size: 14))
+                            .font(pf(14))
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
@@ -156,7 +156,7 @@ struct LaunchView: View {
                         .frame(width: 66, height: 66)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                Text("正在连接…").font(.system(size: 13)).foregroundColor(C.loginGray)
+                Text("正在连接…").font(pf(13)).foregroundColor(C.loginGray)
             }
         }
     }
@@ -193,7 +193,7 @@ struct LoginView: View {
                         panel
                         if let error = error {
                             Text(error)
-                                .font(.system(size: 13.5))
+                                .font(pf(13.5))
                                 .foregroundColor(C.red)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 20)
@@ -201,7 +201,7 @@ struct LoginView: View {
                         }
                         if !usePassword {
                             Text("仅上述手机号用于登录验证")
-                                .font(.system(size: 13.5))
+                                .font(pf(13.5))
                                 .foregroundColor(C.loginGray)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 20)
@@ -213,7 +213,7 @@ struct LoginView: View {
                             focus = nil
                         } label: {
                             Text(usePassword ? "用手机号登录" : "其他方式登录")
-                                .font(.system(size: 16))
+                                .font(pf(16))
                                 .foregroundColor(C.loginLink)
                         }
                         .padding(.top, 18.5)
@@ -238,14 +238,14 @@ struct LoginView: View {
     private var nav: some View {
         ZStack {
             Text(usePassword ? "账号密码登录" : "手机号登录")
-                .font(.system(size: 18, weight: .semibold))
+                .font(pf(18, .semibold))
                 .foregroundColor(C.loginText)
             HStack {
                 Button {
                     focus = nil
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 22, weight: .regular))
+                        .font(pf(22, .regular))
                         .foregroundColor(C.loginText)
                         .frame(width: 44, height: 52)
                 }
@@ -261,16 +261,16 @@ struct LoginView: View {
             if !usePassword {
                 loginRow(label: "国家/地区") {
                     Spacer()
-                    Text(country).font(.system(size: 16)).foregroundColor(C.loginGray)
+                    Text(country).font(pf(16)).foregroundColor(C.loginGray)
                     Chevron(size: 9, line: 1.6, color: C.loginGray)
                 }
                 HairLine(color: C.navLine)
                 loginRow(label: "手机号") {
-                    Text("+86").font(.system(size: 17)).foregroundColor(C.loginText)
+                    Text("+86").font(pf(17)).foregroundColor(C.loginText)
                     TextField("", text: $phone)
                         .focused($focus, equals: .phone)
                         .keyboardType(.numberPad)
-                        .font(.system(size: 17.5))
+                        .font(pf(17.5))
                         .foregroundColor(C.loginText)
                         .frame(height: 46)
                 }
@@ -279,14 +279,14 @@ struct LoginView: View {
                     TextField("", text: $code)
                         .focused($focus, equals: .code)
                         .keyboardType(.numberPad)
-                        .font(.system(size: 17.5))
+                        .font(pf(17.5))
                         .foregroundColor(C.loginText)
                         .frame(height: 46)
                     Button {
                         sendCode()
                     } label: {
                         Text(codeSent ? "已发送" : "获取验证码")
-                            .font(.system(size: 15))
+                            .font(pf(15))
                             .foregroundColor(codeSent ? C.loginGray : C.loginLink)
                             .padding(.vertical, 6)
                     }
@@ -297,7 +297,7 @@ struct LoginView: View {
                         .focused($focus, equals: .user)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
-                        .font(.system(size: 17.5))
+                        .font(pf(17.5))
                         .foregroundColor(C.loginText)
                         .frame(height: 46)
                 }
@@ -305,7 +305,7 @@ struct LoginView: View {
                 loginRow(label: "密码") {
                     SecureField("", text: $password)
                         .focused($focus, equals: .pass)
-                        .font(.system(size: 17.5))
+                        .font(pf(17.5))
                         .foregroundColor(C.loginText)
                         .frame(height: 46)
                 }
@@ -317,7 +317,7 @@ struct LoginView: View {
     private func loginRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 10.9) {
             Text(label)
-                .font(.system(size: 17))
+                .font(pf(17))
                 .foregroundColor(C.loginText)
                 .frame(width: 74, alignment: .leading)
             content()
@@ -333,10 +333,10 @@ struct LoginView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: syncHistory ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 15))
+                        .font(pf(15))
                         .foregroundColor(syncHistory ? C.loginGreen : C.loginGray)
                     Text("登录后同步最近的聊天记录")
-                        .font(.system(size: 13.5))
+                        .font(pf(13.5))
                         .foregroundColor(C.loginGray)
                 }
                 .frame(maxWidth: .infinity)
@@ -348,7 +348,7 @@ struct LoginView: View {
                 submit()
             } label: {
                 Text(busy ? "登录中…" : "同意并继续")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(pf(17, .medium))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
@@ -360,7 +360,7 @@ struct LoginView: View {
                 showServer = true
             } label: {
                 Text("服务器 \(server)（长按可改）")
-                    .font(.system(size: 11))
+                    .font(pf(11))
                     .foregroundColor(C.loginGray.opacity(0.7))
             }
             .padding(.top, 10)

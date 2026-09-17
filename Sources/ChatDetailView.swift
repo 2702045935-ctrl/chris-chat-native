@@ -71,7 +71,7 @@ struct ChatDetailView: View {
                         app.show("聊天设置排在下一批")
                     } label: {
                         Text("⋯")
-                            .font(.system(size: 22))
+                            .font(pf(22))
                             .foregroundColor(C.label)
                             .frame(width: 44, height: L.navH)
                     }
@@ -135,7 +135,7 @@ struct ChatDetailView: View {
                         VStack(spacing: 0) {
                             if showTime(for: message) {
                                 Text(TimeFmt.bubble(message.createdAt))
-                                    .font(.system(size: 14))
+                                    .font(pf(14))
                                     .foregroundColor(C.msgTime)
                                     .frame(maxWidth: .infinity)
                                     .padding(.top, 12)
@@ -204,7 +204,7 @@ struct ChatDetailView: View {
                 HStack(spacing: 0) {
                     TextField("", text: $input)
                         .focused($focused)
-                        .font(.system(size: 17))
+                        .font(pf(17))
                         .foregroundColor(C.label)
                         .onTapGesture { panel = .none }
                     SVGIcon(markup: I.speaker, size: 22, color: C.iconGray)
@@ -244,7 +244,7 @@ struct ChatDetailView: View {
                         sendText()
                     } label: {
                         Text("发送")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(pf(16, .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 13)
                             .frame(height: 32)
@@ -448,7 +448,7 @@ struct MessageRow: View {
 
             if message.isRecalled {
                 Text(mine ? "你撤回了一条消息" : "对方撤回了一条消息")
-                    .font(.system(size: 12))
+                    .font(pf(12))
                     .foregroundColor(C.msgTime)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -491,7 +491,7 @@ struct MessageRow: View {
 
         default:
             Text(message.body)
-                .font(.system(size: 17))
+                .font(pf(17))
                 .foregroundColor(C.bubbleText)
                 .padding(.horizontal, L.bubblePadH)
                 .padding(.vertical, L.bubblePadV)
@@ -518,9 +518,9 @@ struct MessageRow: View {
             RemoteImage(path: Tiles.url(lat: lat, lng: lng), icon: "map")
                 .frame(width: 216, height: 136)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.system(size: 15)).foregroundColor(C.bubbleText).lineLimit(1)
+                Text(name).font(pf(15)).foregroundColor(C.bubbleText).lineLimit(1)
                 Text(addr.isEmpty ? "点击查看地图" : addr)
-                    .font(.system(size: 12)).foregroundColor(C.subLabel).lineLimit(1)
+                    .font(pf(12)).foregroundColor(C.subLabel).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
@@ -540,21 +540,21 @@ struct MessageRow: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "yensign.circle.fill")
-                    .font(.system(size: 26))
+                    .font(pf(26))
                     .foregroundColor(Color(hex: 0xFFFFFF))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("¥\(String(format: "%.2f", amount))")
-                        .font(.system(size: 19, weight: .medium))
+                        .font(pf(19, .medium))
                         .foregroundColor(.white)
                     Text(note.isEmpty ? (mine ? "你发起了一笔转账" : "转账给你") : note)
-                        .font(.system(size: 12))
+                        .font(pf(12))
                         .foregroundColor(Color.white.opacity(0.88))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
             Text(state)
-                .font(.system(size: 11))
+                .font(pf(11))
                 .foregroundColor(Color.white.opacity(0.8))
         }
         .padding(.horizontal, 12)
@@ -570,10 +570,10 @@ struct MessageRow: View {
         let name = (o["name"] as? String) ?? "礼物"
         let price = (o["price"] as? Double) ?? 0
         return HStack(spacing: 10) {
-            Text(icon).font(.system(size: 30))
+            Text(icon).font(pf(30))
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.system(size: 15, weight: .medium)).foregroundColor(C.bubbleText)
-                Text("¥\(String(format: "%.0f", price))").font(.system(size: 12)).foregroundColor(C.red)
+                Text(name).font(pf(15, .medium)).foregroundColor(C.bubbleText)
+                Text("¥\(String(format: "%.0f", price))").font(pf(12)).foregroundColor(C.red)
             }
         }
         .padding(.horizontal, 14)
@@ -590,8 +590,8 @@ struct MessageRow: View {
         return HStack(spacing: 10) {
             SVGIcon(markup: I.plusIcons["file"] ?? "", size: 26, color: C.bubbleText)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.system(size: 14)).foregroundColor(C.bubbleText).lineLimit(1)
-                Text(byteText(bytes)).font(.system(size: 11)).foregroundColor(C.subLabel)
+                Text(name).font(pf(14)).foregroundColor(C.bubbleText).lineLimit(1)
+                Text(byteText(bytes)).font(pf(11)).foregroundColor(C.subLabel)
             }
         }
         .padding(.horizontal, 12)
@@ -612,9 +612,9 @@ struct MessageRow: View {
         HStack(spacing: 10) {
             SVGIcon(markup: icon, size: 20, color: mine ? C.bubbleText : C.green)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .medium)).foregroundColor(C.bubbleText)
+                Text(title).font(pf(15, .medium)).foregroundColor(C.bubbleText)
                 if !detail.isEmpty {
-                    Text(detail).font(.system(size: 12)).foregroundColor(C.subLabel).lineLimit(2)
+                    Text(detail).font(pf(12)).foregroundColor(C.subLabel).lineLimit(2)
                 }
             }
         }

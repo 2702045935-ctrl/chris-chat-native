@@ -50,7 +50,7 @@ struct EmojiPanel: View {
                                 draft += pages[p][i]
                             } label: {
                                 Text(pages[p][i])
-                                    .font(.system(size: L.v(23, 6.6, 28)))
+                                    .font(pf(L.v(23, 6.6, 28)))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: panelH * 0.80 / 4)
                                     .contentShape(Rectangle())
@@ -81,7 +81,7 @@ struct EmojiPanel: View {
                 .buttonStyle(.plain)
                 Button(action: onSend) {
                     Text("发送")
-                        .font(.system(size: 15))
+                        .font(pf(15))
                         .foregroundColor(draft.isEmpty ? C.subLabel : Color(hex: 0x0D0D0D))
                         .padding(.horizontal, 14)
                         .frame(height: 30)
@@ -131,7 +131,7 @@ struct PlusPanel: View {
                                             size: L.v(24, 7, 29),
                                             color: C.label)
                                     Text(item.label ?? "")
-                                        .font(.system(size: L.v(10.5, 3, 12)))
+                                        .font(pf(L.v(10.5, 3, 12)))
                                         .foregroundColor(C.subLabel)
                                         .lineLimit(1)
                                 }
@@ -182,7 +182,7 @@ struct GiftPanel: View {
         VStack(spacing: 0) {
             if gifts.isEmpty {
                 Text("礼物还没配")
-                    .font(.system(size: 14))
+                    .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -196,13 +196,13 @@ struct GiftPanel: View {
                                     onTap(g)
                                 } label: {
                                     VStack(spacing: L.v(3, 1.2, 5)) {
-                                        Text(g.icon ?? "🎁").font(.system(size: L.v(22, 6.4, 27)))
+                                        Text(g.icon ?? "🎁").font(pf(L.v(22, 6.4, 27)))
                                         Text(g.name ?? "礼物")
-                                            .font(.system(size: L.v(10.5, 3, 12)))
+                                            .font(pf(L.v(10.5, 3, 12)))
                                             .foregroundColor(C.subLabel)
                                             .lineLimit(1)
                                         Text("¥\(Int(g.price ?? 0))")
-                                            .font(.system(size: L.v(10, 2.8, 11.5)))
+                                            .font(pf(L.v(10, 2.8, 11.5)))
                                             .foregroundColor(C.red)
                                     }
                                     .frame(maxWidth: .infinity)
@@ -261,7 +261,7 @@ struct LocationSheet: View {
                         TextField("120.3119", text: $lng).keyboardType(.numbersAndPunctuation)
                     }
                     if !addr.isEmpty {
-                        Text(addr).font(.system(size: 13)).foregroundColor(.secondary)
+                        Text(addr).font(pf(13)).foregroundColor(.secondary)
                     }
                 }
             }

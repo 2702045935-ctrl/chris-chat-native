@@ -21,7 +21,7 @@ struct ProfileEditView: View {
                     save()
                 } label: {
                     Text(busy ? "保存中…" : "保存")
-                        .font(.system(size: 17))
+                        .font(pf(17))
                         .foregroundColor(C.green)
                         .frame(height: L.navH)
                         .padding(.trailing, 16)
@@ -36,7 +36,7 @@ struct ProfileEditView: View {
                             showPhoto = true
                         } label: {
                             HStack(spacing: 12) {
-                                Text("头像").font(.system(size: 17)).foregroundColor(C.label)
+                                Text("头像").font(pf(17)).foregroundColor(C.label)
                                 Spacer()
                                 Avatar(path: app.me?.avatarPath ?? "", size: 56, radius: 6)
                                 Chevron(size: 9, line: 1.6).padding(.trailing, 3)
@@ -54,7 +54,7 @@ struct ProfileEditView: View {
 
                     GroupCard {
                         HStack(spacing: 12) {
-                            Text("性别").font(.system(size: 17)).foregroundColor(C.label)
+                            Text("性别").font(pf(17)).foregroundColor(C.label)
                             Spacer()
                             Picker("", selection: $gender) {
                                 Text("男").tag("male")
@@ -78,7 +78,7 @@ struct ProfileEditView: View {
                     }
 
                     Text("手机号一年只能改一次；头像、昵称、地区、签名想改就改。")
-                        .font(.system(size: 12.5))
+                        .font(pf(12.5))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 18)
@@ -106,9 +106,9 @@ struct ProfileEditView: View {
 
     private func field(_ title: String, _ text: Binding<String>) -> some View {
         HStack(spacing: 12) {
-            Text(title).font(.system(size: 17)).foregroundColor(C.label).frame(width: 76, alignment: .leading)
+            Text(title).font(pf(17)).foregroundColor(C.label).frame(width: 76, alignment: .leading)
             TextField("", text: text)
-                .font(.system(size: 17))
+                .font(pf(17))
                 .foregroundColor(C.label)
                 .multilineTextAlignment(.trailing)
         }
@@ -168,7 +168,7 @@ struct NewFriendsView: View {
                 }
                 if incoming.isEmpty && outgoing.isEmpty && !loading {
                     Text("还没有好友申请")
-                        .font(.system(size: 15))
+                        .font(pf(15))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
@@ -178,18 +178,18 @@ struct NewFriendsView: View {
                     HStack(spacing: 12) {
                         Avatar(path: user.avatarPath, size: 48, radius: 8)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(user.name).font(.system(size: 17)).foregroundColor(C.label)
-                            Text("请求加你为好友").font(.system(size: 13)).foregroundColor(C.subLabel)
+                            Text(user.name).font(pf(17)).foregroundColor(C.label)
+                            Text("请求加你为好友").font(pf(13)).foregroundColor(C.subLabel)
                         }
                         Spacer()
                         Button("同意") { respond(user, true) }
-                            .font(.system(size: 15))
+                            .font(pf(15))
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .frame(height: 30)
                             .background(RoundedRectangle(cornerRadius: 6).fill(C.green))
                         Button("拒绝") { respond(user, false) }
-                            .font(.system(size: 15))
+                            .font(pf(15))
                             .foregroundColor(C.subLabel)
                     }
                     .padding(.horizontal, 16)
@@ -201,9 +201,9 @@ struct NewFriendsView: View {
                 ForEach(outgoing) { user in
                     HStack(spacing: 12) {
                         Avatar(path: user.avatarPath, size: 48, radius: 8)
-                        Text(user.name).font(.system(size: 17)).foregroundColor(C.label)
+                        Text(user.name).font(pf(17)).foregroundColor(C.label)
                         Spacer()
-                        Text("等待验证").font(.system(size: 14)).foregroundColor(C.subLabel)
+                        Text("等待验证").font(pf(14)).foregroundColor(C.subLabel)
                     }
                     .padding(.horizontal, 16)
                     .frame(height: 72)
@@ -262,7 +262,7 @@ struct AddFriendView: View {
                     TextField("输入对方的用户名（微信号）", text: $username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
-                        .font(.system(size: 16))
+                        .font(pf(16))
                         .foregroundColor(C.label)
                 }
                 .padding(.horizontal, 12)
@@ -273,7 +273,7 @@ struct AddFriendView: View {
                     add()
                 } label: {
                     Text(busy ? "发送中…" : "添加到通讯录")
-                        .font(.system(size: 17))
+                        .font(pf(17))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -282,10 +282,10 @@ struct AddFriendView: View {
                 .disabled(busy)
 
                 if let message = message {
-                    Text(message).font(.system(size: 14)).foregroundColor(C.subLabel)
+                    Text(message).font(pf(14)).foregroundColor(C.subLabel)
                 }
                 Text("对方用户名可以在他的名片里看到。")
-                    .font(.system(size: 12.5))
+                    .font(pf(12.5))
                     .foregroundColor(C.subLabel)
                 Spacer()
             }
@@ -332,7 +332,7 @@ struct GroupCreateView: View {
                     create()
                 } label: {
                     Text(busy ? "创建中…" : "完成")
-                        .font(.system(size: 17))
+                        .font(pf(17))
                         .foregroundColor(picked.isEmpty ? C.subLabel : C.green)
                         .frame(height: L.navH)
                         .padding(.trailing, 16)
@@ -342,7 +342,7 @@ struct GroupCreateView: View {
 
             HStack(spacing: 8) {
                 TextField("群名称", text: $name)
-                    .font(.system(size: 16))
+                    .font(pf(16))
                     .foregroundColor(C.label)
             }
             .padding(.horizontal, 12)
@@ -358,7 +358,7 @@ struct GroupCreateView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Avatar(path: user.avatarPath, size: 40, radius: 6)
-                            Text(user.name).font(.system(size: 17)).foregroundColor(C.label)
+                            Text(user.name).font(pf(17)).foregroundColor(C.label)
                             Spacer()
                             Image(systemName: picked.contains(user.id) ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(picked.contains(user.id) ? C.green : C.subLabel)
@@ -430,9 +430,9 @@ struct ServiceView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("零钱").font(.system(size: 15)).foregroundColor(C.subLabel)
+                        Text("零钱").font(pf(15)).foregroundColor(C.subLabel)
                         Text("¥\(String(format: "%.2f", app.me?.balance ?? 0))")
-                            .font(.system(size: 30, weight: .medium))
+                            .font(pf(30, .medium))
                             .foregroundColor(C.label)
                         HStack(spacing: 10) {
                             Button {
@@ -440,7 +440,7 @@ struct ServiceView: View {
                                 showRecharge = true
                             } label: {
                                 Text("充值")
-                                    .font(.system(size: 15))
+                                    .font(pf(15))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 18)
                                     .frame(height: 34)
@@ -450,7 +450,7 @@ struct ServiceView: View {
                                 Task { await loadBills() }
                             } label: {
                                 Text("刷新账单")
-                                    .font(.system(size: 15))
+                                    .font(pf(15))
                                     .foregroundColor(C.label)
                                     .padding(.horizontal, 18)
                                     .frame(height: 34)
@@ -469,7 +469,7 @@ struct ServiceView: View {
                         ProgressView().padding(.vertical, 30)
                     } else if bills.isEmpty {
                         Text("还没有账单项")
-                            .font(.system(size: 15))
+                            .font(pf(15))
                             .foregroundColor(C.subLabel)
                             .padding(.vertical, 30)
                     } else {
@@ -477,15 +477,15 @@ struct ServiceView: View {
                             VStack(spacing: 0) {
                                 HStack(spacing: 12) {
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(bill.title).font(.system(size: 16)).foregroundColor(C.label)
-                                        Text(bill.date).font(.system(size: 12.5)).foregroundColor(C.subLabel)
+                                        Text(bill.title).font(pf(16)).foregroundColor(C.label)
+                                        Text(bill.date).font(pf(12.5)).foregroundColor(C.subLabel)
                                     }
                                     Spacer()
                                     VStack(alignment: .trailing, spacing: 3) {
                                         Text("¥\(String(format: "%.2f", bill.amount))")
-                                            .font(.system(size: 16, weight: .medium))
+                                            .font(pf(16, .medium))
                                             .foregroundColor(C.label)
-                                        Text(bill.status).font(.system(size: 12.5)).foregroundColor(C.subLabel)
+                                        Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
                                     }
                                 }
                                 .padding(.horizontal, 16)

@@ -52,11 +52,11 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                .font(.system(size: 25, weight: .regular))
+                                .font(pf(25, .regular))
                                 .frame(width: 26, height: 26)
                             if i == 0 && badge > 0 {
                                 Text(badge > 99 ? "99+" : "\(badge)")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(pf(11, .semibold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 3)
                                     .frame(minWidth: 15, minHeight: 15)
@@ -65,7 +65,7 @@ struct TabBar: View {
                             }
                         }
                         Text(items[i].2)
-                            .font(.system(size: 11))
+                            .font(pf(11))
                     }
                     .foregroundColor(selection == i ? C.green : C.tabInk)
                     .frame(maxWidth: .infinity)
@@ -110,7 +110,7 @@ struct NavBar<Right: View>: View {
     var body: some View {
         ZStack {
             Text(title)
-                .font(.system(size: titleSize, weight: weight))
+                .font(pf(titleSize, weight))
                 .foregroundColor(C.label)
                 .onLongPressGesture { onLongPressTitle?() }
 
@@ -118,7 +118,7 @@ struct NavBar<Right: View>: View {
                 if let back = back {
                     Button(action: back) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .medium))
+                            .font(pf(20, .medium))
                             .foregroundColor(C.label)
                             .frame(width: 44, height: L.navH)
                     }
@@ -158,12 +158,12 @@ struct SearchBoxCenter: View {
             ZStack(alignment: centered ? .center : .leading) {
                 if text.isEmpty {
                     Text("搜索")
-                        .font(.system(size: 16))
+                        .font(pf(16))
                         .foregroundColor(C.searchIcon)
                 }
                 TextField("", text: $text)
                     .focused($focused)
-                    .font(.system(size: 16))
+                    .font(pf(16))
                     .foregroundColor(C.label)
                     .multilineTextAlignment(centered ? .center : .leading)
             }
@@ -194,11 +194,11 @@ struct SearchBoxLeft: View {
             ZStack(alignment: .leading) {
                 if text.isEmpty {
                     Text("搜索")
-                        .font(.system(size: 15))
+                        .font(pf(15))
                         .foregroundColor(C.searchIcon2)
                 }
                 TextField("", text: $text)
-                    .font(.system(size: 15))
+                    .font(pf(15))
                     .foregroundColor(C.label)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -240,13 +240,13 @@ struct MenuRow: View {
                     .frame(width: L.menuIcon, height: L.menuIcon)
 
                 Text(title)
-                    .font(.system(size: 17))
+                    .font(pf(17))
                     .foregroundColor(C.label)
 
                 Spacer(minLength: 0)
 
                 if !detail.isEmpty {
-                    Text(detail).font(.system(size: 15)).foregroundColor(C.subLabel)
+                    Text(detail).font(pf(15)).foregroundColor(C.subLabel)
                 }
                 if !thumb.isEmpty {
                     ZStack(alignment: .topTrailing) {

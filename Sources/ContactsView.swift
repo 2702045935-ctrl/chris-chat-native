@@ -50,7 +50,7 @@ struct ContactsView: View {
                         path.append("addFriend")
                     } label: {
                         Text("＋")
-                            .font(.system(size: 19))
+                            .font(pf(19))
                             .foregroundColor(C.label)
                             .frame(width: 44, height: L.navH)
                     }
@@ -142,7 +142,7 @@ struct ContactsView: View {
             HStack(spacing: L.ctGap) {
                 FuncIcon(markup: item.1, bg: item.2, size: L.avatar)
                 Text(item.0)
-                    .font(.system(size: 17))
+                    .font(pf(17))
                     .foregroundColor(C.label)
                 Spacer(minLength: 0)
                 Chevron(size: 9, line: 1.6)
@@ -160,7 +160,7 @@ struct ContactsView: View {
         HStack(spacing: L.ctGap) {
             Avatar(path: user.avatarPath, size: L.avatar, radius: 8)
             Text(user.name)
-                .font(.system(size: 17))
+                .font(pf(17))
                 .foregroundColor(C.label)
                 .lineLimit(1)
             Spacer(minLength: 0)
@@ -183,7 +183,7 @@ struct ContactsView: View {
                     }
                 } label: {
                     Text(section.letter)
-                        .font(.system(size: 12.5))
+                        .font(pf(12.5))
                         .foregroundColor(C.arrow)
                         .frame(width: 22, height: 14)
                 }
@@ -217,18 +217,18 @@ struct ContactCardView: View {
                         Avatar(path: user.avatarPath, size: 64, radius: 8)
                         HStack(spacing: 6) {
                             Text(user.name)
-                                .font(.system(size: 20, weight: .medium))
+                                .font(pf(20, .medium))
                                 .foregroundColor(C.label)
                             if user.gender == "male" {
                                 Circle().fill(Color(hex: 0x10AEFF)).frame(width: 14, height: 14)
-                                    .overlay(Image(systemName: "person.fill").font(.system(size: 8)).foregroundColor(.white))
+                                    .overlay(Image(systemName: "person.fill").font(pf(8)).foregroundColor(.white))
                             } else if user.gender == "female" {
                                 Circle().fill(Color(hex: 0xFA6E9A)).frame(width: 14, height: 14)
-                                    .overlay(Image(systemName: "person.fill").font(.system(size: 8)).foregroundColor(.white))
+                                    .overlay(Image(systemName: "person.fill").font(pf(8)).foregroundColor(.white))
                             }
                         }
                         if let bio = user.bio, !bio.isEmpty {
-                            Text(bio).font(.system(size: 14)).foregroundColor(C.subLabel)
+                            Text(bio).font(pf(14)).foregroundColor(C.subLabel)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -251,7 +251,7 @@ struct ContactCardView: View {
                                 onOpenMoments(user.id)
                             } label: {
                                 HStack(spacing: 8) {
-                                    Text("朋友圈").font(.system(size: 16)).foregroundColor(C.label)
+                                    Text("朋友圈").font(pf(16)).foregroundColor(C.label)
                                     Spacer()
                                     HStack(spacing: 4) {
                                         ForEach(thumbs.prefix(4), id: \.self) { p in
@@ -276,7 +276,7 @@ struct ContactCardView: View {
                         openChat()
                     } label: {
                         Text(busy ? "打开中…" : "发消息")
-                            .font(.system(size: 17))
+                            .font(pf(17))
                             .foregroundColor(C.green)
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
@@ -301,9 +301,9 @@ struct ContactCardView: View {
 
     private func infoRow(_ title: String, _ value: String) -> some View {
         HStack {
-            Text(title).font(.system(size: 16)).foregroundColor(C.label)
+            Text(title).font(pf(16)).foregroundColor(C.label)
             Spacer()
-            Text(value).font(.system(size: 16)).foregroundColor(C.subLabel)
+            Text(value).font(pf(16)).foregroundColor(C.subLabel)
         }
         .padding(.horizontal, 16)
         .frame(height: 48)

@@ -110,8 +110,8 @@ struct ComingSoonView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text(title).font(.system(size: 17)).foregroundColor(C.label)
-            Text("这一页排在下一批").font(.system(size: 14)).foregroundColor(C.subLabel)
+            Text(title).font(pf(17)).foregroundColor(C.label)
+            Text("这一页排在下一批").font(pf(14)).foregroundColor(C.subLabel)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(C.pageBg)
@@ -119,11 +119,11 @@ struct ComingSoonView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 18, weight: .medium))
+                    Image(systemName: "chevron.left").font(pf(18, .medium))
                 }
             }
             ToolbarItem(placement: .principal) {
-                Text(title).font(.system(size: 18)).foregroundColor(C.label)
+                Text(title).font(pf(18)).foregroundColor(C.label)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -259,7 +259,7 @@ struct MomentsView: View {
 
             HStack(alignment: .bottom, spacing: 12) {
                 Text(app.me?.name ?? "")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(pf(17, .semibold))
                     .foregroundColor(.white)
                     .shadow(color: Color.black.opacity(0.55), radius: 4, x: 0, y: 1)
                     .padding(.bottom, 24)
@@ -280,7 +280,7 @@ struct MomentsView: View {
         VStack(spacing: 0) {
             if moments.isEmpty {
                 Text("正在加载朋友圈…")
-                    .font(.system(size: 14))
+                    .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 40)
             }
@@ -315,7 +315,7 @@ struct MomentsView: View {
 
             if solid {
                 Text("朋友圈")
-                    .font(.system(size: 18))
+                    .font(pf(18))
                     .foregroundColor(C.label)
                     .frame(maxWidth: .infinity)
             }
@@ -351,7 +351,7 @@ struct MomentsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 TextEditor(text: $draft)
                     .frame(minHeight: 110)
-                    .font(.system(size: 17))
+                    .font(pf(17))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.gray.opacity(0.2))
@@ -372,7 +372,7 @@ struct MomentsView: View {
                     composerPick = true
                 } label: {
                     Label("添加图片", systemImage: "photo.on.rectangle")
-                        .font(.system(size: 15))
+                        .font(pf(15))
                 }
                 Spacer()
             }
@@ -484,12 +484,12 @@ struct MomentRow: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(moment.author?.name ?? "")
-                    .font(.system(size: 18.3, weight: .medium))
+                    .font(pf(18.3, .medium))
                     .foregroundColor(C.link)
 
                 if let content = moment.content, !content.isEmpty {
                     Text(content)
-                        .font(.system(size: 18.3))
+                        .font(pf(18.3))
                         .foregroundColor(C.label)
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
@@ -503,7 +503,7 @@ struct MomentRow: View {
 
                 HStack(spacing: 14) {
                     Text(TimeFmt.ago(moment.createdAt))
-                        .font(.system(size: 14.5))
+                        .font(pf(14.5))
                         .foregroundColor(Color.dyn(0xA5A5A5, 0x8A8A8E))
 
                     Spacer()
@@ -531,13 +531,13 @@ struct MomentRow: View {
                     VStack(alignment: .leading, spacing: 3) {
                         if !likes.isEmpty {
                             Text(likes.compactMap { $0.nickname }.joined(separator: "、"))
-                                .font(.system(size: 15))
+                                .font(pf(15))
                                 .foregroundColor(C.link)
                         }
                         ForEach(comments.indices, id: \.self) { i in
                             let c = comments[i]
                             Text((c.nickname ?? "") + "：" + (c.content ?? ""))
-                                .font(.system(size: 15))
+                                .font(pf(15))
                                 .foregroundColor(C.label)
                         }
                     }

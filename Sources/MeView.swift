@@ -86,10 +86,10 @@ struct MeView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text(app.me?.name ?? "")
-                        .font(.system(size: L.v(17, 4.8, 19.5)))
+                        .font(pf(L.v(17, 4.8, 19.5)))
                         .foregroundColor(C.label)
                     Text("微信号：\(app.me?.username ?? "-")")
-                        .font(.system(size: 16))
+                        .font(pf(16))
                         .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
                         .padding(.top, L.v(4, 1.8, 8))
                 }
@@ -124,7 +124,7 @@ struct MeView: View {
                 chip {
                     Text("朋友圈")
                     Text("\(friendCount) 个朋友")
-                        .font(.system(size: L.v(11.5, 3.2, 12.5)))
+                        .font(pf(L.v(11.5, 3.2, 12.5)))
                         .foregroundColor(C.subLabel)
                         .padding(.leading, L.v(3, 1.2, 5))
                 } action: {
@@ -143,7 +143,7 @@ struct MeView: View {
     private func chip<Content: View>(@ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: L.v(2, 1, 4)) { content() }
-                .font(.system(size: L.v(12.5, 3.4, 13.5)))
+                .font(pf(L.v(12.5, 3.4, 13.5)))
                 .foregroundColor(Color.dyn(0x191919, 0xF2F2F7))
                 .padding(.horizontal, L.v(10, 3.2, 13))
                 .frame(height: L.v(28, 8, 32))
@@ -165,12 +165,12 @@ struct MeView: View {
                     .frame(width: L.v(26, 7.6, 32), height: L.v(38, 11, 46))
                 VStack(alignment: .leading, spacing: L.v(3, 1.2, 5)) {
                     Text("热卖 5000+")
-                        .font(.system(size: L.v(10.5, 2.9, 11.5)))
+                        .font(pf(L.v(10.5, 2.9, 11.5)))
                         .foregroundColor(Color.dyn(0xE0393B, 0xFF8A8D))
                         .padding(.horizontal, L.v(5, 1.6, 7))
                         .background(RoundedRectangle(cornerRadius: 4).fill(Color.dyn(0xFFECEB, 0x4A1F20)))
                     Text("可口可乐碳酸饮料")
-                        .font(.system(size: L.v(14, 3.9, 15.5)))
+                        .font(pf(L.v(14, 3.9, 15.5)))
                         .foregroundColor(C.label)
                         .lineLimit(1)
                 }
@@ -222,7 +222,7 @@ struct SettingsView: View {
                         confirmLogout = true
                     } label: {
                         Text(busy ? "退出中…" : "退出登录")
-                            .font(.system(size: 17))
+                            .font(pf(17))
                             .foregroundColor(C.red)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
@@ -255,10 +255,10 @@ struct SettingsView: View {
     private func settingRow(_ title: String, _ value: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Text(title).font(.system(size: 17)).foregroundColor(C.label)
+                Text(title).font(pf(17)).foregroundColor(C.label)
                 Spacer(minLength: 0)
                 if !value.isEmpty {
-                    Text(value).font(.system(size: 15)).foregroundColor(C.subLabel)
+                    Text(value).font(pf(15)).foregroundColor(C.subLabel)
                 }
                 Chevron(size: 9, line: 1.6).padding(.trailing, 3)
             }

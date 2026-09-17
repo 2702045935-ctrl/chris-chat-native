@@ -51,6 +51,12 @@ struct ChatDetailView: View {
     @FocusState private var focused: Bool
 
     private var myId: String { app.me?.id ?? "" }
+    private var isGroup: Bool { chat.type == "group" }
+
+    private func displayName(_ message: Message) -> String {
+        if let n = message.senderName, !n.isEmpty { return n }
+        return app.contact(for: message.senderId ?? "")?.name ?? ""
+    }
 
     private var backgroundPath: String {
         let v = app.me?.chatBackground ?? "auto"
@@ -141,7 +147,10 @@ struct ChatDetailView: View {
                                     .padding(.top, 12)
                                     .padding(.bottom, 16)
                             }
-                            MessageRow(message: message, mine: message.senderId == myId)
+                            MessageRow(message: message,
+                                       mine: message.senderId == myId,
+                                       senderName: (!isGroup || message.senderId == myId)
+                                           ? "" : displayName(message))
                                 .padding(.bottom, 15)
                                 .contextMenu {
                                     if message.senderId == myId {
@@ -429,6 +438,7 @@ struct ChatDetailView: View {
 struct MessageRow: View {
     let message: Message
     let mine: Bool
+    var senderName: String = ""
 
     @EnvironmentObject var app: AppState
 
@@ -444,17 +454,16 @@ struct MessageRow: View {
             if !mine {
                 Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
                 Spacer().frame(width: 9)
-            }
-
-            if message.isRecalled {
-                Text(mine ? "你撤回了一条消息" : "对方撤回了一条消息")
-                    .font(pf(12))
-                    .foregroundColor(C.msgTime)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(C.bubbleOther))
+                VStack(alignment: .leading, spacing: 4) {
+                    if !senderName.isEmpty {
+                        Text(senderName)
+                            .font(pf(12))
+                            .foregroundColor(C.subLabel)
+                    }
+                    content
+                }
             } else {
-                bubble
+                content
             }
 
             if !mine { Spacer(minLength: 60) }
@@ -463,6 +472,20 @@ struct MessageRow: View {
                 Spacer().frame(width: 9)
                 Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if message.isRecalled {
+            Text(mine ? "你撤回了一条消息" : "对方撤回了一条消息")
+                .font(pf(12))
+                .foregroundColor(C.msgTime)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 5).fill(C.bubbleOther))
+        } else {
+            bubble
         }
     }
 

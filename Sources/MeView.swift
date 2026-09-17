@@ -22,18 +22,18 @@ struct MeView: View {
 
                     GroupCard {
                         MenuRow(icon: I.star, iconColor: Color(hex: 0x4489EA),
-                                title: "收藏", onTap: { path.append("soon:收藏") })
+                                title: "收藏", onTap: { path.append("favorites") })
                         rowLine
                         MenuRow(icon: I.album, iconColor: Color(hex: 0x7275E9),
                                 title: "朋友圈", onTap: { path.append("moments") })
                         rowLine
                         MenuRow(icon: I.works, iconColor: Color(hex: 0x3D83E7),
-                                title: "作品", onTap: { path.append("soon:作品") })
+                                title: "作品", onTap: { path.append("works") })
                         rowLine
                         promoRow
                         rowLine
                         MenuRow(icon: I.sticker, iconColor: Color(hex: 0xF5C144),
-                                title: "表情", onTap: { path.append("soon:表情") })
+                                title: "表情", onTap: { path.append("stickers") })
                     }
 
                     gap
@@ -58,6 +58,12 @@ struct MeView: View {
                     ProfileEditView()
                 } else if key == "service" {
                     ServiceView()
+                } else if key == "favorites" {
+                    FavoritesView()
+                } else if key == "stickers" {
+                    StickerView()
+                } else if key == "works" {
+                    WorksView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -196,6 +202,8 @@ struct SettingsView: View {
 
     @State private var confirmLogout = false
     @State private var busy = false
+    @State private var showBg = false
+    @State private var showBgPick = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -204,6 +212,8 @@ struct SettingsView: View {
                 VStack(spacing: 0) {
                     GroupCard {
                         settingRow("个人信息", app.me?.name ?? "") { app.show("个人信息排在下一批") }
+                        HairLine(inset: 16)
+                        settingRow("聊天背景", (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
                         HairLine(inset: 16)
                         settingRow("账号与安全", "") { app.show("账号与安全排在下一批") }
                         HairLine(inset: 16)
@@ -240,6 +250,20 @@ struct SettingsView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .confirmationDialog("聊天背景", isPresented: $showBg, titleVisibility: .visible) {
+            Button("从相册选一张") { showBgPick = true }
+            Button("恢复默认") {
+                Task {
+                    await API.shared.changeBackground("auto")
+                    app.me = try? await API.shared.me()
+                    app.show("已恢复默认背景")
+                }
+            }
+            Button("取消", role: .cancel) { }
+        }
+        .sheet(isPresented: $showBgPick) {
+            PhotoPicker { image in changeBg(image) }
+        }
         .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) {
                 busy = true
@@ -249,6 +273,18 @@ struct SettingsView: View {
                 }
             }
             Button("取消", role: .cancel) { }
+        }
+    }
+
+    private func changeBg(_ image: UIImage) {
+        busy = true
+        Task {
+            if let url = try? await API.shared.upload(image: image) {
+                await API.shared.changeBackground(url)
+                app.me = try? await API.shared.me()
+                app.show("聊天背景换好了")
+            }
+            busy = false
         }
     }
 

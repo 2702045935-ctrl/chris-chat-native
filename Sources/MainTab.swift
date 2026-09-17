@@ -224,6 +224,8 @@ struct SearchBoxLeft: View {
 struct MenuRow: View {
     let icon: String
     var iconColor: Color = C.green
+    /// 发现页左边距 17，我页/设置页 19（网页版就是这样，差这 2px 看着就不一样）
+    var padLeading: CGFloat = 17
     let title: String
     var detail: String = ""
     var showArrow: Bool = true
@@ -265,7 +267,7 @@ struct MenuRow: View {
                         .padding(.trailing, 3)
                 }
             }
-            .padding(.leading, L.menuPadL)
+            .padding(.leading, padLeading)
             .padding(.trailing, L.menuPadR)
             .frame(height: L.menuH)
             .background(C.cardBg)

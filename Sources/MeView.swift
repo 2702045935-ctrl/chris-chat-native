@@ -15,32 +15,32 @@ struct MeView: View {
 
                     GroupCard {
                         MenuRow(icon: I.wallet, iconColor: Color(hex: 0x59C47E),
-                                title: "服务", onTap: { path.append("service") })
+                                padLeading: 19, title: "服务", onTap: { path.append("service") })
                     }
 
                     gap
 
                     GroupCard {
                         MenuRow(icon: I.star, iconColor: Color(hex: 0x4489EA),
-                                title: "收藏", onTap: { path.append("favorites") })
+                                padLeading: 19, title: "收藏", onTap: { path.append("favorites") })
                         rowLine
                         MenuRow(icon: I.album, iconColor: Color(hex: 0x7275E9),
-                                title: "朋友圈", onTap: { path.append("moments") })
+                                padLeading: 19, title: "朋友圈", onTap: { path.append("moments") })
                         rowLine
                         MenuRow(icon: I.works, iconColor: Color(hex: 0x3D83E7),
-                                title: "作品", onTap: { path.append("works") })
+                                padLeading: 19, title: "作品", onTap: { path.append("works") })
                         rowLine
                         promoRow
                         rowLine
                         MenuRow(icon: I.sticker, iconColor: Color(hex: 0xF5C144),
-                                title: "表情", onTap: { path.append("stickers") })
+                                padLeading: 19, title: "表情", onTap: { path.append("stickers") })
                     }
 
                     gap
 
                     GroupCard {
                         MenuRow(icon: I.gear, iconColor: Color(hex: 0x3D83E7),
-                                title: "设置", onTap: { path.append("settings") })
+                                padLeading: 19, title: "设置", onTap: { path.append("settings") })
                     }
 
                     Spacer().frame(height: 24)

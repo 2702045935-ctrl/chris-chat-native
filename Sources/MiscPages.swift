@@ -245,8 +245,8 @@ struct StatusView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 96)
                             .background(
-                                LinearGradient(colors: [Color(hex: it.color ?? "#6F8A38"),
-                                                        Color(hex: it.color2 ?? it.color ?? "#6F8A38")],
+                                LinearGradient(colors: [Color(hexString: it.color ?? "#6F8A38"),
+                                                        Color(hexString: it.color2 ?? it.color ?? "#6F8A38")],
                                                startPoint: .topLeading, endPoint: .bottomTrailing)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

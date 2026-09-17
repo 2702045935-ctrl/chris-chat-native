@@ -154,6 +154,11 @@ extension UIColor {
 
 extension Color {
     init(hex: UInt32) { self = Color(UIColor(hex: hex)) }
+    /// "#6F8A38" 这种字符串颜色
+    init(hexString: String, fallback: UInt32 = 0x6F8A38) {
+        let s = hexString.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespaces)
+        self = Color(UIColor(hex: UInt32(s, radix: 16) ?? fallback))
+    }
     static func dyn(_ light: UInt32, _ dark: UInt32) -> Color { Color(UIColor.dyn(light, dark)) }
 }
 

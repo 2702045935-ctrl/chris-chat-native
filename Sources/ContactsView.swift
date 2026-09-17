@@ -191,6 +191,7 @@ struct ContactCardView: View {
     var onOpenMoments: (String) -> Void
 
     @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
     @State private var busy = false
     @State private var thumbs: [String] = []
 

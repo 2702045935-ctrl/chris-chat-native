@@ -20,6 +20,8 @@ struct BalancePageView: View {
     @State private var showBills = false
     @State private var showRecharge = false
     @State private var rechargeAmount = ""
+    @State private var showFaq = false
+    @State private var faqAnswer: String?
 
     private var st: BalanceStyle { cfg?.style ?? BalanceStyle() }
 
@@ -47,6 +49,17 @@ struct BalancePageView: View {
             TextField("金额", text: $rechargeAmount).keyboardType(.decimalPad)
             Button("充值") { doRecharge() }
             Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("常见问题", isPresented: $showFaq, titleVisibility: .visible) {
+            ForEach((cfg?.faq ?? []).indices, id: \.self) { i in
+                Button(cfg!.faq![i].q) { faqAnswer = cfg!.faq![i].a }
+            }
+            Button("关闭", role: .cancel) { }
+        }
+        .alert("常见问题", isPresented: Binding(get: { faqAnswer != nil }, set: { if !$0 { faqAnswer = nil } })) {
+            Button("知道了", role: .cancel) { faqAnswer = nil }
+        } message: {
+            Text(faqAnswer ?? "")
         }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
@@ -147,6 +160,7 @@ struct BalancePageView: View {
         case "recharge": rechargeAmount = ""; showRecharge = true
         case "bills": showBills = true
         case "withdraw": app.show("提现：还没接后端，先把页面做出来")
+        case "faq": showFaq = true
         default: app.show("「\(label)」还没接后端，先把页面做出来")
         }
     }

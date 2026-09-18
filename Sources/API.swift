@@ -469,6 +469,11 @@ struct BalanceLink: Decodable, Identifiable, Hashable {
     var enabled: Bool?
 }
 
+struct BalanceFaq: Decodable, Hashable {
+    var q: String
+    var a: String
+}
+
 struct BalanceStyle: Decodable, Hashable {
     var bg: String?
     var circleSize: Double?
@@ -529,6 +534,7 @@ struct BalancePageConfig: Decodable, Hashable {
     var withdraw: BalanceButton?
     var links: [BalanceLink]?
     var footer: String?
+    var faq: [BalanceFaq]?
     var style: BalanceStyle?
     var balance: Double?
     var frozen: Double?

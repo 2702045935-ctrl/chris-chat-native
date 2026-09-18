@@ -102,7 +102,7 @@ struct BillsView: View {
         }
         .confirmationDialog("账单", isPresented: $showMore, titleVisibility: .hidden) {
             Button("账单常见问题") { app.show("账单常见问题：还没做，排在下一批") }
-            Button("导出账单（CSV）") { app.show("导出账单：还没做，排在下一批") }
+            Button("导出账单（CSV）") { exportCsv() }
             Button("取消", role: .cancel) { }
         }
         .navigationDestination(isPresented: $showDetail) {
@@ -288,6 +288,27 @@ struct BillsView: View {
     }
 
     private func money(_ v: Double) -> String { "¥" + String(format: "%.2f", v) }
+
+    /// 导出账单：拼一份 CSV 复制到剪贴板（手机上先这样，之后可以接分享）
+    private func exportCsv() {
+        guard !bills.isEmpty else { app.show("还没有账单可以导出"); return }
+        var lines = ["时间,对方,方向,金额,状态,说明,支付方式,单号"]
+        for b in bills {
+            let fields = [
+                TimeFmt.bill(b.createdAt),
+                b.peer,
+                b.mine ? "支出" : "收入",
+                (b.mine ? "-" : "+") + String(format: "%.2f", b.amount),
+                b.stateText,
+                b.note ?? "",
+                (b.method ?? "balance") == "card" ? "银行卡" : "零钱",
+                b.id
+            ]
+            lines.append(fields.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }.joined(separator: ","))
+        }
+        UIPasteboard.general.string = lines.joined(separator: "\n")
+        app.show("已复制 \(bills.count) 笔账单到剪贴板（CSV）")
+    }
 
     private func load(_ m: String) async {
         loading = true

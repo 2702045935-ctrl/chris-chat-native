@@ -113,7 +113,7 @@ struct ComingSoonView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                Text(title).font(pf(18)).foregroundColor(C.label)
+                Text(title).font(pf(UIConfig.num("navTitle", 17))).foregroundColor(C.label)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -305,7 +305,7 @@ struct MomentsView: View {
 
             if solid {
                 Text("朋友圈")
-                    .font(pf(18))
+                    .font(pf(UIConfig.num("navTitle", 17)))
                     .foregroundColor(C.label)
                     .frame(maxWidth: .infinity)
             }

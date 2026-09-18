@@ -147,8 +147,11 @@ struct NavBar<Right: View>: View {
         .frame(height: L.navH)
     }
 
-    /// 网页版：会话/聊天页 18px，发现页 17px，都是常规体
-    private var titleSize: CGFloat { title == "发现" ? 17 : 18 }
+    /// 顶部标题：默认 17（发现页小一号 16）；想再调就改 ui.json 里的 navTitle
+    private var titleSize: CGFloat {
+        let base = UIConfig.num("navTitle", 17)
+        return title == "发现" ? base - 1 : base
+    }
     private var weight: Font.Weight { .regular }
 }
 

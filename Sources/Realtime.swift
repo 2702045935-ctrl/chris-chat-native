@@ -13,6 +13,13 @@ struct PushEvent: Equatable {
     var momentUnread: Int? = nil
     /// 待处理的好友申请数量（服务器在 ready 里给；手机在后台没收到推送时靠它补上通讯录红点）
     var friendRequests: Int? = nil
+    var callId = ""
+    var callAction = ""
+    var callMedia = ""
+    var callPeerId = ""
+    var callPeerName = ""
+    var callPeerAvatar = ""
+    var callError = ""
     var tick = 0
 }
 
@@ -66,6 +73,14 @@ final class Realtime: ObservableObject {
         connected = true
     }
 
+    /// 往长连接里发一条 JSON（通话信令用）
+    func sendJSON(_ obj: [String: Any]) {
+        guard let socket = socket,
+              let data = try? JSONSerialization.data(withJSONObject: obj),
+              let text = String(data: data, encoding: .utf8) else { return }
+        socket.send(.string(text)) { _ in }
+    }
+
     func stop() {
         loop?.cancel()
         loop = nil
@@ -92,6 +107,14 @@ final class Realtime: ObservableObject {
         ev.announce = (obj["text"] as? String) ?? ""
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
         if let n = obj["friendRequests"] as? Int { ev.friendRequests = n }
+        // 通话信令（invite/incoming/ringing/accept/reject/cancel/hangup）
+        ev.callId = (obj["callId"] as? String) ?? ""
+        ev.callAction = (obj["action"] as? String) ?? ""
+        ev.callMedia = (obj["media"] as? String) ?? ""
+        ev.callPeerId = (obj["peerId"] as? String) ?? ""
+        ev.callPeerName = (obj["peerName"] as? String) ?? ""
+        ev.callPeerAvatar = (obj["peerAvatar"] as? String) ?? ""
+        ev.callError = (obj["error"] as? String) ?? ""
         /* 推送洪水节流：每条都通知界面的话，几千条一来手机就卡死/崩。
            有任务在跑就先攒着，最多每 0.25 秒发一次（最后那条一定会发出去）。 */
         if publishTask == nil {
@@ -115,3 +138,4 @@ final class Realtime: ObservableObject {
         }
     }
 }
+

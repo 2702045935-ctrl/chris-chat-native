@@ -225,7 +225,7 @@ struct ChatsView: View {
 
                     SearchBoxCenter(text: $keyword)
                         .padding(L.searchPad)
-                        .background(C.chatsTopBg)      // 顶部（导航栏+搜索框）底色 #F7F7F7
+                        .background(C.navBg)      // 和「通讯录」顶部用同一个颜色（ui.json 的 navBg）
                         .zIndex(1)                     // 压在上面：顶栏滑过来是钻到它后面，不会糊住搜索框
                 }
 
@@ -262,8 +262,8 @@ struct ChatsView: View {
                     .coordinateSpace(name: "chatsScroll")
                 }
             }
-            .background(C.chatsTopBg.ignoresSafeArea(edges: .bottom))
-            .background(C.chatsTopBg.ignoresSafeArea(edges: .top))
+            .background(C.navBg.ignoresSafeArea(edges: .bottom))
+            .background(C.navBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)

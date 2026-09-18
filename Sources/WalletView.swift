@@ -122,8 +122,7 @@ struct WalletView: View {
                 Spacer(minLength: 0)
 
                 if !value.isEmpty {
-                    Text(value)
-                        .font(pf(s.valueFont))
+                    moneyText(value, size: s.valueFont, curSize: s.curFontSize)
                         .fontWeight(.medium)
                         .monospacedDigit()          // 钱用等宽数字：数字一样宽、小数点对齐
                         .foregroundColor(s.valueColorV)

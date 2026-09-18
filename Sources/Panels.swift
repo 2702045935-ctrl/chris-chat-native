@@ -201,8 +201,8 @@ struct GiftPanel: View {
                                             .font(pf(L.v(10.5, 3, 12)))
                                             .foregroundColor(C.subLabel)
                                             .lineLimit(1)
-                                        Text("¥\(Int(g.price ?? 0))")
-                                            .font(pf(L.v(10, 2.8, 11.5)))
+                    Text("¥\(Int(g.price ?? 0))")
+                        .font(pfMoney(L.v(10, 2.8, 11.5)))
                                             .foregroundColor(C.red)
                                     }
                                     .frame(maxWidth: .infinity)

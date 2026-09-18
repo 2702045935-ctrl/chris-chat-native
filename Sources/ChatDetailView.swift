@@ -747,7 +747,7 @@ struct MessageRow: View {
             Text(icon).font(pf(30))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).font(pf(15, .medium)).foregroundColor(C.bubbleText)
-                Text("¥\(String(format: "%.0f", price))").font(pf(12)).foregroundColor(C.red)
+                    Text("¥\(String(format: "%.0f", price))").font(pfMoney(12)).foregroundColor(C.red)
             }
         }
         .padding(.horizontal, 14)

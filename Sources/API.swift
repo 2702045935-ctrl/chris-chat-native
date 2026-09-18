@@ -261,6 +261,7 @@ struct ServiceStyle: Decodable, Hashable {
     var cardTextColor: String?
     var cardTextSize: Double?
     var cardSubSize: Double?
+    var curSize: Double?
     var cardSubOpacity: Double?
     var iconSize: Double?
     var gridTitleSize: Double?
@@ -274,6 +275,7 @@ struct ServiceStyle: Decodable, Hashable {
     var icon: CGFloat { CGFloat(iconSize ?? 28) }
     var cardNameSize: CGFloat { CGFloat(cardTextSize ?? 18) }
     var cardSubSizeV: CGFloat { CGFloat(cardSubSize ?? 12) }
+    var curFontSize: CGFloat { CGFloat(curSize ?? 0) }
     var cardSubOpacityV: Double { cardSubOpacity ?? 0.5 }
     var titleSize: CGFloat { CGFloat(gridTitleSize ?? 14) }
     var textSize: CGFloat { CGFloat(gridTextSize ?? 13) }
@@ -350,6 +352,7 @@ struct WalletStyle: Decodable, Hashable {
     var rightInset: Double?
     var labelSize: Double?
     var valueSize: Double?
+    var curSize: Double?
     var noteSize: Double?
     var footerSize: Double?
     var groupGap: Double?
@@ -368,6 +371,7 @@ struct WalletStyle: Decodable, Hashable {
     var rightPad: CGFloat { CGFloat(rightInset ?? 18) }
     var labelFont: CGFloat { CGFloat(labelSize ?? 17) }
     var valueFont: CGFloat { CGFloat(valueSize ?? 16) }
+    var curFontSize: CGFloat { CGFloat(curSize ?? 0) }
     var noteFont: CGFloat { CGFloat(noteSize ?? 13) }
     var footFont: CGFloat { CGFloat(footerSize ?? 13) }
     var gap: CGFloat { CGFloat(groupGap ?? 12) }
@@ -462,6 +466,8 @@ struct BillsPageStyle: Decodable, Hashable {
     var titleSize: Double?
     var timeSize: Double?
     var amountSize: Double?
+    var curSize: Double?
+    var curSize: Double?
     var monthSize: Double?
     var sumSize: Double?
     var rowHeight: Double?
@@ -470,6 +476,7 @@ struct BillsPageStyle: Decodable, Hashable {
     var titleFont: CGFloat { CGFloat(titleSize ?? 17) }
     var timeFont: CGFloat { CGFloat(timeSize ?? 13) }
     var amountFont: CGFloat { CGFloat(amountSize ?? 16) }
+    var curFontSize: CGFloat { CGFloat(curSize ?? 0) }
     var monthFont: CGFloat { CGFloat(monthSize ?? 15) }
     var sumFont: CGFloat { CGFloat(sumSize ?? 13) }
     var row: CGFloat { CGFloat(rowHeight ?? 80) }
@@ -524,6 +531,7 @@ struct BalanceStyle: Decodable, Hashable {
     var yenFont: CGFloat { CGFloat(yenSize ?? 24) }
     var titleFont: CGFloat { CGFloat(titleSize ?? 18) }
     var amountFont: CGFloat { CGFloat(amountSize ?? 64) }
+    var curFont: CGFloat { CGFloat(curSize ?? 28) }
     var noteFont: CGFloat { CGFloat(noteSize ?? 16) }
     var topPad: CGFloat { CGFloat(padTop ?? 60) }
     var gapTitleV: CGFloat { CGFloat(gapTitle ?? 24) }

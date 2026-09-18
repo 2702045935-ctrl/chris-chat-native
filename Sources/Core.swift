@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-18 22:40 金额统一SFProDisplayMedium"
+    static let build = "2026-09-18 23:00 金融体统一+¥单独字号"
 }
 
 /* ============================================================
@@ -328,6 +328,20 @@ func pfMoney(_ size: CGFloat) -> Font {
         if let f = UIFont(name: name, size: s) { return Font(f) }
     }
     return .system(size: s, weight: .medium, design: .default)
+}
+
+/// 金额拼成一段 Text：**¥ 可以单独用自己的字号**（微信那样比数字小）。
+/// curSize <= 0 就整段一个字号。
+func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0) -> Text {
+    guard let r = text.range(of: "¥") else {
+        return Text(text).font(pfMoney(size))
+    }
+    let prefix = String(text[text.startIndex..<r.lowerBound])
+    let rest = String(text[r.upperBound...])
+    let curFont = curSize > 0 ? pfMoney(curSize) : pfMoney(size)
+    var out = Text(prefix).font(pfMoney(size))
+    out = out + Text("¥").font(curFont)
+    return out + Text(rest).font(pfMoney(size))
 }
 
 enum AppIconImage {

@@ -596,8 +596,7 @@ struct ServiceView: View {
                     .foregroundColor(s.cardText)
                     .padding(.top, 17)
                 if !sub.isEmpty {
-                    Text(sub)
-                        .font(pf(s.cardSubSizeV))
+                    moneyText(sub, size: s.cardSubSizeV, curSize: s.curFontSize)
                         .monospacedDigit()          // 绿卡上的零钱也用等宽数字
                         .foregroundColor(s.cardText.opacity(s.cardSubOpacityV))
                         .padding(.top, 10)

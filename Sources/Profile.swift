@@ -598,6 +598,7 @@ struct ServiceView: View {
                 if !sub.isEmpty {
                     Text(sub)
                         .font(pf(s.cardSubSizeV))
+                        .monospacedDigit()          // 绿卡上的零钱也用等宽数字
                         .foregroundColor(s.cardText.opacity(s.cardSubOpacityV))
                         .padding(.top, 10)
                 }
@@ -611,22 +612,17 @@ struct ServiceView: View {
 
     private func groupCard(_ g: Group) -> some View {
         let s = st
-        /* 版块自己的上下尺寸（后台可调；留空/没配就跟全局）。左右固定 8pt，不给调。 */
-        let gs = g.style
-        let titleH = CGFloat(gs?.titleHeight ?? Double(s.titleHeight))
-        let cellH = CGFloat(gs?.rowHeight ?? Double(s.cellHeight))
-        let rowGap = CGFloat(gs?.rowGap ?? 0)
-        let padTop = CGFloat(gs?.padTop ?? 0)
-        let padBottom = CGFloat(gs?.padBottom ?? 20)
+        /* 版块自己的「上 / 下」在 topGap() 里处理（块与块之间的空隙）；
+           标题行高、每行高、行间距、留白都是参考图那套固定值。左右固定 8pt。 */
         return VStack(spacing: 0) {
             Text(g.title)
                 .font(pf(s.titleSize))
                 .foregroundColor(s.titleColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 16.7)
-                .frame(height: titleH)
+                .frame(height: s.titleHeight)
 
-            LazyVGrid(columns: cols, spacing: rowGap) {
+            LazyVGrid(columns: cols, spacing: 0) {
                 ForEach(g.cells) { c in
                     Button {
                         run(c.action, c.label)
@@ -642,14 +638,13 @@ struct ServiceView: View {
                         }
                         .padding(.top, 14)
                         .frame(maxWidth: .infinity)
-                        .frame(height: cellH, alignment: .top)
+                        .frame(height: s.cellHeight, alignment: .top)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.bottom, padBottom)
+            .padding(.bottom, 20)
         }
-        .padding(.top, padTop)
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(C.cardBg))
         .padding(.horizontal, 8)
     }

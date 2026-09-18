@@ -202,6 +202,8 @@ struct BillsView: View {
                 Spacer(minLength: 8)
                 Text((b.mine ? "-" : "+") + money(b.amount))
                     .font(pf(16))
+                    .fontWeight(.medium)
+                    .monospacedDigit()
                     .foregroundColor(b.mine ? C.label : incomeGold)
                     .padding(.trailing, 18)
             }

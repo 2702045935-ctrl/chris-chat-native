@@ -241,15 +241,10 @@ struct ServiceCard: Decodable, Hashable {
 }
 
 /// 一个分类：标题 + 里面的格子（格子复用发现页那套字段）
-/// 版块自己的上下尺寸（后台「版块上下 / 行距」里配的；nil = 跟全局样式）
+/// 版块只给「上 / 下」两个值（块与块之间的空隙；nil = 用默认：上 0 / 下 8）
 struct ServiceGroupStyle: Decodable, Hashable {
     var gapTop: Double?
     var gapBottom: Double?
-    var titleHeight: Double?
-    var rowHeight: Double?
-    var rowGap: Double?
-    var padTop: Double?
-    var padBottom: Double?
 }
 
 struct ServiceGroup: Decodable, Identifiable, Hashable {
@@ -458,6 +453,73 @@ struct BillsPayload: Decodable, Hashable {
     var months: [String]?
     var summary: BillSummary?
     var month: String?
+}
+
+/* ---------------- 零钱页（钱包页点「零钱」进来，后台「零钱页」模块下发） ---------------- */
+
+struct BalanceButton: Decodable, Hashable {
+    var label: String?
+    var action: String?
+}
+
+struct BalanceLink: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var action: String?
+    var enabled: Bool?
+}
+
+struct BalanceStyle: Decodable, Hashable {
+    var bg: String?
+    var iconSize: Double?
+    var titleSize: Double?
+    var balanceSize: Double?
+    var noteSize: Double?
+    var noteColor: String?
+    var btnWidth: Double?
+    var btnHeight: Double?
+    var btnRadius: Double?
+    var rechargeBg: String?
+    var rechargeInk: String?
+    var withdrawBg: String?
+    var withdrawInk: String?
+    var linkSize: Double?
+    var linkColor: String?
+    var footerSize: Double?
+    var footerColor: String?
+
+    var icon: CGFloat { CGFloat(iconSize ?? 48) }
+    var titleFont: CGFloat { CGFloat(titleSize ?? 17) }
+    var amountFont: CGFloat { CGFloat(balanceSize ?? 44) }
+    var noteFont: CGFloat { CGFloat(noteSize ?? 13) }
+    var btnW: CGFloat { CGFloat(btnWidth ?? 183.7) }
+    var btnH: CGFloat { CGFloat(btnHeight ?? 47.7) }
+    var btnR: CGFloat { CGFloat(btnRadius ?? 8) }
+    var linkFont: CGFloat { CGFloat(linkSize ?? 13) }
+    var footFont: CGFloat { CGFloat(footerSize ?? 12) }
+    var pageBg: Color { Color(hexString: bg ?? "#FFFFFF", fallback: 0xFFFFFF) }
+    var noteColorV: Color { Color(hexString: noteColor ?? "#FA9D3B", fallback: 0xFA9D3B) }
+    var rechargeBgV: Color { Color(hexString: rechargeBg ?? "#07C160", fallback: 0x07C160) }
+    var rechargeInkV: Color { Color(hexString: rechargeInk ?? "#FFFFFF", fallback: 0xFFFFFF) }
+    var withdrawBgV: Color { Color(hexString: withdrawBg ?? "#F2F2F2", fallback: 0xF2F2F2) }
+    var withdrawInkV: Color { Color(hexString: withdrawInk ?? "#313131", fallback: 0x313131) }
+    var linkColorV: Color { Color(hexString: linkColor ?? "#576B95", fallback: 0x576B95) }
+    var footerColorV: Color { Color(hexString: footerColor ?? "#B3B3B3", fallback: 0xB3B3B3) }
+}
+
+struct BalancePageConfig: Decodable, Hashable {
+    var icon: String?
+    var svg: String?
+    var title: String?
+    var detailLabel: String?
+    var note: String?
+    var recharge: BalanceButton?
+    var withdraw: BalanceButton?
+    var links: [BalanceLink]?
+    var footer: String?
+    var style: BalanceStyle?
+    var balance: Double?
+    var frozen: Double?
 }
 
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
@@ -950,6 +1012,11 @@ final class API {
             path += "?month=" + m.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
         }
         return try await get(path, as: BillsPayload.self)
+    }
+
+    /// 零钱页（钱包页点「零钱」进来）
+    func balancePage() async throws -> BalancePageConfig {
+        try await get("/api/balance-page", as: BalancePageConfig.self)
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）

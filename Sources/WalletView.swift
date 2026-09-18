@@ -17,6 +17,7 @@ struct WalletView: View {
 
     @State private var cfg: WalletConfig?
     @State private var showBills = false
+    @State private var showCoin = false
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
     @State private var revealed: Set<String> = []
 
@@ -65,6 +66,7 @@ struct WalletView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .navigationDestination(isPresented: $showBills) { BillsView() }
+        .navigationDestination(isPresented: $showCoin) { BalancePageView() }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" || ev.type == "ui" { Task { await load() } }
@@ -122,6 +124,8 @@ struct WalletView: View {
                 if !value.isEmpty {
                     Text(value)
                         .font(pf(s.valueFont))
+                        .fontWeight(.medium)
+                        .monospacedDigit()          // 钱用等宽数字：数字一样宽、小数点对齐
                         .foregroundColor(s.valueColorV)
                         .padding(.trailing, 11)
                         .onTapGesture {
@@ -165,7 +169,7 @@ struct WalletView: View {
     private func run(_ action: String, _ label: String) {
         switch action {
         case "balance":
-            app.show("零钱 ¥\(String(format: "%.2f", app.me?.balance ?? 0))")
+            showCoin = true               // 进「零钱」页（照参考图做的那一页）
         case "bills":
             showBills = true            // 进「账单」页（真实转账记录）
         case "settings":

@@ -761,8 +761,8 @@ struct LoginView: View {
     }
 
     func loginWithWechat() {
-        // 没有微信 SDK：接到自建的「设备确认登录」
-        showPair = true
+        // 按最新要求：点「微信登录」直接进入账号密码登录页
+        sheet = .password
     }
 }
 

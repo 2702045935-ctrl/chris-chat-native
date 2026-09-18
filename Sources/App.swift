@@ -702,12 +702,14 @@ struct LoginView: View {
         ZStack {
             loginBackground
             NavigationStack {
-                ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 40)
-
                     // 头像区：登录过的账号最多 3 个，可以左右滑；点一下就用那个账号一键登录
+                    // （放在滚动区外面，横向滑动才不会被上下滚动抢走手势）
                     avatarPager
+                        .padding(.top, 34)
+                        .padding(.horizontal, 20)
+                    ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
                         .padding(.top, 16)
@@ -867,6 +869,9 @@ struct LoginView: View {
                     Text(quickBusy ? "正在登录…" : "点一下头像，快捷登录")
                         .font(.system(size: 12))
                         .foregroundColor(LoginTheme.accent)
+                    Text("（再登录一个账号，这里就能左右滑动切换）")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(LoginTheme.sub ?? .secondary)
                 }
                 Text(app.accounts[min(avatarIndex, app.accounts.count - 1)].nickname)
                     .font(.system(size: 13))

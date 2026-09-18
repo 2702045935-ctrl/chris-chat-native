@@ -458,6 +458,7 @@ struct ServiceView: View {
         let id: String
         let title: String
         let cells: [Cell]
+        var style: ServiceGroupStyle? = nil
     }
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 4)
@@ -476,7 +477,7 @@ struct ServiceView: View {
                          svg: SvcIcon.markup(it.icon, it.svg),
                          action: it.action ?? "soon")
                 }
-                return cells.isEmpty ? nil : Group(id: g.id, title: g.title, cells: cells)
+                return cells.isEmpty ? nil : Group(id: g.id, title: g.title, cells: cells, style: g.style)
             }
         }
         return ServiceFallback.groups.map { pair in
@@ -508,7 +509,7 @@ struct ServiceView: View {
                 VStack(spacing: 0) {
                     if cfg?.card?.enabled != false { greenCard.padding(.top, 13) }
                     ForEach(groups) { g in
-                        groupCard(g).padding(.top, 8)
+                        groupCard(g).padding(.top, CGFloat(g.style?.gapTop ?? 8))
                     }
                     billsCard.padding(.top, 8)
                     Color.clear.frame(height: 24)
@@ -610,15 +611,22 @@ struct ServiceView: View {
 
     private func groupCard(_ g: Group) -> some View {
         let s = st
+        /* 版块自己的上下尺寸（后台可调；留空/没配就跟全局）。左右固定 8pt，不给调。 */
+        let gs = g.style
+        let titleH = CGFloat(gs?.titleHeight ?? Double(s.titleHeight))
+        let cellH = CGFloat(gs?.rowHeight ?? Double(s.cellHeight))
+        let rowGap = CGFloat(gs?.rowGap ?? 0)
+        let padTop = CGFloat(gs?.padTop ?? 0)
+        let padBottom = CGFloat(gs?.padBottom ?? 20)
         return VStack(spacing: 0) {
             Text(g.title)
                 .font(pf(s.titleSize))
                 .foregroundColor(s.titleColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 16.7)
-                .frame(height: s.titleHeight)
+                .frame(height: titleH)
 
-            LazyVGrid(columns: cols, spacing: 0) {
+            LazyVGrid(columns: cols, spacing: rowGap) {
                 ForEach(g.cells) { c in
                     Button {
                         run(c.action, c.label)
@@ -634,15 +642,17 @@ struct ServiceView: View {
                         }
                         .padding(.top, 14)
                         .frame(maxWidth: .infinity)
-                        .frame(height: s.cellHeight, alignment: .top)
+                        .frame(height: cellH, alignment: .top)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, padBottom)
         }
+        .padding(.top, padTop)
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(C.cardBg))
         .padding(.horizontal, 8)
+        .padding(.bottom, CGFloat(gs?.gapBottom ?? 0))
     }
 
     /* ---------------------------------------------------------- 账单（原来那一套，接在下面） */

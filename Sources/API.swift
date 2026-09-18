@@ -241,10 +241,22 @@ struct ServiceCard: Decodable, Hashable {
 }
 
 /// 一个分类：标题 + 里面的格子（格子复用发现页那套字段）
+/// 版块自己的上下尺寸（后台「版块上下 / 行距」里配的；nil = 跟全局样式）
+struct ServiceGroupStyle: Decodable, Hashable {
+    var gapTop: Double?
+    var gapBottom: Double?
+    var titleHeight: Double?
+    var rowHeight: Double?
+    var rowGap: Double?
+    var padTop: Double?
+    var padBottom: Double?
+}
+
 struct ServiceGroup: Decodable, Identifiable, Hashable {
     var id: String
     var title: String
     var enabled: Bool?
+    var style: ServiceGroupStyle?
     var items: [DiscoverItem]?
 }
 

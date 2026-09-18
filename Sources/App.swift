@@ -254,7 +254,7 @@ struct RootView: View {
 struct LaunchView: View {
     var body: some View {
         ZStack {
-            C.loginBg.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
             VStack(spacing: 14) {
                 if let img = AppIconImage.image {
                     Image(uiImage: img)
@@ -292,7 +292,7 @@ struct LoginViewOld: View {
 
     var body: some View {
         ZStack {
-            C.loginBg.ignoresSafeArea()
+            Color(.systemBackground).ignoresSafeArea()
             VStack(spacing: 0) {
                 nav
                 ScrollView {
@@ -473,7 +473,7 @@ struct LoginViewOld: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, max(16, L.safeBottom))
-        .background(C.loginBg)
+        .background(Color(.systemBackground))
     }
 
     private func sendCode() {
@@ -829,7 +829,7 @@ struct AccountLoginSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
             }
-            .background(C.loginBg.ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             .navigationTitle(mode == .phone ? "手机号登录" : "账号密码登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -932,7 +932,7 @@ struct RegisterSheet: View {
                 .padding(.top, 20)
                 Spacer()
             }
-            .background(C.loginBg.ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             .navigationTitle("注册")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } } }
@@ -1003,7 +1003,7 @@ struct PairSheet: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity)
-            .background(C.loginBg.ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             .navigationTitle("微信登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("取消") { stop(); dismiss() } } }
@@ -1067,7 +1067,7 @@ struct TermsSheet: View {
                 }
                 .padding(20)
             }
-            .background(C.loginBg.ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("好") { dismiss() } } }
         }

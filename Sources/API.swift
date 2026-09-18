@@ -135,6 +135,10 @@ private struct BrandingPayload: Decodable { var branding: BrandInfo? }
 struct BrandInfo: Decodable, Hashable {
     var appName: String?
     var logo: String?
+    /// 服务器上配的「默认聊天背景」（用户自己没设时用它）
+    var chatBackground: String?
+    var fontScale: Double?
+    var accentColor: String?
 }
 
 struct PlusItem: Decodable, Identifiable, Hashable {

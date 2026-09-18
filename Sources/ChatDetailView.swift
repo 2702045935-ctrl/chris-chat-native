@@ -68,7 +68,11 @@ struct ChatDetailView: View {
 
     private var backgroundPath: String {
         let v = app.me?.chatBackground ?? "auto"
-        if v.isEmpty || v == "auto" { return "" }
+        if v.isEmpty || v == "auto" {
+            // 自己没设就用服务器上配的默认背景（和网页版一致），都没有才留空白
+            let def = app.defaultChatBackground
+            return (def == "auto") ? "" : def
+        }
         return v
     }
 

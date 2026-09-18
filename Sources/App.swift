@@ -12,6 +12,8 @@ final class AppState: ObservableObject {
     @Published var moments: [Moment] = []
     /// 朋友圈有没有新的（别人发了就 > 0，「发现」上挂红点）
     @Published var momentsUnread = 0
+    /// 服务器上配的默认聊天背景（自己没设时用它，和网页版一致）
+    @Published var defaultChatBackground = ""
     @Published var toast: String?
     @Published var loadingChats = false
     @Published var loadError: String?
@@ -109,6 +111,10 @@ final class AppState: ObservableObject {
             UIConfig.apply(cfg.ui)
             IconOverrides.map = cfg.icons
             uiVersion += 1
+        }
+        // 服务器上配的默认聊天背景（自己没设时用）
+        if let b = await API.shared.branding() {
+            defaultChatBackground = b.chatBackground ?? ""
         }
     }
 

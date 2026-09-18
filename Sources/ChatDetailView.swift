@@ -78,42 +78,25 @@ struct ChatDetailView: View {
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                /* 顶栏：单独一个实心颜色（后台可调 ui.json 的 chatNavBg），
-                   不跟聊天背景图同色 —— 和微信一样，背景图从顶栏下面才开始铺 */
-                NavBar(title: chat.name, back: { dismiss() }) {
-                    Button {
-                        app.show("聊天设置排在下一批")
-                    } label: {
-                        Text("⋯")
-                            .font(pf(22))
-                            .foregroundColor(C.label)
-                            .frame(width: 44, height: L.navH)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .background(
-                    UIConfig.color("chatNavBg", 0xEDEDED, 0x18181A)
-                        .ignoresSafeArea(edges: .top)
-                )
-
-                /* 聊天区：页面底色 +（有的话）聊天背景图 */
-                messageList
-                    // 点一下（哪怕是空白处）：表情/＋ 面板收回去，打字键盘也收起来
-                    // 再叠一层：手一滑动也收（微信就是这样）
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
-                    .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
-                    .background {
-                        ZStack {
-                            C.pageBg
-                            if !backgroundPath.isEmpty {
-                                RemoteImage(path: backgroundPath)
-                                    .id(backgroundPath)     // 换聊天背景立刻生效
-                            }
+            /* 聊天区铺满整屏（含顶栏、输入栏下面那两块），
+               顶栏和输入栏用 iOS 原生超薄毛玻璃浮在上面，
+               所以消息滚到上面/下面的时候会透过玻璃看到 —— 就是微信那种质感 */
+            messageList
+                // 点一下（哪怕是空白处）：表情/＋ 面板收回去，打字键盘也收起来
+                // 再叠一层：手一滑动也收（微信就是这样）
+                .contentShape(Rectangle())
+                .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
+                .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
+                .background {
+                    ZStack {
+                        C.pageBg
+                        if !backgroundPath.isEmpty {
+                            RemoteImage(path: backgroundPath)
+                                .id(backgroundPath)     // 换聊天背景立刻生效
                         }
                     }
-            }
+                    .ignoresSafeArea()
+                }
 
             if uploading {
                 ZStack {
@@ -124,6 +107,21 @@ struct ChatDetailView: View {
                 }
             }
 
+        }
+        /* 顶栏：超薄毛玻璃（浅色模式下就是 iOS 那种浅浅的磨砂），背景图/消息从底下透过去 */
+        .safeAreaInset(edge: .top, spacing: 0) {
+            NavBar(title: chat.name, back: { dismiss() }) {
+                Button {
+                    app.show("聊天设置排在下一批")
+                } label: {
+                    Text("⋯")
+                        .font(pf(22))
+                        .foregroundColor(C.label)
+                        .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
+            }
+            .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .swipeBack { dismiss() }
@@ -331,16 +329,14 @@ struct ChatDetailView: View {
             .padding(.vertical, 8)
 
             panelView
+                /* 表情 / ＋ / 礼物面板还是实心底（和微信一样），不跟着玻璃一起透 */
+                .background(panel == .none ? Color.clear : C.tabBg)
         }
-        .background(
-            ZStack {
-                C.tabBg.ignoresSafeArea(edges: .bottom)
-                VStack(spacing: 0) {
-                    Rectangle().fill(C.navLine).frame(height: 0.5)
-                    Spacer()
-                }
-            }
-        )
+        /* 输入栏：和顶栏同一套超薄毛玻璃；上面压一条 0.5px 细线做分隔（微信也有） */
+        .background(.ultraThinMaterial, ignoresSafeAreaEdges: .bottom)
+        .overlay(alignment: .top) {
+            Rectangle().fill(C.navLine).frame(height: 0.5)
+        }
     }
 
     @ViewBuilder

@@ -805,7 +805,8 @@ struct PickedGrid: View {
         if images.count == 1 {
             let img = images[0]
             let a = min(max(img.size.width / max(1, img.size.height), 0.75), 2.0)
-            let w = min(240, img.size.width)
+            let limit = a >= 1 ? (L.width - 32) : (L.width - 32) * 0.62
+            let w = min(limit, img.size.width)
             Image(uiImage: img)
                 .resizable()
                 .scaledToFill()
@@ -852,7 +853,9 @@ struct MomentSingleImage: View {
 
     var body: some View {
         let a = min(max(aspect, 0.75), 2.0)                  // 3:4 ~ 2:1
-        let w = naturalW > 0 ? min(avail, naturalW) : avail  // 小图不放大
+        // 和微信一样：横图能占满内容宽，竖图只占 62%
+        let limit = a >= 1 ? avail : avail * 0.62
+        let w = naturalW > 0 ? min(limit, naturalW) : limit  // 小图不放大
         let h = min(w / a, 300)                              // 超长图限高裁切
         RemoteImage(path: path, icon: "photo")
             .frame(width: w, height: h)

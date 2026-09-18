@@ -769,8 +769,11 @@ struct LoginView: View {
     var body: some View {
         ZStack {
             loginBackground
-            NavigationStack {
-                VStack(spacing: 0) {
+            /* 这里原来套的是 NavigationStack —— 它会自带一层不透明的系统背景，
+               把后面的登录页背景图整个盖掉，所以后台换了背景图手机上永远看不到。
+               换成 App 自己的 NavBar（透明背景），背景图就能透出来了。 */
+            VStack(spacing: 0) {
+                NavBar(title: "账号登录")
                     // 头像区：登录过的账号最多 3 个，可以左右滑；点一下就用那个账号一键登录
                     // （放在滚动区外面，横向滑动才不会被上下滚动抢走手势）
                     avatarPager
@@ -861,14 +864,10 @@ struct LoginView: View {
                         .padding(.bottom, 20)
                 }
                 .padding(.horizontal, 20)
-                .frame(minHeight: UIScreen.main.bounds.height - 120, alignment: .top)
+                .frame(minHeight: UIScreen.main.bounds.height - 170, alignment: .top)
             }
             .background(Color.clear)
             .scrollContentBackground(.hidden)
-            .navigationTitle("账号登录")
-            .navigationBarTitleDisplayMode(.inline)
-            }
-            .background(Color.clear)
         }
         .sheet(isPresented: $showPair) { PairSheet() }
         .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }

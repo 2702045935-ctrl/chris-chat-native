@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import ImageIO          // 解码时缩小图片（防解压炸弹）
 
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
@@ -384,7 +385,7 @@ struct RemoteImage: View {
             if let comma = path.firstIndex(of: ",") {
                 let b64 = String(path[path.index(after: comma)...])
                 if let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters),
-                   let img = UIImage(data: data) {
+                   let img = RemoteImage.downsampled(data, maxSide: 1600) {
                     ImageStore.shared.put(path, img)
                     image = img
                 }
@@ -394,11 +395,32 @@ struct RemoteImage: View {
         guard let url = API.shared.assetURL(path) else { return }
         do {
             let (data, _) = try await API.shared.session.data(from: url)
-            if let img = UIImage(data: data) {
+            /* 安全：按"解码时就缩小"的方式加载图片。
+               直接用 UIImage(data:) 会把原图整张解到内存里 —— 一张 20000×20000 的图
+               （文件才 1MB）解码要 1.5GB 内存，手机当场被杀（解压炸弹）。
+               改成 CGImageSource 缩略图：解码阶段就直接出 1600px 的位图，多大都不怕。 */
+            if let img = RemoteImage.downsampled(data, maxSide: 1600) {
                 ImageStore.shared.put(path, img)
                 image = img
             }
         } catch { }
+    }
+
+    /// 边解码边缩小：不管原图多大，内存里最多只有 maxSide 边长的位图
+    static func downsampled(_ data: Data, maxSide: CGFloat) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return UIImage(data: data)                  // 兜底
+        }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxSide,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
+        if let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) {
+            return UIImage(cgImage: cg)
+        }
+        return UIImage(data: data)
     }
 }
 
@@ -760,7 +782,7 @@ struct PhotoPager: View {
             var image: UIImage? = ImageStore.shared.get(path)
             if image == nil, let url = API.shared.assetURL(path) {
                 if let (data, _) = try? await API.shared.session.data(from: url) {
-                    image = UIImage(data: data)
+                    image = RemoteImage.downsampled(data, maxSide: 1600)
                 }
             }
             guard let img = image else { return }

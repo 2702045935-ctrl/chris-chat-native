@@ -151,10 +151,9 @@ struct ChatDetailView: View {
             LocationSheet { payload in send(kind: "location", content: payload) }
         }
         .sheet(isPresented: $showTransfer) {
-            TransferPagesFlow(chatId: chat.id,
-                              peerName: chat.title ?? chat.name,
-                              peerAccount: peerAccount,
-                              onClose: { showTransfer = false })
+            /* 用「照网页版一条条量出来」的那套转账页（TransferView）：
+               转账页 + 支付面板 + 付款方式面板 + 结果页，颜色/尺寸和网页版一致 */
+            TransferView(chat: chat)
         }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)

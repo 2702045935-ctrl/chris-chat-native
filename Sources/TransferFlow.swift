@@ -171,6 +171,8 @@ struct TransferView: View {
                 .offset(y: padOn ? 0 : L.tfPadRowH * 4 + 2)
         }
         .animation(.easeOut(duration: 0.26), value: padOn)
+        /* 和微信一样：一进转账页数字键盘就弹出来（以前要先点一下金额，看着像下面没渲染） */
+        .onAppear { padOn = true }
     }
 
     private var head: some View {

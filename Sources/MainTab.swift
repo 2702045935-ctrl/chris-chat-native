@@ -26,9 +26,13 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            TabBar(selection: $tab, badge: unreadTotal, momentsDot: app.momentsUnread > 0)
+            if !app.tabBarHidden {
+                TabBar(selection: $tab, badge: unreadTotal, momentsDot: app.momentsUnread > 0)
+                    .transition(.move(edge: .bottom))
+            }
         }
         .background(C.navBg.ignoresSafeArea())
+        .animation(.easeOut(duration: 0.18), value: app.tabBarHidden)
     }
 }
 

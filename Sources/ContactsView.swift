@@ -314,6 +314,7 @@ struct ContactCardView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .confirmationDialog("", isPresented: $showMore, titleVisibility: .hidden) {
             Button("设置备注和标签") { app.show("备注和标签还没开，先看下面的资料") }
             Button("朋友圈权限") { app.show("默认：能看他的朋友圈") }

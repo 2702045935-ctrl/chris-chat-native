@@ -17,6 +17,8 @@ final class AppState: ObservableObject {
     @Published var loadError: String?
     /// 服务器上的界面配置变了就 +1，整个界面重建一次（不用重装 App）
     @Published var uiVersion = 0
+    /// 点进二级页面（聊天、名片、朋友圈…）时把底部 4 个 tab 收起来
+    @Published var tabBarHidden = false
     private var lastUIConfig = ""
     private var refreshTask: Task<Void, Never>?
 

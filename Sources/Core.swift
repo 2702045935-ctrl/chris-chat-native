@@ -634,6 +634,65 @@ struct FlexIcon: View {
    点图看大图：黑底、左右翻、点一下返回（和微信一样，不带那个 × ）
    聊天里的图、朋友圈的图、名片里的小图都用这一个。
    ============================================================ */
+
+/* ============================================================
+   点头像 → 名片（聊天页、朋友圈页都能用）
+   名片里的「发消息 / 看他的朋友圈」还能继续往下走。
+   ============================================================ */
+/// 二级页面用：进来把底部 4 个 tab 收起来，返回时再放出来（微信就是这样）
+struct HidesTabBar: ViewModifier {
+    @EnvironmentObject var app: AppState
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { app.tabBarHidden = true }
+            .onDisappear { app.tabBarHidden = false }
+    }
+}
+
+extension View {
+    func hidesTabBar() -> some View { modifier(HidesTabBar()) }
+}
+
+struct TapAvatarCard: ViewModifier {
+    @Binding var cardUser: User?
+
+    @State private var nextChat: Chat?
+    @State private var nextMoments: User?
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(isPresented: Binding(
+                get: { cardUser != nil },
+                set: { if !$0 { cardUser = nil } }
+            )) {
+                if let u = cardUser {
+                    ContactCardView(user: u,
+                                    onOpenChat: { chat in
+                                        cardUser = nil
+                                        nextChat = chat
+                                    },
+                                    onOpenMoments: { _ in
+                                        nextMoments = u
+                                        cardUser = nil
+                                    })
+                }
+            }
+            .navigationDestination(isPresented: Binding(
+                get: { nextChat != nil },
+                set: { if !$0 { nextChat = nil } }
+            )) {
+                if let c = nextChat { ChatDetailView(chat: c) }
+            }
+            .navigationDestination(isPresented: Binding(
+                get: { nextMoments != nil },
+                set: { if !$0 { nextMoments = nil } }
+            )) {
+                if let t = nextMoments { MomentsView(target: t) }
+            }
+    }
+}
+
 struct PhotoPager: View {
     let paths: [String]
     let startIndex: Int

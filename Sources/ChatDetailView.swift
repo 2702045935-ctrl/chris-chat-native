@@ -51,6 +51,8 @@ struct ChatDetailView: View {
     @State private var uploading = false
     /// 点开聊天里的图片：paths = 这个会话里所有图片，index = 点的那张
     @State private var viewer: PhotoPager.Item?
+    /// 点头像 → 名片（自己的头像是自己的名片）
+    @State private var cardUser: User?
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
@@ -126,6 +128,8 @@ struct ChatDetailView: View {
         .fullScreenCover(item: $viewer) { item in
             PhotoPager(paths: item.paths, startIndex: item.index) { viewer = nil }
         }
+        .modifier(TapAvatarCard(cardUser: $cardUser))
+        .hidesTabBar()
         .sheet(isPresented: Binding(
             get: { billInfo != nil },
             set: { if !$0 { billInfo = nil } }
@@ -181,7 +185,8 @@ struct ChatDetailView: View {
                                        senderName: (!isGroup || message.senderId == myId)
                                            ? "" : displayName(message),
                                        onTapTransfer: { info in billInfo = info },
-                                       onOpenImage: { path in openImage(path) })
+                                       onOpenImage: { path in openImage(path) },
+                                       onOpenAvatar: { id in openAvatar(id) })
                                 .padding(.bottom, 15)
                                 .contextMenu {
                                     if message.senderId == myId {
@@ -395,6 +400,18 @@ struct ChatDetailView: View {
         viewer = PhotoPager.Item(paths: all, index: all.firstIndex(of: path) ?? 0)
     }
 
+    /// 点头像 → 名片。自己的头像是自己的名片；查不到的（陌生人 / 群里的人）现拉一次
+    private func openAvatar(_ senderId: String) {
+        let id = senderId.isEmpty ? myId : senderId
+        if id.isEmpty { return }
+        if id == myId, let me = app.me { cardUser = me; return }
+        if let u = app.contact(for: id) { cardUser = u; return }
+        Task {
+            if let u = try? await API.shared.user(id: id) { cardUser = u }
+            else { app.show("打不开这个人的名片") }
+        }
+    }
+
     private func send(kind: String, content: String) {
         Task {
             do {
@@ -510,6 +527,8 @@ struct MessageRow: View {
     var onTapTransfer: ((TransferInfo) -> Void)? = nil
     /// 点图片 → 打开大图
     var onOpenImage: ((String) -> Void)? = nil
+    /// 点头像 → 名片
+    var onOpenAvatar: ((String) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
 
@@ -524,6 +543,8 @@ struct MessageRow: View {
 
             if !mine {
                 Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
                 Spacer().frame(width: 9)
                 VStack(alignment: .leading, spacing: 4) {
                     if !senderName.isEmpty {
@@ -542,6 +563,8 @@ struct MessageRow: View {
             if mine {
                 Spacer().frame(width: 9)
                 Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
             }
         }
     }

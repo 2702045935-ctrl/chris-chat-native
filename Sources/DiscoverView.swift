@@ -221,6 +221,8 @@ struct MomentsView: View {
     /// 点开朋友圈的图片：paths = 这条动态的图片，index = 点的那张
     @State private var viewerPaths: [String] = []
     @State private var viewerIndex: Int?
+    /// 点头像 → 名片
+    @State private var cardUser: User?
     /// 朋友圈往下翻页：还有没有更多 / 正在加载 / 一共多少条
     @State private var hasMoreMoments = false
     @State private var loadingMore = false
@@ -285,6 +287,8 @@ struct MomentsView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .modifier(TapAvatarCard(cardUser: $cardUser))
+        .hidesTabBar()
         .onAppear {
             baseTop = nil
             baseBlock = nil
@@ -412,7 +416,8 @@ struct MomentsView: View {
             ForEach(moments) { moment in
                 MomentRow(moment: moment,
                           onMore: { actionMoment = moment },
-                          onOpenImage: { path in openPhoto(path, in: moment) })
+                          onOpenImage: { path in openPhoto(path, in: moment) },
+                          onOpenAvatar: { u in cardUser = u })
             }
             // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
             if hasMoreMoments {
@@ -657,11 +662,15 @@ struct MomentRow: View {
     var onMore: (() -> Void)? = nil
     /// 点图片 → 看大图
     var onOpenImage: ((String) -> Void)? = nil
+    /// 点头像 → 名片
+    var onOpenAvatar: ((User) -> Void)? = nil
 
     private var images: [String] { moment.images ?? [] }
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Avatar(path: moment.author?.avatarPath ?? "", size: L.momentAvatar, radius: 5)
+                .contentShape(Rectangle())
+                .onTapGesture { if let u = moment.author { onOpenAvatar?(u) } }
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(moment.author?.name ?? "")

@@ -263,8 +263,8 @@ struct MomentsView: View {
             Button("取消", role: .cancel) { }
         }
         .sheet(isPresented: $showPhoto) {
-            PhotoPicker { image in
-                picked = [image]
+            PhotosPicker(limit: 9) { images in
+                picked = Array(images.prefix(9))          // 最多 9 张，顺序就是选图顺序
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { posting = true }
             }
         }
@@ -449,16 +449,13 @@ struct MomentsView: View {
                             .stroke(Color.gray.opacity(0.2))
                     )
                 if !picked.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(picked.indices, id: \.self) { i in
-                            Image(uiImage: picked[i])
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 74, height: 74)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                        }
-                        Spacer()
+                    // 这里按发表后的样子摆（同一套规则）：2/4 张两列，3 张以上三列
+                    PickedGrid(images: picked) { i in
+                        picked.remove(at: i)                  // 点一下＝删掉这张，顺序不变
                     }
+                    Text("最多 9 张 · 顺序就是你选图的先后顺序 · 点缩略图可以删掉")
+                        .font(pf(12))
+                        .foregroundColor(C.subLabel)
                 }
                 Button {
                     composerPick = true
@@ -472,7 +469,15 @@ struct MomentsView: View {
             .navigationTitle("发表")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $composerPick) {
-                PhotoPicker { image in picked.append(image) }
+                PhotosPicker(limit: max(1, 9 - picked.count)) { images in
+                    let room = 9 - picked.count
+                    if images.count > room {
+                        app.show("最多 9 张图，还能再加 \(room) 张")
+                        picked.append(contentsOf: images.prefix(room))
+                    } else {
+                        picked.append(contentsOf: images)
+                    }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -598,13 +603,6 @@ struct MomentRow: View {
     var onOpenImage: ((String) -> Void)? = nil
 
     private var images: [String] { moment.images ?? [] }
-    private var cols: Int {
-        let n = images.count
-        if n == 1 { return 1 }
-        if n == 2 || n == 4 { return 2 }
-        return 3
-    }
-
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Avatar(path: moment.author?.avatarPath ?? "", size: L.momentAvatar, radius: 5)
@@ -679,32 +677,137 @@ struct MomentRow: View {
     }
 
     private var grid: some View {
-        let n = images.count
-        let avail = L.width - L.momentPadH * 2 - L.momentAvatar - 9
-        let maxW: CGFloat
-        if n == 1 { maxW = avail * 0.525 }
-        else if n == 2 { maxW = avail * 0.62 }
-        else if n == 4 { maxW = avail * 0.52 }
-        else { maxW = avail * 0.74 }
-        let c = CGFloat(cols)
-        let cellW = (maxW - (c - 1) * 4) / c
-        let cellH: CGFloat = n == 1 ? min(cellW * 0.78, 240) : (n == 2 ? cellW * 0.75 : cellW)
-        let rows = stride(from: 0, to: n, by: cols).map { start in
-            Array(images[start..<min(start + cols, n)])
-        }
-        return VStack(alignment: .leading, spacing: 4) {
-            ForEach(rows.indices, id: \.self) { r in
-                HStack(spacing: 4) {
-                    ForEach(rows[r].indices, id: \.self) { i in
-                        RemoteImage(path: rows[r][i], icon: "photo")
-                            .frame(width: cellW, height: cellH)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                            .contentShape(Rectangle())
-                            .onTapGesture { onOpenImage?(rows[r][i]) }
+        MomentImageGrid(images: images,
+                        avail: L.width - L.momentPadH * 2 - L.momentAvatar - 9,
+                        onTap: { i in if i < images.count { onOpenImage?(images[i]) } })
+    }
+}
+
+/* ============================================================
+   朋友圈图片排列（严格按规格）：
+   1 张 → 不进九宫格，按原图比例自适应（比例限制 3:4 ~ 2:1，超出的居中裁切，最高 300）
+   2 / 4 张 → 2 列；3 张 → 3 列；5~9 张 → 统一 3 列
+   正方形缩略图居中裁切 · 间隙 6 · 圆角 4 · 顺序 = 发的人选图顺序
+   ============================================================ */
+struct MomentImageGrid: View {
+    let images: [String]
+    var avail: CGFloat
+    var onTap: (Int) -> Void
+
+    private let gap: CGFloat = 6
+    private let radius: CGFloat = 4
+
+    var body: some View {
+        if images.count == 1 {
+            MomentSingleImage(path: images[0], avail: avail, radius: radius) { onTap(0) }
+        } else {
+            let cols = (images.count == 2 || images.count == 4) ? 2 : 3
+            let maxW = avail * (cols == 2 ? (images.count == 4 ? 0.52 : 0.62) : 0.74)
+            let cell = (maxW - gap * CGFloat(cols - 1)) / CGFloat(cols)
+            let rows = stride(from: 0, to: images.count, by: cols).map { start in
+                Array(start..<min(start + cols, images.count))
+            }
+            VStack(alignment: .leading, spacing: gap) {
+                ForEach(rows.indices, id: \.self) { r in
+                    HStack(spacing: gap) {
+                        ForEach(rows[r], id: \.self) { i in
+                            Button { onTap(i) } label: {
+                                RemoteImage(path: images[i], icon: "photo")
+                                    .frame(width: cell, height: cell)
+                                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if rows[r].count < cols { Spacer(minLength: 0) }
                     }
-                    if rows[r].count < cols { Spacer(minLength: 0) }
                 }
             }
         }
+    }
+}
+
+/// 单张图：等原图加载出来，按它的宽高比摆（极端比例裁切，小图不放大）
+/// 发表页里已经选好的图：和发出去以后一模一样的摆法（点一下删掉）
+struct PickedGrid: View {
+    let images: [UIImage]
+    var onTap: (Int) -> Void
+
+    private let gap: CGFloat = 6
+    private let radius: CGFloat = 4
+
+    var body: some View {
+        if images.count == 1 {
+            let img = images[0]
+            let a = min(max(img.size.width / max(1, img.size.height), 0.75), 2.0)
+            let w = min(240, img.size.width)
+            Image(uiImage: img)
+                .resizable()
+                .scaledToFill()
+                .frame(width: w, height: min(w / a, 300))
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .contentShape(Rectangle())
+                .onTapGesture { onTap(0) }
+        } else {
+            let cols = (images.count == 2 || images.count == 4) ? 2 : 3
+            let maxW = L.width - 32
+            let cell = (maxW - gap * CGFloat(cols - 1)) / CGFloat(cols)
+            let rows = stride(from: 0, to: images.count, by: cols).map { start in
+                Array(start..<min(start + cols, images.count))
+            }
+            VStack(alignment: .leading, spacing: gap) {
+                ForEach(rows.indices, id: \.self) { r in
+                    HStack(spacing: gap) {
+                        ForEach(rows[r], id: \.self) { i in
+                            Image(uiImage: images[i])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: cell, height: cell)
+                                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                                .contentShape(Rectangle())
+                                .onTapGesture { onTap(i) }
+                        }
+                        if rows[r].count < cols { Spacer(minLength: 0) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct MomentSingleImage: View {
+    let path: String
+    var avail: CGFloat
+    var radius: CGFloat = 4
+    var onTap: () -> Void
+
+    @State private var aspect: CGFloat = 4.0 / 3.0
+    @State private var naturalW: CGFloat = 0
+    @State private var started = false
+
+    var body: some View {
+        let a = min(max(aspect, 0.75), 2.0)                  // 3:4 ~ 2:1
+        let w = naturalW > 0 ? min(avail, naturalW) : avail  // 小图不放大
+        let h = min(w / a, 300)                              // 超长图限高裁切
+        RemoteImage(path: path, icon: "photo")
+            .frame(width: w, height: h)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .contentShape(Rectangle())
+            .onTapGesture { onTap() }
+            .onAppear { if !started { started = true; Task { await measure() } } }
+    }
+
+    private func measure() async {
+        if let hit = ImageStore.shared.get(path), hit.size.height > 0 {
+            aspect = hit.size.width / hit.size.height
+            naturalW = hit.size.width
+            return
+        }
+        guard let url = API.shared.assetURL(path) else { return }
+        guard let (data, _) = try? await API.shared.session.data(from: url),
+              let img = UIImage(data: data), img.size.height > 0 else { return }
+        ImageStore.shared.put(path, img)
+        aspect = img.size.width / img.size.height
+        naturalW = img.size.width
     }
 }

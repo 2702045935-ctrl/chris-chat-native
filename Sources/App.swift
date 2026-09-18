@@ -16,6 +16,21 @@ final class AppState: ObservableObject {
     @Published var accounts: [SavedAccount] = AccountStore.load()
     /// 待处理的好友申请数量（通讯录红点用它）
     @Published var friendRequests = 0
+    /// 后台配的红点规则（哪个位置该不该亮）
+    @Published var badges: [String: String] = [:]
+
+    /// 这个位置要不要显示红点：auto = 看真实数据；on = 一直亮；off = 不显示
+    func showDot(_ key: String, auto: Bool) -> Bool {
+        switch badges[key] ?? "auto" {
+        case "on": return true
+        case "off": return false
+        default: return auto
+        }
+    }
+
+    func loadBadges() async {
+        badges = await API.shared.badgeConfig()
+    }
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
     @Published var moments: [Moment] = []
@@ -102,6 +117,7 @@ final class AppState: ObservableObject {
 
     func boot() async {
         await refreshUI(force: true)
+        await loadBadges()
         if API.shared.token.isEmpty {
             booting = false
             return

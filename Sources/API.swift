@@ -135,6 +135,7 @@ private struct MomentsPayload: Decodable {
     var total: Int?
 }
 private struct BrandingPayload: Decodable { var branding: BrandInfo? }
+private struct BadgesPayload: Decodable { var badges: [String: String]? }
 
 struct BrandInfo: Decodable, Hashable {
     var appName: String?
@@ -397,6 +398,12 @@ final class API {
     func branding() async -> BrandInfo? {
         guard let payload: BrandingPayload = try? await get("/api/branding", as: BrandingPayload.self) else { return nil }
         return payload.branding
+    }
+
+    /// 后台配的「红点提醒」：某个位置 auto（按真实数据）/ on（一直亮）/ off（不显示）
+    func badgeConfig() async -> [String: String] {
+        guard let payload: BadgesPayload = try? await get("/api/badges", as: BadgesPayload.self) else { return [:] }
+        return payload.badges ?? [:]
     }
 
     /// 服务器上的界面配置（data/ui.json）+ 换过的 UI 图标（data/icons.json）

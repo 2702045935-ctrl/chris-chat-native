@@ -27,9 +27,11 @@ struct MainTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if !app.tabBarHidden {
-                TabBar(selection: $tab, badge: unreadTotal,
-                       contactsDot: app.friendRequests > 0,
-                       momentsDot: app.momentsUnread > 0)
+                TabBar(selection: $tab,
+                       badge: app.showDot("chats", auto: unreadTotal > 0) ? unreadTotal : 0,
+                       contactsDot: app.showDot("contacts", auto: app.friendRequests > 0),
+                       momentsDot: app.showDot("discover", auto: app.momentsUnread > 0),
+                       meDot: app.showDot("me", auto: false))
                     .transition(.move(edge: .bottom))
             }
         }
@@ -45,6 +47,8 @@ struct TabBar: View {
     var contactsDot: Bool = false
     /// 「发现」上那个小红点（有人发朋友圈就亮）
     var momentsDot: Bool = false
+    /// 「我」上那个小红点（后台可以设成一直亮）
+    var meDot: Bool = false
 
     private let items: [(String, String, String)] = [
         ("message", "message.fill", "微信"),
@@ -100,6 +104,14 @@ struct TabBar: View {
                             }
                             // 通讯录：有人加你好友就一个红点
                             if i == 1 && contactsDot {
+                                Circle()
+                                    .fill(C.red)
+                                    .frame(width: 9, height: 9)
+                                    .overlay(Circle().stroke(C.tabBg, lineWidth: 1.5))
+                                    .offset(x: 5, y: -3)
+                            }
+                            // 我：后台设成「一直亮」时显示
+                            if i == 3 && meDot {
                                 Circle()
                                     .fill(C.red)
                                     .frame(width: 9, height: 9)

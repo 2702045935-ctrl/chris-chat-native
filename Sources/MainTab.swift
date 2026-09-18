@@ -140,10 +140,10 @@ struct NavBar<Right: View>: View {
 
     var body: some View {
         ZStack {
-            Text(title)
-                .font(pf(titleSize, weight))
-                .foregroundColor(C.label)
-                .onLongPressGesture { onLongPressTitle?() }
+            // 描一遍再错开一点点叠一遍：苹方最粗只有 Semibold，
+            // 这样叠出来的笔画更黑（微信那种标题的分量）
+            titleText
+            titleText.offset(x: 0.4)
 
             HStack(spacing: 0) {
                 if let back = back {
@@ -159,6 +159,13 @@ struct NavBar<Right: View>: View {
             }
         }
         .frame(height: L.navH)
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .font(pf(titleSize, weight))
+            .foregroundColor(C.label)
+            .onLongPressGesture { onLongPressTitle?() }
     }
 
     /// 顶部标题：默认 17（发现页小一号 16）；想再调就改 ui.json 里的 navTitle

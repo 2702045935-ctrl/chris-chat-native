@@ -471,7 +471,7 @@ struct MomentsView: View {
     private func loadMoreMoments() async {
         guard hasMoreMoments, !loadingMore, let last = moments.last else { return }
         loadingMore = true
-        if let feed = try? await API.shared.momentsFeed(limit: 30, before: last.createdAt,
+        if let feed = try? await API.shared.momentsFeed(limit: 30, before: last.createdAt, beforeId: last.id,
                                                         userId: target?.id) {
             let known = Set(moments.map { $0.id })
             moments.append(contentsOf: feed.moments.filter { !known.contains($0.id) })

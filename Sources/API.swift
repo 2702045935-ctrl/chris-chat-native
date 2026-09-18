@@ -527,10 +527,11 @@ final class API {
 
     /// 朋友圈首页要的完整信息：列表 + 有没有新的（「发现」上的小红点）+ 还有没有更多
     ///（before = 上一页最后一条的时间，用来往下翻页）
-    func momentsFeed(limit: Int = 20, before: String? = nil, userId: String? = nil)
+    func momentsFeed(limit: Int = 20, before: String? = nil, beforeId: String? = nil, userId: String? = nil)
         async throws -> (moments: [Moment], unread: Int, total: Int, hasMore: Bool) {
         var path = "/api/moments?limit=\(limit)"
         if let before = before, !before.isEmpty { path += "&before=\(before)" }
+        if let beforeId = beforeId, !beforeId.isEmpty { path += "&beforeId=\(beforeId)" }
         if let userId = userId, !userId.isEmpty { path += "&userId=\(userId)" }
         let payload: MomentsPayload = try await get(path, as: MomentsPayload.self)
         return (payload.moments, payload.unread ?? 0, payload.total ?? payload.moments.count, payload.hasMore ?? false)

@@ -29,6 +29,7 @@ struct BillsView: View {
     @State private var query = ""
     @State private var openBill: BillRecord?
     @State private var showDetail = false
+    @State private var style = BillsPageStyle()
 
     private let fieldBg = Color.dyn(0xE3E3E3, 0x2C2C2E)
     private let fieldInk = Color.dyn(0x3A3A3A, 0xEDEDED)
@@ -164,14 +165,14 @@ struct BillsView: View {
         return HStack(spacing: 0) {
             Button { showMonths = true } label: {
                 HStack(spacing: 4) {
-                    Text(monthLabel(g.month)).font(pf(15)).foregroundColor(C.label)
+                    Text(monthLabel(g.month)).font(pf(style.monthFont)).foregroundColor(C.label)
                     DownChevron(size: 9, color: C.label)
                 }
             }
             .buttonStyle(.plain)
             Spacer(minLength: 0)
             Text("支出 \(money(s.out)) 收入 \(money(s.income))")
-                .font(pf(13))
+                .font(pf(style.sumFont))
                 .foregroundColor(sumGray)
         }
         .padding(.leading, 17)
@@ -187,27 +188,27 @@ struct BillsView: View {
             showDetail = true
         } label: {
             HStack(spacing: 0) {
-                Avatar(path: b.peerAvatar ?? "", size: 48, radius: 12)
+                Avatar(path: b.peerAvatar ?? "", size: style.icon, radius: style.icon * 0.25)
                     .padding(.leading, 16)
                 VStack(alignment: .leading, spacing: 11) {
                     Text(b.peer)
-                        .font(pf(17))
+                        .font(pf(style.titleFont))
                         .foregroundColor(C.label)
                         .lineLimit(1)
                     Text(TimeFmt.bill(b.createdAt))
-                        .font(pf(13))
+                        .font(pf(style.timeFont))
                         .foregroundColor(timeGray)
                 }
                 .padding(.leading, 17)
                 Spacer(minLength: 8)
                 Text((b.mine ? "-" : "+") + money(b.amount))
-                    .font(pf(16))
+                    .font(pf(style.amountFont))
                     .fontWeight(.medium)
                     .monospacedDigit()
                     .foregroundColor(b.mine ? C.label : incomeGold)
                     .padding(.trailing, 18)
             }
-            .frame(height: 80)
+            .frame(height: style.row)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -317,6 +318,7 @@ struct BillsView: View {
             months = d.months ?? []
             summary = d.summary
             month = m
+            if let s = d.style { style = s }
         }
         loading = false
     }

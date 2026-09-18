@@ -453,6 +453,26 @@ struct BillsPayload: Decodable, Hashable {
     var months: [String]?
     var summary: BillSummary?
     var month: String?
+    var style: BillsPageStyle?
+}
+
+/// 账单页外观（后台「账单页」里调）
+struct BillsPageStyle: Decodable, Hashable {
+    var iconSize: Double?
+    var titleSize: Double?
+    var timeSize: Double?
+    var amountSize: Double?
+    var monthSize: Double?
+    var sumSize: Double?
+    var rowHeight: Double?
+
+    var icon: CGFloat { CGFloat(iconSize ?? 48) }
+    var titleFont: CGFloat { CGFloat(titleSize ?? 17) }
+    var timeFont: CGFloat { CGFloat(timeSize ?? 13) }
+    var amountFont: CGFloat { CGFloat(amountSize ?? 16) }
+    var monthFont: CGFloat { CGFloat(monthSize ?? 15) }
+    var sumFont: CGFloat { CGFloat(sumSize ?? 13) }
+    var row: CGFloat { CGFloat(rowHeight ?? 80) }
 }
 
 /* ---------------- 零钱页（钱包页点「零钱」进来，后台「零钱页」模块下发） ---------------- */
@@ -500,8 +520,8 @@ struct BalanceStyle: Decodable, Hashable {
     var footerSize: Double?
     var footerColor: String?
 
-    var circle: CGFloat { CGFloat(circleSize ?? 88) }
-    var yenFont: CGFloat { CGFloat(yenSize ?? 32) }
+    var circle: CGFloat { CGFloat(circleSize ?? 64) }
+    var yenFont: CGFloat { CGFloat(yenSize ?? 24) }
     var titleFont: CGFloat { CGFloat(titleSize ?? 18) }
     var amountFont: CGFloat { CGFloat(amountSize ?? 64) }
     var noteFont: CGFloat { CGFloat(noteSize ?? 16) }

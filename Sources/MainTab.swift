@@ -140,10 +140,12 @@ struct NavBar<Right: View>: View {
 
     var body: some View {
         ZStack {
-            // 描一遍再错开一点点叠一遍：苹方最粗只有 Semibold，
-            // 这样叠出来的笔画更黑（微信那种标题的分量）
+            // 加黑程度可以在后台「界面文字」里调：navTitleStroke
+            // 0 = 不加（苹方 Semibold 本身）· 0.2 = 加一点 · 0.4 = 更黑
             titleText
-            titleText.offset(x: 0.4)
+            if titleStroke > 0 {
+                titleText.offset(x: titleStroke)
+            }
 
             HStack(spacing: 0) {
                 if let back = back {
@@ -175,6 +177,9 @@ struct NavBar<Right: View>: View {
     }
     /// 顶部标题字重：明显加黑（苹方 Semibold，和手机微信一致）
     private var weight: Font.Weight { .semibold }
+
+    /// 描叠偏移（在后台默认 0：只保留苹方 Semibold，不再叠第二遍）
+    private var titleStroke: CGFloat { UIConfig.num("navTitleStroke", 0) }
 }
 
 extension NavBar where Right == EmptyView {

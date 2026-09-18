@@ -121,7 +121,15 @@ struct ChatDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
+            .background {
+                /* 超薄毛玻璃 + 一层白（深色模式换成深灰）：
+                   之前太透了，压一层白以后就是 iOS 那种「奶白磨砂」的观感 */
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial)
+                    Color.dyn(0xFFFFFF, 0x1C1C1E).opacity(0.45)
+                }
+                .ignoresSafeArea(edges: .top)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .swipeBack { dismiss() }
@@ -332,8 +340,14 @@ struct ChatDetailView: View {
                 /* 表情 / ＋ / 礼物面板还是实心底（和微信一样），不跟着玻璃一起透 */
                 .background(panel == .none ? Color.clear : C.tabBg)
         }
-        /* 输入栏：和顶栏同一套超薄毛玻璃；上面压一条 0.5px 细线做分隔（微信也有） */
-        .background(.ultraThinMaterial, ignoresSafeAreaEdges: .bottom)
+        /* 输入栏：和顶栏同一套超薄毛玻璃 + 一层白；上面压一条 0.5px 细线做分隔（微信也有） */
+        .background {
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.dyn(0xFFFFFF, 0x1C1C1E).opacity(0.45)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
         .overlay(alignment: .top) {
             Rectangle().fill(C.navLine).frame(height: 0.5)
         }

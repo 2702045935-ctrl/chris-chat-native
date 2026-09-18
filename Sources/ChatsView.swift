@@ -186,6 +186,8 @@ struct ChatsView: View {
     @State private var path = NavigationPath()
     @State private var plusMenu = false
     @State private var openRow: String?
+    /// 下拉时露出来的距离（用滚动偏移算，不会抢左右滑的手势）
+    @State private var pullY: CGFloat = 0
 
     private var list: [Chat] {
         guard !keyword.isEmpty else { return app.chats }
@@ -224,6 +226,14 @@ struct ChatsView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
+                            /* 顶部哨兵：记录往下拉了多远（负数=往上滚，正数=下拉） */
+                            GeometryReader { g in
+                                Color.clear
+                                    .onChange(of: g.frame(in: .named("chatsScroll")).minY) { y in
+                                        pullY = max(0, y)
+                                    }
+                            }
+                            .frame(height: 0)
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,
@@ -237,6 +247,19 @@ struct ChatsView: View {
                     }
                     .background(C.chatRowBg)
                     .refreshable { await app.loadChats() }
+                    .coordinateSpace(name: "chatsScroll")
+                    /* 下拉时浮出「微信(数字)」——和朋友圈下拉出现「朋友圈」一样 */
+                    .overlay(alignment: .top) {
+                        if pullY > 1 {
+                            Text(navTitle)
+                                .font(pf(UIConfig.num("navTitle", 17), .semibold))
+                                .foregroundColor(C.label)
+                                .padding(.top, 6)
+                                .opacity(Double(min(1, pullY / 36)))
+                                .offset(y: min(18, pullY * 0.35))
+                                .allowsHitTesting(false)
+                        }
+                    }
                 }
             }
             .background(C.chatsTopBg.ignoresSafeArea(edges: .bottom))

@@ -160,12 +160,13 @@ struct MomentsView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    GeometryReader { geo in
-                        Color.clear.preference(key: OffsetKey.self, value: geo.frame(in: .named("moments")).minY)
-                    }
-                    .frame(height: 0)
-
                     coverView
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(key: OffsetKey.self,
+                                                       value: geo.frame(in: .named("moments")).minY)
+                            }
+                        )
                     momentList
                 }
             }
@@ -322,7 +323,6 @@ struct MomentsView: View {
             }
         }
         .frame(height: L.navH)
-        .padding(.top, L.safeTop)
         .background(
             Group {
                 if solid {

@@ -137,7 +137,6 @@ struct TransferView: View {
                 }
             }
             .frame(height: L.navH)
-            .padding(.top, L.safeTop)
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {

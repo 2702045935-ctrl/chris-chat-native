@@ -276,7 +276,6 @@ struct LoginView: View {
             }
         }
         .frame(height: 52)
-        .padding(.top, L.safeTop)
     }
 
     private var panel: some View {

@@ -70,39 +70,9 @@ struct SwipeChatRow: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            HStack(spacing: 0) {
-                actionButton("标为未读", Color(hex: 0x07C160), mode == .none ? btnW : 0) {
-                    onUnread()
-                    close()
-                }
-                actionButton(mode == .hideConfirm ? "不显示该聊天" : "不显示",
-                             Color(hex: 0xFA9D3C),
-                             mode == .hideConfirm ? fullW : (mode == .none ? btnW : 0)) {
-                    if mode == .hideConfirm {
-                        onHide(false)
-                        close()
-                    } else {
-                        mode = .hideConfirm
-                        withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
-                    }
-                }
-                actionButton(mode == .delConfirm ? "清空记录同时不显示聊天" : "删除",
-                             Color(hex: mode == .delConfirm ? 0xE75E58 : 0xFA5151),
-                             mode == .delConfirm ? fullW : (mode == .none ? btnW : 0)) {
-                    if mode == .delConfirm {
-                        onDelete()
-                        close()
-                    } else {
-                        mode = .delConfirm
-                        withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .frame(height: L.rowH)
-
+            /* ① 行内容：跟着手指往左推 */
             ChatRow(chat: chat)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: L.width, height: L.rowH, alignment: .leading)
                 .background(rowBg)
                 .overlay(alignment: .bottom) { HairLine(inset: L.dividerLeft) }
                 .offset(x: offset)
@@ -110,10 +80,50 @@ struct SwipeChatRow: View {
                 .onTapGesture {
                     if offset != 0 { close() } else { onOpen() }
                 }
-                .gesture(dragGesture)
+                .simultaneousGesture(dragGesture)
+                .zIndex(1)
+
+            /* ② 操作按钮：画在最上层，只露出滑开的那一块 —— 这样点一定点得到 */
+            actionButtons
+                .frame(width: fullW, height: L.rowH, alignment: .trailing)
+                .frame(width: max(0, -offset), height: L.rowH, alignment: .trailing)
+                .clipped()
+                .allowsHitTesting(offset != 0)
+                .zIndex(2)
         }
-        .frame(height: L.rowH)
+        .frame(width: L.width, height: L.rowH, alignment: .leading)
         .clipped()
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 0) {
+            actionButton("标为未读", Color(hex: 0x07C160), mode == .none ? btnW : 0) {
+                onUnread()
+                close()
+            }
+            actionButton(mode == .hideConfirm ? "不显示该聊天" : "不显示",
+                         Color(hex: 0xFA9D3C),
+                         mode == .hideConfirm ? fullW : (mode == .none ? btnW : 0)) {
+                if mode == .hideConfirm {
+                    onHide(false)
+                    close()
+                } else {
+                    mode = .hideConfirm
+                    withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
+                }
+            }
+            actionButton(mode == .delConfirm ? "清空记录同时不显示聊天" : "删除",
+                         Color(hex: mode == .delConfirm ? 0xE75E58 : 0xFA5151),
+                         mode == .delConfirm ? fullW : (mode == .none ? btnW : 0)) {
+                if mode == .delConfirm {
+                    onDelete()
+                    close()
+                } else {
+                    mode = .delConfirm
+                    withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
+                }
+            }
+        }
     }
 
     private func actionButton(_ title: String, _ bg: Color, _ width: CGFloat,

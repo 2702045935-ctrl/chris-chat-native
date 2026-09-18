@@ -668,6 +668,8 @@ struct LoginView: View {
     @State private var themeTick = 0
     /// 一键登录进行中
     @State private var quickBusy = false
+    /// 出错提示（比如一键登录的登录态过期了）
+    @State private var error: String?
 
     enum Way: String, Identifiable { case phone, password; var id: String { rawValue } }
 
@@ -746,6 +748,14 @@ struct LoginView: View {
                     .font(.system(size: 14))
                     .foregroundColor(LoginTheme.sub ?? Color(hexString: "#636366"))
                     .padding(.top, 24)
+
+                    if let e = error {
+                        Text(e)
+                            .font(.system(size: 13))
+                            .foregroundColor(C.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 14)
+                    }
 
                     Spacer(minLength: 32)
 

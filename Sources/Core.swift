@@ -645,8 +645,8 @@ struct HidesTabBar: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onAppear { app.tabBarHidden = true }
-            .onDisappear { app.tabBarHidden = false }
+            .onAppear { app.tabBarDepth += 1 }
+            .onDisappear { app.tabBarDepth = max(0, app.tabBarDepth - 1) }
     }
 }
 

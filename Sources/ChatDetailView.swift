@@ -116,6 +116,7 @@ struct ChatDetailView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showPhoto) {

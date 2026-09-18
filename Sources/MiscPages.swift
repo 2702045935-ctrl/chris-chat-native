@@ -62,6 +62,7 @@ struct FavoritesView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .task { await load() }
         .overlay {
             if let i = viewerIndex, !viewerPaths.isEmpty {
@@ -159,6 +160,7 @@ struct StickerView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .task {
             packs = (try? await API.shared.stickerPacks()) ?? []
         }
@@ -294,6 +296,7 @@ struct StatusView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .task {
             cats = (try? await API.shared.statusCategories()) ?? []
         }
@@ -345,6 +348,7 @@ struct WalletCardView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 
     private func row(_ title: String, _ value: String) -> some View {
@@ -380,5 +384,6 @@ struct WorksView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 }

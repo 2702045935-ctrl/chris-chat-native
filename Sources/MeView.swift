@@ -292,6 +292,7 @@ struct SettingsView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .confirmationDialog("聊天背景", isPresented: $showBg, titleVisibility: .visible) {
             Button("从相册选一张") { showBgPick = true }
             Button("恢复默认") {

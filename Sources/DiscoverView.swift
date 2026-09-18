@@ -176,6 +176,7 @@ struct ComingSoonView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 }
 
@@ -287,6 +288,7 @@ struct MomentsView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .modifier(TapAvatarCard(cardUser: $cardUser))
         .hidesTabBar()
         .onAppear {

@@ -92,6 +92,7 @@ struct ProfileEditView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .onAppear {
             nickname = app.me?.nickname ?? ""
             bio = app.me?.bio ?? ""
@@ -222,6 +223,7 @@ struct NewFriendsView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .task { await load() }
     }
 
@@ -295,6 +297,7 @@ struct AddFriendView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 
     private func add() {
@@ -382,6 +385,7 @@ struct GroupCreateView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 
     private func create() {
@@ -519,6 +523,7 @@ struct ServiceView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
         .sheet(isPresented: Binding(
             get: { detailInfo != nil },
             set: { if !$0 { detailInfo = nil; detailChat = nil } }

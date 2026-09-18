@@ -189,6 +189,7 @@ struct BillDetailView: View {
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .hidesTabBar()
     }
 
     private func infoRow(_ k: String, _ v: String, small: Bool = false) -> some View {

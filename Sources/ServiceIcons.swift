@@ -51,3 +51,58 @@ enum ServiceFallback {
                    ("拼多多", "svc.pdd", "#FA5151")])
     ]
 }
+
+/* ============================================================
+   钱包页的图标 + 兜底内容（和服务器 data/icon-defaults.json 里的 svc.w* 一致）
+   正常情况下这些都从 /api/wallet 下发，这里只是服务器连不上/还没升级时不至于白屏。
+   ============================================================ */
+
+enum WalletIcon {
+    static let map: [String: String] = [
+        "svc.wcoin": #"<svg data-key="svc.wcoin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.4v9M9.6 9.8l2.4 2.6 2.4-2.6M9.8 12.6h4.4"/></svg>"#,
+        "svc.wbiz": #"<svg data-key="svc.wbiz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.6h16v9.6H4z"/><path d="M3.2 9.6l1.6-4.8h14.4l1.6 4.8"/><path d="M9.6 19.2v-5.4h4.8v5.4"/></svg>"#,
+        "svc.wfund": #"<svg data-key="svc.wfund" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M8.4 13.6l2.6-2.8 2.2 2 2.6-3"/><path d="M14.2 9.8h2v2"/></svg>"#,
+        "svc.wcard": #"<svg data-key="svc.wcard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6.2" width="18" height="12.6" rx="2.6"/><path d="M3 10.8h18"/><path d="M6.4 15.4h4"/></svg>"#,
+        "svc.wfamily": #"<svg data-key="svc.wfamily" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="9.4" r="3"/><path d="M3.8 19.4c0-3 2.4-5.2 5.4-5.2s5.4 2.2 5.4 5.2"/><path d="M15.4 7.4a2.6 2.6 0 0 1 0 5.2M17.4 19.4c0-2.2-.9-4-2.2-5.2"/></svg>"#,
+        "svc.wscore": #"<svg data-key="svc.wscore" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6l7 2.6v5.2c0 4.3-2.9 7.4-7 8.8-4.1-1.4-7-4.5-7-8.8V6.2z"/><path d="M9 12l2.2 2.2 4-4.2"/></svg>"#,
+        "svc.wservice": #"<svg data-key="svc.wservice" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 14.6v-2.4a7.6 7.6 0 0 1 15.2 0v2.4"/><rect x="2.6" y="13.4" width="3.6" height="5.4" rx="1.6"/><rect x="17.8" y="13.4" width="3.6" height="5.4" rx="1.6"/><path d="M19.6 18.8v.6a2.6 2.6 0 0 1-2.6 2.6h-2.4"/></svg>"#
+    ]
+
+    static func markup(_ key: String?, _ served: String?) -> String {
+        if let served = served, !served.isEmpty { return served }
+        if let key = key, let hit = map[key] { return hit }
+        return ""
+    }
+}
+
+enum WalletFallback {
+    /// 拉不到 /api/wallet 时用这份（内容和参考图一致；零钱那行的数值由视图现填余额）
+    static func config(balance: Double) -> WalletConfig {
+        func item(_ id: String, _ label: String, _ key: String, _ color: String,
+                  value: String? = nil, note: String? = nil, kind: String? = nil, action: String = "soon") -> WalletItem {
+            WalletItem(id: id, label: label, value: value, valueKind: kind, note: note,
+                       icon: key, svg: WalletIcon.markup(key, nil), color: color, action: action, enabled: true)
+        }
+        let card1 = WalletGroup(id: "wg1", enabled: true, items: [
+            item("w01", "零钱", "svc.wcoin", "#F5C000", value: "¥" + String(format: "%.2f", balance), kind: "balance", action: "balance"),
+            item("w02", "经营账户", "svc.wbiz", "#F5C000", value: "¥0.00"),
+            item("w03", "零钱通", "svc.wfund", "#F5C000", note: "收益率 1.01%"),
+            item("w04", "银行卡", "svc.wcard", "#1180E0", action: "card"),
+            item("w05", "亲属卡", "svc.wfamily", "#FA9D3B")
+        ])
+        let card2 = WalletGroup(id: "wg2", enabled: true, items: [
+            item("w06", "支付分", "svc.wscore", "#2BC46E"),
+            item("w07", "客服中心", "svc.wservice", "#07C160", action: "service")
+        ])
+        let foot = [
+            WalletFoot(id: "wf1", label: "身份信息", action: "identity", enabled: true),
+            WalletFoot(id: "wf2", label: "支付设置", action: "settings", enabled: true)
+        ]
+        return WalletConfig(title: "钱包",
+                            right: WalletRight(label: "账单", action: "bills"),
+                            groups: [card1, card2],
+                            footer: foot,
+                            style: WalletStyle(),
+                            balance: balance)
+    }
+}

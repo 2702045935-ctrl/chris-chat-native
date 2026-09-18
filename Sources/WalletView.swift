@@ -94,7 +94,7 @@ struct WalletView: View {
             run(it.action ?? "soon", it.label)
         } label: {
             HStack(spacing: 0) {
-                SVGIcon(markup: it.svg ?? "", size: s.icon,
+                SVGIcon(markup: WalletIcon.markup(it.icon, it.svg), size: s.icon,
                         color: Color(hexString: it.color ?? "#1180E0", fallback: 0x1180E0))
                     .frame(width: s.icon, height: s.icon)
                     .padding(.leading, s.iconX)
@@ -170,6 +170,9 @@ struct WalletView: View {
     private func load() async {
         if let got = try? await API.shared.walletConfig() {
             cfg = got
+        } else if cfg == nil {
+            // 服务器连不上 / 还没升级：用内置那份兜底，别开天窗
+            cfg = WalletFallback.config(balance: app.me?.balance ?? 0)
         }
     }
 }

@@ -598,6 +598,13 @@ final class API {
         return (payload.friends, payload.incoming ?? [])
     }
 
+    private struct BadgeCountsPayload: Decodable { var friendRequests: Int?; var momentUnread: Int? }
+    /// 红点数字（很轻的接口）：回到前台 / 定时兜底查一下，防止漏推送
+    func badgeCounts() async -> (friendRequests: Int, momentUnread: Int)? {
+        guard let p = try? await get("/api/badge-counts", as: BadgeCountsPayload.self) else { return nil }
+        return (p.friendRequests ?? 0, p.momentUnread ?? 0)
+    }
+
     func respondFriend(_ requestId: String, accept: Bool) async {
         _ = try? await request("POST", "/api/friends/respond",
                                body: ["requestId": requestId, "accept": accept])

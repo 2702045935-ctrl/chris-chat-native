@@ -7,7 +7,11 @@ import UIKit
 final class AppState: ObservableObject {
     @Published var booting = true
     @Published var me: User? {
-        didSet { rememberLastUser() }        // 谁登录（或改了头像）就记住谁，登录页圆圈用它
+        didSet {
+            rememberLastUser()               // 谁登录（或改了头像）就记住谁，登录页圆圈用它
+            /* 一登录就开始「红点兜底」轮询；退出登录就停 */
+            if me != nil { startDotWatch() } else { dotTask?.cancel() }
+        }
     }
     /// 这台设备上最后登录的人（登录页圆圈显示他的头像 / 名字）
     @Published var lastAvatar: String = UserDefaults.standard.string(forKey: "chris.lastAvatar") ?? ""
@@ -89,6 +93,13 @@ final class AppState: ObservableObject {
             show("系统公告：" + ev.announce)
         }
         if let n = ev.momentUnread { momentsUnread = n }      // ready 里带的朋友圈未读数
+        if let n = ev.friendRequests {
+            /* 长连接重连（手机刚从后台回来）时把「新的朋友」红点补上；
+               数字变了就把通讯录重拉一次，行里那个红点数字也跟着新 */
+            let changed = n != friendRequests
+            friendRequests = n
+            if changed { coalesce { [weak self] in await self?.loadContacts() } }
+        }
         switch ev.type {
         case "message":
             coalesce { [weak self] in await self?.loadChats() }
@@ -184,6 +195,32 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+    }
+
+    /* ---------------- 红点兜底 ----------------
+       推送偶尔会漏（手机在后台、长连接正在重连、被系统掐了）。
+       所以除了推送，还有两层：
+       ① 长连接重连时服务器在 ready 里带上 friendRequests；
+       ② 回到前台 + 每 25 秒轻量问一次 /api/badge-counts。
+       这样「有人加你好友」最迟 25 秒内通讯录一定出红点。 */
+    private var dotTask: Task<Void, Never>?
+    func startDotWatch() {
+        dotTask?.cancel()
+        dotTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 25_000_000_000)
+                if Task.isCancelled { break }
+                await self?.refreshDotCounts()
+            }
+        }
+    }
+    func refreshDotCounts() async {
+        guard me != nil, let d = await API.shared.badgeCounts() else { return }
+        if d.friendRequests != friendRequests {
+            friendRequests = d.friendRequests
+            await loadContacts()          // 让「新的朋友」行里的数字也跟上
+        }
+        if d.momentUnread != momentsUnread { momentsUnread = d.momentUnread }
     }
 
     /// 记住这台设备上最后登录的人（登录页的圆圈用它显示头像）
@@ -324,6 +361,8 @@ struct RootView: View {
                 Task {
                     await app.refreshUI()
                     await app.loadChats()
+                    await app.loadContacts()      // 回到前台也要重拉好友申请，不然通讯录红点不亮
+                    await app.refreshDotCounts()
                     Realtime.shared.start()
                 }
             }

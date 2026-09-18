@@ -11,6 +11,8 @@ struct PushEvent: Equatable {
     var user: User? = nil
     /// 朋友圈有没有新的（服务器在 ready 里给；有就给「发现」挂红点）
     var momentUnread: Int? = nil
+    /// 待处理的好友申请数量（服务器在 ready 里给；手机在后台没收到推送时靠它补上通讯录红点）
+    var friendRequests: Int? = nil
     var tick = 0
 }
 
@@ -89,6 +91,7 @@ final class Realtime: ObservableObject {
         }
         ev.announce = (obj["text"] as? String) ?? ""
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
+        if let n = obj["friendRequests"] as? Int { ev.friendRequests = n }
         /* 推送洪水节流：每条都通知界面的话，几千条一来手机就卡死/崩。
            有任务在跑就先攒着，最多每 0.25 秒发一次（最后那条一定会发出去）。 */
         if publishTask == nil {

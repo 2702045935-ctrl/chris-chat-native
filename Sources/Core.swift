@@ -246,6 +246,8 @@ enum C {
     static var label       : Color { UIConfig.color("labelColor", 0x191919, 0xF2F2F7) }
     static var preview     : Color { UIConfig.color("previewColor", 0xB2B2B2, 0xB2B2B2) }
     static var time        : Color { UIConfig.color("timeColor", 0xC7C7CC, 0xC7C7CC) }
+    /// 通讯录右侧 A-Z 索引的字母颜色（后台「界面文字」里可以改）
+    static var ctIdxColor  : Color { UIConfig.color("ctIdxColor", 0x555555, 0x8E8E93) }
     static var subLabel    : Color { UIConfig.color("subLabelColor", 0x999999, 0x8F8F8F) }
     static var hairline    : Color { UIConfig.color("lineColor", 0xE5E5E5, 0x333335) }
     static var navLine     : Color { UIConfig.color("navLineColor", 0xE8E8E8, 0x2C2C2E) }

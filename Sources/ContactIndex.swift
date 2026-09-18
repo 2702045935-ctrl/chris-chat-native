@@ -9,19 +9,21 @@ struct ContactIndexBar: View {
     var onPick: (String) -> Void
     var onSearch: () -> Void
 
-    private let fontSize: CGFloat = 12.5
-    private let gap: CGFloat = 1.68
     private let padV: CGFloat = 4.2
     private let searchBox: CGFloat = 15
     private let searchGap: CGFloat = 4
 
-    private var pitch: CGFloat { fontSize + gap }
+    /* 字号 / 行距 / 颜色都从后台「界面文字」读（ctIdxSize / ctIdxItemH / ctIdxColor），
+       以前这里写死 12.5 和 #B2B2B2，所以后台改了手机上没反应 */
+    private var fontSize: CGFloat { max(6, C.ctIdxSize) }
+    private var rowH: CGFloat { max(fontSize, C.ctIdxItemH) }
+    private var pitch: CGFloat { rowH }
     private var listTop: CGFloat { padV + searchBox + searchGap }
 
     var body: some View {
-        VStack(spacing: gap) {
+        VStack(spacing: 0) {
             Button(action: onSearch) {
-                SVGIcon(markup: I.searchBig, size: 13, color: Color(hex: 0xB2B2B2))
+                SVGIcon(markup: I.searchBig, size: 13, color: C.ctIdxColor)
                     .frame(width: searchBox, height: searchBox)
             }
             .buttonStyle(.plain)
@@ -30,8 +32,8 @@ struct ContactIndexBar: View {
             ForEach(Self.letters, id: \.self) { L in
                 Text(L)
                     .font(pf(fontSize))
-                    .foregroundColor(Color(hex: 0xB2B2B2))
-                    .frame(height: fontSize)
+                    .foregroundColor(C.ctIdxColor)
+                    .frame(height: rowH)
             }
         }
         .padding(.vertical, padV)

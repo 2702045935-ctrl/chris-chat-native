@@ -180,10 +180,16 @@ struct ChatsView: View {
         }
     }
 
+    /// 和网页版一样：有未读时标题变成「微信(3)」
+    private var navTitle: String {
+        let total = app.chats.reduce(0) { $0 + ($1.unread ?? 0) }
+        return total > 0 ? "微信(\(total))" : "微信"
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: "微信") {
+                NavBar(title: navTitle) {
                     Button {
                         plusMenu = true
                     } label: {

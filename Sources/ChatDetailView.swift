@@ -77,19 +77,11 @@ struct ChatDetailView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
+            /* ① 背景 + 消息区：整块往上顶到状态栏（和朋友圈封面一个写法），
+                  所以顶部那一条也是这张背景，不会露出窗口的白色 */
             VStack(spacing: 0) {
-                NavBar(title: chat.name, back: { dismiss() }) {
-                    Button {
-                        app.show("聊天设置排在下一批")
-                    } label: {
-                        Text("⋯")
-                            .font(pf(22))
-                            .foregroundColor(C.label)
-                            .frame(width: 44, height: L.navH)
-                    }
-                    .buttonStyle(.plain)
-                }
+                Color.clear.frame(height: L.safeTop + L.navH)      // 给顶栏让出位置（背景照铺）
 
                 messageList
                     // 点一下（哪怕是空白处）：表情/＋ 面板收回去，打字键盘也收起来
@@ -98,8 +90,7 @@ struct ChatDetailView: View {
                     .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
                     .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
             }
-            // 背景整屏铺在最底下：页面底色 +（有的话）聊天背景图。
-            // 这样顶栏那一条也一定是这张背景，不会漏出系统/窗口的白色。
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 ZStack {
                     C.pageBg
@@ -107,7 +98,20 @@ struct ChatDetailView: View {
                         RemoteImage(path: backgroundPath)
                     }
                 }
-                .ignoresSafeArea()
+            }
+            .ignoresSafeArea(edges: .top)
+
+            /* ② 导航栏：单独浮在安全区里（标题不会被状态栏压住） */
+            NavBar(title: chat.name, back: { dismiss() }) {
+                Button {
+                    app.show("聊天设置排在下一批")
+                } label: {
+                    Text("⋯")
+                        .font(pf(22))
+                        .foregroundColor(C.label)
+                        .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
             }
 
             if uploading {

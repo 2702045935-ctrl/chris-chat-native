@@ -110,10 +110,10 @@ enum I {
 
     // ---------------- 朋友圈 ----------------
     static let backCover = """
-    <svg data-key="i.backCover" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16.2 4.1L8.9 12l7.3 7.9"/></svg>
+    <svg data-key="i.backCover" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.92" stroke-linecap="round" stroke-linejoin="round"><path d="M16.2 4.1L8.9 12l7.3 7.9"/></svg>
     """
     static let camera = """
-    <svg data-key="i.camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 8.9a2.1 2.1 0 0 1 2.1-2.1h1.8l1.3-1.9h6.8l1.3 1.9h1.8a2.1 2.1 0 0 1 2.1 2.1v7.6a2.1 2.1 0 0 1-2.1 2.1H5.5a2.1 2.1 0 0 1-2.1-2.1z"/><circle cx="12" cy="12.5" r="3.4"/></svg>
+    <svg data-key="i.camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 8.9a2.1 2.1 0 0 1 2.1-2.1h1.8l1.3-1.9h6.8l1.3 1.9h1.8a2.1 2.1 0 0 1 2.1 2.1v7.6a2.1 2.1 0 0 1-2.1 2.1H5.5a2.1 2.1 0 0 1-2.1-2.1z"/><circle cx="12" cy="12.5" r="3.4"/></svg>
     """
 
     // ---------------- 通用 ----------------

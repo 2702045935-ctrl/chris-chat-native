@@ -149,7 +149,8 @@ struct MomentsView: View {
     @State private var commentText = ""
     @State private var actionMoment: Moment?
 
-    private var solid: Bool { offset < -(L.coverH - L.navH - 50) }
+    /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
+    private var solid: Bool { offset < -(L.coverH - 52) }
     private var owner: User? { target ?? app.me }
     private var cover: String { owner?.momentCover ?? "" }
 
@@ -292,40 +293,40 @@ struct MomentsView: View {
     /* ---------------------------------------------------------- 顶部浮条 */
 
     private var navBar: some View {
-        HStack(spacing: 0) {
-            Button { dismiss() } label: {
-                SVGIcon(markup: I.backCover, size: 20, color: .white)
-                    .frame(width: 36, height: 36)
-                    .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 4)
-
-            Spacer()
-
+        ZStack {
+            // 滚过封面后回到中间出现「朋友圈」（网页版就是这样）
             if solid {
                 Text("朋友圈")
                     .font(pf(UIConfig.num("navTitle", 17)))
                     .foregroundColor(C.label)
-                    .frame(maxWidth: .infinity)
             }
 
-            Spacer()
+            HStack(spacing: 0) {
+                Button { dismiss() } label: {
+                    SVGIcon(markup: I.backCover, size: 20, color: .white)
+                        .frame(width: 36, height: 36)
+                        .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 4)
 
-            Button { cameraMenu = true } label: {
-                SVGIcon(markup: I.camera, size: 26, color: .white)
-                    .frame(width: 36, height: 36)
-                    .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                Spacer(minLength: 0)
+
+                Button { cameraMenu = true } label: {
+                    SVGIcon(markup: I.camera, size: 26, color: .white)
+                        .frame(width: 36, height: 36)
+                        .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 10)
             }
-            .buttonStyle(.plain)
-            .padding(.trailing, 10)
         }
         .frame(height: L.navH)
         .padding(.top, L.safeTop)
         .background(
             Group {
                 if solid {
-                    C.navBg
+                    Rectangle().fill(.ultraThinMaterial)
                 } else {
                     Color.clear
                 }

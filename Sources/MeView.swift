@@ -23,7 +23,7 @@ struct MeView: View {
                             ForEach(grouped[gi].indices, id: \.self) { ri in
                                 let item = grouped[gi][ri]
                                 if ri > 0 { rowLine }
-                                MenuRow(icon: item.svg ?? I.star,
+                                MenuRow(icon: (item.svg?.isEmpty == false) ? item.svg! : I.star,
                                         iconColor: Color(hexString: item.color ?? "#4A90D9", fallback: 0x4A90D9),
                                         title: item.label,
                                         onTap: { open(item) })

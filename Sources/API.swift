@@ -467,6 +467,7 @@ struct BillsPageStyle: Decodable, Hashable {
     var timeSize: Double?
     var amountSize: Double?
     var curSize: Double?
+    var amountWeight: Double?
     var monthSize: Double?
     var sumSize: Double?
     var rowHeight: Double?
@@ -476,6 +477,15 @@ struct BillsPageStyle: Decodable, Hashable {
     var timeFont: CGFloat { CGFloat(timeSize ?? 13) }
     var amountFont: CGFloat { CGFloat(amountSize ?? 16) }
     var curFontSize: CGFloat { CGFloat(curSize ?? 0) }
+    /// 金额字重：300 细 / 400 常规 / 500 中 / 600 粗（账单页默认 400，比钱包页细）
+    var amountWeightV: Font.Weight {
+        switch Int(amountWeight ?? 400) {
+        case ..<350: return .light
+        case 350..<450: return .regular
+        case 450..<550: return .medium
+        default: return .semibold
+        }
+    }
     var monthFont: CGFloat { CGFloat(monthSize ?? 15) }
     var sumFont: CGFloat { CGFloat(sumSize ?? 13) }
     var row: CGFloat { CGFloat(rowHeight ?? 80) }

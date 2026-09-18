@@ -203,7 +203,8 @@ struct BillsView: View {
                 Spacer(minLength: 8)
                 MoneyLabel(text: (b.mine ? "-" : "+") + money(b.amount),
                            size: style.amountFont, curSize: style.curFontSize,
-                           color: b.mine ? C.label : incomeGold)
+                           color: b.mine ? C.label : incomeGold,
+                           weight: style.amountWeightV)
                     .padding(.trailing, 18)
             }
             .frame(height: style.row)

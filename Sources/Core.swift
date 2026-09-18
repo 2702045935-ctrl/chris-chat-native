@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-18 23:35 方形小数点+¥左上角"
+    static let build = "2026-09-18 23:50 账单页细字重"
 }
 
 /* ============================================================
@@ -322,31 +322,34 @@ func pfExact(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
 
 /// 金额专用字体：**SF Pro Display Medium**（所有金融数字统一走这个）
 /// 大字号系统会自动用 SF Pro Display；小字号如果拿不到 Display 就退回系统中等字重。
-func pfMoney(_ size: CGFloat) -> Font {
+func pfMoney(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
     let s = max(9, (size * fontScale).rounded())
-    for name in ["SFProDisplay-Medium", "SF Pro Display", ".SFUI-Display-Medium"] {
-        if let f = UIFont(name: name, size: s) { return Font(f) }
+    if weight == .medium {
+        for name in ["SFProDisplay-Medium", "SF Pro Display", ".SFUI-Display-Medium"] {
+            if let f = UIFont(name: name, size: s) { return Font(f) }
+        }
     }
-    return .system(size: s, weight: .medium, design: .default)
+    return .system(size: s, weight: weight, design: .default)
 }
 
 /// 金额拼成一段 Text：**¥ 可以单独用自己的字号**（微信那样比数字小）。
 /// curSize <= 0 就整段一个字号。
-func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0, topAlign: Bool = false) -> Text {
+func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0, topAlign: Bool = false,
+               weight: Font.Weight = .medium) -> Text {
     guard let r = text.range(of: "¥") else {
-        return Text(text).font(pfMoney(size))
+        return Text(text).font(pfMoney(size, weight))
     }
     let prefix = String(text[text.startIndex..<r.lowerBound])
     let rest = String(text[r.upperBound...])
-    let curFont = curSize > 0 ? pfMoney(curSize) : pfMoney(size)
-    var out = Text(prefix).font(pfMoney(size))
+    let curFont = curSize > 0 ? pfMoney(curSize, weight) : pfMoney(size, weight)
+    var out = Text(prefix).font(pfMoney(size, weight))
     var cur = Text("¥").font(curFont)
     /* 左上角对齐（和微信一样）：把钱号往上抬，抬多少 ≈ 两者字高差的 0.72 */
     if topAlign, curSize > 0, curSize < size {
         cur = cur.baselineOffset((size - curSize) * 0.72)
     }
     out = out + cur
-    return out + Text(rest).font(pfMoney(size))
+    return out + Text(rest).font(pfMoney(size, weight))
 }
 
 /// 金额显示：**方形小数点** + 可单独设大小的「¥」（微信那种金融样式）。
@@ -357,13 +360,14 @@ struct MoneyLabel: View {
     var curSize: CGFloat = 0
     var topAlign: Bool = false
     var color: Color = C.label
+    var weight: Font.Weight = .medium
 
     var body: some View {
         let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
         let head = String(parts.first ?? "")
         let tail = parts.count > 1 ? String(parts[1]) : ""
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
-            moneyText(head, size: size, curSize: curSize, topAlign: topAlign)
+            moneyText(head, size: size, curSize: curSize, topAlign: topAlign, weight: weight)
                 .foregroundColor(color)
             if !tail.isEmpty || text.contains(".") {
                 Rectangle()
@@ -372,7 +376,7 @@ struct MoneyLabel: View {
                     .padding(.horizontal, size * 0.04)
             }
             if !tail.isEmpty {
-                Text(tail).font(pfMoney(size)).foregroundColor(color)
+                Text(tail).font(pfMoney(size, weight)).foregroundColor(color)
             }
         }
         .monospacedDigit()

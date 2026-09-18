@@ -201,7 +201,8 @@ struct BillsView: View {
                 }
                 .padding(.leading, 17)
                 Spacer(minLength: 8)
-                MoneyLabel(text: (b.mine ? "-" : "+") + money(b.amount),
+                /* 收入不带 +，只有支出带 -（跟参考图一致） */
+                MoneyLabel(text: (b.mine ? "-" : "") + (style.showCurV ? money(b.amount) : String(format: "%.2f", b.amount)),
                            size: style.amountFont, curSize: style.curFontSize,
                            color: b.mine ? C.label : incomeGold,
                            weight: style.amountWeightV)

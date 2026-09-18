@@ -468,6 +468,7 @@ struct BillsPageStyle: Decodable, Hashable {
     var amountSize: Double?
     var curSize: Double?
     var amountWeight: Double?
+    var showCur: Bool?
     var monthSize: Double?
     var sumSize: Double?
     var rowHeight: Double?
@@ -486,6 +487,8 @@ struct BillsPageStyle: Decodable, Hashable {
         default: return .semibold
         }
     }
+    /// 每行金额要不要带 ¥（默认不带，参考图里只显示 +/− 和数字）
+    var showCurV: Bool { showCur ?? false }
     var monthFont: CGFloat { CGFloat(monthSize ?? 15) }
     var sumFont: CGFloat { CGFloat(sumSize ?? 13) }
     var row: CGFloat { CGFloat(rowHeight ?? 80) }

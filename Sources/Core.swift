@@ -835,38 +835,46 @@ enum TransferTheme {
     static var accent: Color { LoginTheme.accent2 }
     static var success: Color { Color(hexString: "#34C759") }
 }
-/// 登录过、可以一键切换的账号（最多 3 个，存在钥匙串里）
+
+/// 登录过、可以一键切换的账号（最多 3 个）
+/// 账号列表放 UserDefaults（昵称/头像，重装也能保留）；令牌单独放钥匙串，按账号分开存
 struct SavedAccount: Codable, Identifiable, Hashable {
     var username: String
     var nickname: String
     var avatar: String
-    var token: String
     var id: String { username }
 }
 
 enum AccountStore {
-    private static let key = "accounts"
+    private static let listKey = "chris.accounts"
     static let maxCount = 3
 
     static func load() -> [SavedAccount] {
-        guard let raw = Keychain.get(key), let data = raw.data(using: .utf8),
+        guard let raw = UserDefaults.standard.string(forKey: listKey),
+              let data = raw.data(using: .utf8),
               let list = try? JSONDecoder().decode([SavedAccount].self, from: data) else { return [] }
         return Array(list.prefix(maxCount))
     }
 
-    static func save(_ list: [SavedAccount]) {
+    static func saveList(_ list: [SavedAccount]) {
         let trimmed = Array(list.prefix(maxCount))
         if let data = try? JSONEncoder().encode(trimmed), let s = String(data: data, encoding: .utf8) {
-            Keychain.set(s, for: key)
+            UserDefaults.standard.set(s, forKey: listKey)
         }
     }
 
-    /// 登录成功后记一条（同一个账号放最前面，最多留 3 个）
+    /// 登录成功后记一条：列表放最前面，令牌放钥匙串
     @discardableResult
     static func upsert(username: String, nickname: String, avatar: String, token: String) -> [SavedAccount] {
         var list = load().filter { $0.username != username }
-        list.insert(SavedAccount(username: username, nickname: nickname, avatar: avatar, token: token), at: 0)
-        save(list)
+        list.insert(SavedAccount(username: username, nickname: nickname, avatar: avatar), at: 0)
+        saveList(list)
+        if !token.isEmpty { Keychain.set(token, for: "token." + username) }
         return Array(list.prefix(maxCount))
+    }
+
+    /// 取某个账号保存的登录令牌（没有就返回空）
+    static func token(for username: String) -> String {
+        return Keychain.get("token." + username) ?? ""
     }
 }

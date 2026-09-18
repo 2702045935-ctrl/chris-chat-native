@@ -839,7 +839,17 @@ struct LoginView: View {
                 .frame(width: 80, height: 80)
                 .clipShape(Circle())
             } else {
-                TabView(selection: $avatarIndex) {
+                HStack(spacing: 6) {
+                    if app.accounts.count > 1 {
+                        Button { withAnimation { avatarIndex = max(0, avatarIndex - 1) } } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(avatarIndex > 0 ? LoginTheme.accent : LoginTheme.disabledGray)
+                                .frame(width: 30, height: 60)
+                        }
+                        .disabled(avatarIndex <= 0)
+                    }
+                    TabView(selection: $avatarIndex) {
                     ForEach(Array(app.accounts.enumerated()), id: \.element.id) { idx, acc in
                         Group {
                             if !acc.avatar.isEmpty {
@@ -858,9 +868,19 @@ struct LoginView: View {
                         .tag(idx)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: app.accounts.count > 1 ? .always : .never))
-                .frame(height: 108)
-                .frame(maxWidth: app.accounts.count > 1 ? .infinity : 96)
+                    .tabViewStyle(.page(indexDisplayMode: app.accounts.count > 1 ? .always : .never))
+                    .frame(height: 108)
+                    .frame(maxWidth: app.accounts.count > 1 ? .infinity : 96)
+                    if app.accounts.count > 1 {
+                        Button { withAnimation { avatarIndex = min(app.accounts.count - 1, avatarIndex + 1) } } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(avatarIndex < app.accounts.count - 1 ? LoginTheme.accent : LoginTheme.disabledGray)
+                                .frame(width: 30, height: 60)
+                        }
+                        .disabled(avatarIndex >= app.accounts.count - 1)
+                    }
+                }
 
                 if app.accounts.count > 1 {
                     Text("← 左右滑动切换账号，点头像直接登录 →")
@@ -916,7 +936,8 @@ struct LoginView: View {
         quickBusy = true
         error = nil
         Task {
-            let ok = await app.quickLogin(token: account?.token)
+            let saved = account.map { AccountStore.token(for: $0.username) } ?? ""
+            let ok = await app.quickLogin(token: saved.isEmpty ? nil : saved)
             quickBusy = false
             if !ok { error = "登录状态已过期，请重新输入密码登录" }
         }

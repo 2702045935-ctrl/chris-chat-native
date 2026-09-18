@@ -3,6 +3,9 @@ import SwiftUI
 struct MeView: View {
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
+    /// 后台配的我页下面那几行（加一行、删一行，切回本页就变）
+    @State private var items: [DiscoverItem] = []
+    @State private var loaded = false
     @ObservedObject private var realtime = Realtime.shared
 
     private var friendCount: Int { app.contacts.count }
@@ -14,41 +17,23 @@ struct MeView: View {
                     profileTop
                     GroupGap()
 
-                    GroupCard {
-                        MenuRow(icon: I.wallet, iconColor: Color(hex: 0x59C47E),
-                                title: "服务", onTap: { path.append("service") })
-                    }
-
-                    GroupGap()
-
-                    GroupCard {
-                        MenuRow(icon: I.star, iconColor: Color(hex: 0x4489EA),
-                                title: "收藏", onTap: { path.append("favorites") })
-                        rowLine
-                        MenuRow(icon: I.album, iconColor: Color(hex: 0x7275E9),
-                                title: "朋友圈", onTap: { path.append("moments") })
-                        rowLine
-                        MenuRow(icon: I.works, iconColor: Color(hex: 0x3D83E7),
-                                title: "作品", onTap: { path.append("works") })
-                        if UIConfig.num("showPromo", 0) > 0 {
-                            rowLine
-                            promoRow
+                    // 下面这些行全部来自后台配置（/api/me-page）
+                    ForEach(grouped.indices, id: \.self) { gi in
+                        GroupCard {
+                            ForEach(grouped[gi].indices, id: \.self) { ri in
+                                let item = grouped[gi][ri]
+                                if ri > 0 { rowLine }
+                                MenuRow(icon: item.svg ?? I.star,
+                                        iconColor: Color(hexString: item.color ?? "#4A90D9", fallback: 0x4A90D9),
+                                        title: item.label,
+                                        onTap: { open(item) })
+                            }
+                            if UIConfig.num("showPromo", 0) > 0 && gi == grouped.count - 1 {
+                                rowLine
+                                promoRow
+                            }
                         }
-                    }
-
-                    GroupGap()
-
-                    // 参考图里「表情」是单独一组
-                    GroupCard {
-                        MenuRow(icon: I.sticker, iconColor: Color(hex: 0xF5C144),
-                                title: "表情", onTap: { path.append("stickers") })
-                    }
-
-                    GroupGap()
-
-                    GroupCard {
-                        MenuRow(icon: I.gear, iconColor: Color(hex: 0x3D83E7),
-                                title: "设置", onTap: { path.append("settings") })
+                        GroupGap()
                     }
 
                     Spacer().frame(height: 24)
@@ -84,6 +69,41 @@ struct MeView: View {
             if ev.user != nil || ev.type == "profile" {
                 Task { app.me = try? await API.shared.me() }
             }
+            if ev.type == "ui" { Task { await loadItems() } }
+        }
+        .task { if !loaded { await loadItems() } }
+    }
+
+    /// 按 group 分组：同一组排一张卡（和网页版一致）
+    private var grouped: [[DiscoverItem]] {
+        var out: [[DiscoverItem]] = []
+        var last: Int? = nil
+        for it in items {
+            let g = it.group ?? 1
+            if last == nil || g != last! { out.append([]); last = g }
+            out[out.count - 1].append(it)
+        }
+        return out
+    }
+
+    private func loadItems() async {
+        if let list = try? await API.shared.mePage(), !list.isEmpty {
+            items = list
+            loaded = true
+        } else if items.isEmpty {
+            items = DiscoverItem.builtinMe       // 拉不到就用内置那套，别空着
+        }
+    }
+
+    private func open(_ item: DiscoverItem) {
+        switch item.action ?? "soon" {
+        case "service": path.append("service")
+        case "favorites": path.append("favorites")
+        case "moments": path.append("moments")
+        case "works": path.append("works")
+        case "stickers": path.append("stickers")
+        case "settings": path.append("settings")
+        default: path.append("soon:" + item.label)
         }
     }
 

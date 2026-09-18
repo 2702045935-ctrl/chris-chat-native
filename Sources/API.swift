@@ -578,6 +578,12 @@ final class API {
         return payload.items.filter { $0.enabled != false }
     }
 
+    /// 我页下面那几行（同样是后台配的）
+    func mePage() async throws -> [DiscoverItem] {
+        let payload: DiscoverPayload = try await get("/api/me-page", as: DiscoverPayload.self)
+        return payload.items.filter { $0.enabled != false }
+    }
+
     /// 设置/清除「状态」（对应后台配的那些状态）
     func setMood(_ item: StatusItem?) async {
         if let item = item {

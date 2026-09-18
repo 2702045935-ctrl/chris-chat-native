@@ -132,6 +132,24 @@ extension DiscoverItem {
                          color: "#9A6AE8", action: "soon", group: 7, enabled: true)
         ]
     }
+
+    /// 我页的兜底（和默认配置一致）
+    static var builtinMe: [DiscoverItem] {
+        [
+            DiscoverItem(id: "m01", label: "服务", icon: "i.wallet", svg: I.wallet,
+                         color: "#59C47E", action: "service", group: 1, enabled: true),
+            DiscoverItem(id: "m02", label: "收藏", icon: "i.star", svg: I.star,
+                         color: "#4489EA", action: "favorites", group: 2, enabled: true),
+            DiscoverItem(id: "m03", label: "朋友圈", icon: "i.album", svg: I.album,
+                         color: "#7275E9", action: "moments", group: 2, enabled: true),
+            DiscoverItem(id: "m04", label: "作品", icon: "i.works", svg: I.works,
+                         color: "#3D83E7", action: "works", group: 2, enabled: true),
+            DiscoverItem(id: "m05", label: "表情", icon: "i.sticker", svg: I.sticker,
+                         color: "#F5C144", action: "stickers", group: 3, enabled: true),
+            DiscoverItem(id: "m06", label: "设置", icon: "i.gear", svg: I.gear,
+                         color: "#3D83E7", action: "settings", group: 4, enabled: true)
+        ]
+    }
 }
 
 struct ComingSoonView: View {

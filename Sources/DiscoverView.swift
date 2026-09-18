@@ -158,6 +158,10 @@ struct MomentsView: View {
     /// 点开朋友圈的图片：paths = 这条动态的图片，index = 点的那张
     @State private var viewerPaths: [String] = []
     @State private var viewerIndex: Int?
+    /// 朋友圈往下翻页：还有没有更多 / 正在加载 / 一共多少条
+    @State private var hasMoreMoments = false
+    @State private var loadingMore = false
+    @State private var momentTotal = 0
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
@@ -205,7 +209,7 @@ struct MomentsView: View {
         .onChange(of: realtime.event) { _ in
             Task {
                 app.me = try? await API.shared.me()
-                await reload()
+                await pollNewMoments()          // 只把新出现的插到最前面，别把翻过的页冲掉
             }
         }
         .task {
@@ -214,7 +218,7 @@ struct MomentsView: View {
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
                 if Task.isCancelled { break }
                 app.me = try? await API.shared.me()
-                await reload()
+                await pollNewMoments()
             }
         }
         .confirmationDialog("发表", isPresented: $cameraMenu, titleVisibility: .visible) {
@@ -317,6 +321,23 @@ struct MomentsView: View {
                 MomentRow(moment: moment,
                           onMore: { actionMoment = moment },
                           onOpenImage: { path in openPhoto(path, in: moment) })
+            }
+            // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
+            if hasMoreMoments {
+                Text(loadingMore ? "正在加载…" : " ")
+                    .font(pf(14))
+                    .foregroundColor(C.subLabel)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .onAppear {
+                        Task { await loadMoreMoments() }
+                    }
+            } else if momentTotal > 0 {
+                Text("没有更多了")
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
             }
         }
         .padding(.top, 60)
@@ -430,11 +451,44 @@ struct MomentsView: View {
     }
 
     private func reload() async {
-        if let list = try? await API.shared.moments(userId: target?.id) {
-            moments = list
+        if let feed = try? await API.shared.momentsFeed(limit: 30, userId: target?.id) {
+            moments = feed.moments
+            hasMoreMoments = feed.hasMore
+            momentTotal = feed.total
         } else {
             moments = app.moments
+            hasMoreMoments = false
         }
+        // 打开朋友圈 = 看过了：把「发现」上的小红点清掉
+        if target == nil {
+            await API.shared.markMomentsSeen()
+            app.momentsUnread = 0
+        }
+    }
+
+    /// 往下翻一页（3000 条也能一条条刷到底）
+    private func loadMoreMoments() async {
+        guard hasMoreMoments, !loadingMore, let last = moments.last else { return }
+        loadingMore = true
+        if let feed = try? await API.shared.momentsFeed(limit: 30, before: last.createdAt,
+                                                        userId: target?.id) {
+            let known = Set(moments.map { $0.id })
+            moments.append(contentsOf: feed.moments.filter { !known.contains($0.id) })
+            hasMoreMoments = feed.hasMore && !feed.moments.isEmpty
+        } else {
+            hasMoreMoments = false
+        }
+        loadingMore = false
+    }
+
+    /// 轮询 / 收到推送时：只把「新出现的」插到最前面，已经在列表里的和翻过的页都不动
+    private func pollNewMoments() async {
+        guard let feed = try? await API.shared.momentsFeed(limit: 30, userId: target?.id) else { return }
+        let known = Set(moments.map { $0.id })
+        let fresh = feed.moments.filter { !known.contains($0.id) }
+        if !fresh.isEmpty { moments.insert(contentsOf: fresh, at: 0) }
+        momentTotal = feed.total
+        if moments.count <= 30 { hasMoreMoments = feed.hasMore }
     }
 
     private func publish() {

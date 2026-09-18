@@ -26,7 +26,7 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            TabBar(selection: $tab, badge: unreadTotal)
+            TabBar(selection: $tab, badge: unreadTotal, momentsDot: app.momentsUnread > 0)
         }
         .background(C.navBg.ignoresSafeArea())
     }
@@ -35,6 +35,8 @@ struct MainTabView: View {
 struct TabBar: View {
     @Binding var selection: Int
     var badge: Int
+    /// 「发现」上那个小红点（有人发朋友圈就亮）
+    var momentsDot: Bool = false
 
     private let items: [(String, String, String)] = [
         ("message", "message.fill", "微信"),
@@ -79,6 +81,14 @@ struct TabBar: View {
                                     .frame(minWidth: 15, minHeight: 15)
                                     .background(Capsule().fill(C.red))
                                     .offset(x: 9, y: -6)
+                            }
+                            // 发现：有人发朋友圈就一个红点（微信就是这样，不带数字）
+                            if i == 2 && momentsDot {
+                                Circle()
+                                    .fill(C.red)
+                                    .frame(width: 9, height: 9)
+                                    .overlay(Circle().stroke(C.tabBg, lineWidth: 1.5))
+                                    .offset(x: 5, y: -3)
                             }
                         }
                         Text(items[i].2)

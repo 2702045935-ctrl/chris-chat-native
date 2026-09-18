@@ -9,6 +9,8 @@ struct PushEvent: Equatable {
     var balance: Double? = nil
     var announce = ""
     var user: User? = nil
+    /// 朋友圈有没有新的（服务器在 ready 里给；有就给「发现」挂红点）
+    var momentUnread: Int? = nil
     var tick = 0
 }
 
@@ -82,6 +84,7 @@ final class Realtime: ObservableObject {
             ev.user = decoded
         }
         ev.announce = (obj["text"] as? String) ?? ""
+        if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
         tick += 1
         ev.tick = tick
         event = ev

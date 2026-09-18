@@ -10,6 +10,8 @@ final class AppState: ObservableObject {
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
     @Published var moments: [Moment] = []
+    /// 朋友圈有没有新的（别人发了就 > 0，「发现」上挂红点）
+    @Published var momentsUnread = 0
     @Published var toast: String?
     @Published var loadingChats = false
     @Published var loadError: String?
@@ -47,12 +49,14 @@ final class AppState: ObservableObject {
         if !ev.announce.isEmpty && ev.type == "announce" {
             show("系统公告：" + ev.announce)
         }
+        if let n = ev.momentUnread { momentsUnread = n }      // ready 里带的朋友圈未读数
         switch ev.type {
         case "message":
             coalesce { [weak self] in await self?.loadChats() }
         case "chat":
             coalesce { [weak self] in await self?.loadChats() }
         case "moment":
+            momentsUnread = max(1, momentsUnread)          // 有人发朋友圈：先点红点，再拉一次
             coalesce { [weak self] in await self?.loadMoments() }
         case "friend", "presence", "profile":
             coalesce { [weak self] in await self?.loadContacts() }
@@ -140,7 +144,10 @@ final class AppState: ObservableObject {
     }
 
     func loadMoments() async {
-        if let list = try? await API.shared.moments() { moments = list }
+        if let feed = try? await API.shared.momentsFeed() {
+            moments = feed.moments
+            momentsUnread = feed.unread
+        }
     }
 
     func logout() async {

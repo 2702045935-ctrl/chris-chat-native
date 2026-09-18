@@ -7,6 +7,9 @@ import UIKit
 final class AppState: ObservableObject {
     @Published var booting = true
     @Published var me: User?
+    /// 这台设备上最后登录的人（登录页圆圈显示他的头像 / 名字）
+    @Published var lastAvatar: String = UserDefaults.standard.string(forKey: "chris.lastAvatar") ?? ""
+    @Published var lastName: String = UserDefaults.standard.string(forKey: "chris.lastName") ?? ""
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
     @Published var moments: [Moment] = []
@@ -131,14 +134,25 @@ final class AppState: ObservableObject {
 
     func login(username: String, password: String) async throws {
         me = try await API.shared.login(username: username, password: password)
+        rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
     }
 
     func login(phone: String, code: String) async throws {
         me = try await API.shared.loginPhone(phone: phone, code: code)
+        rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+    }
+
+    /// 记住这台设备上最后登录的人（登录页的圆圈用它显示头像）
+    func rememberLastUser() {
+        guard let me = me else { return }
+        lastAvatar = me.avatar ?? ""
+        lastName = me.nickname ?? me.username ?? ""
+        UserDefaults.standard.set(lastAvatar, forKey: "chris.lastAvatar")
+        UserDefaults.standard.set(lastName, forKey: "chris.lastName")
     }
 
     func refreshAll() async {
@@ -642,7 +656,12 @@ struct LoginView: View {
 
                     // App Logo（你代码里是灰色圆形占位；后台配了 logo 就用 logo，没配就是灰圆）
                     Group {
-                        if let p = logoPath {
+                        /* 优先显示「这台设备上最后登录的人」的头像 —— 谁登录过就显示谁 */
+                        if !app.lastAvatar.isEmpty {
+                            RemoteImage(path: app.lastAvatar, icon: "person.fill", mode: .fill)
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                        } else if let p = logoPath {
                             RemoteImage(path: p, icon: "message.fill", mode: .fill)
                                 .frame(width: 80, height: 80)
                                 .clipShape(Circle())

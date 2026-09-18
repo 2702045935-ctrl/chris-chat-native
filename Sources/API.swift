@@ -1172,6 +1172,18 @@ final class API {
         return has
     }
 
+    /// 校验支付密码（转账确认用）
+    func verifyPayPassword(_ password: String) async throws {
+        _ = try await request("POST", "/api/me/paypassword/verify", body: ["password": password])
+    }
+
+    /// 设置 / 修改支付密码（6 位数字；已经设过的要带上原密码）
+    func setPayPassword(_ password: String, current: String = "") async throws {
+        var body: [String: Any] = ["password": password]
+        if !current.isEmpty { body["current"] = current }
+        _ = try await request("POST", "/api/me/paypassword", body: body)
+    }
+
     /// 举报某人（后台「举报处理」里能看到）
     func report(userId: String, chatId: String, reason: String, content: String) async {
         _ = try? await request("POST", "/api/reports", body: [

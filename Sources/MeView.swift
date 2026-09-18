@@ -59,6 +59,8 @@ struct MeView: View {
                     WorksView()
                 } else if key == "status" {
                     StatusView()
+                } else if key == "paypwd" {
+                    PayPasswordView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -247,6 +249,8 @@ struct SettingsView: View {
     @State private var showBg = false
     @State private var showBgPick = false
     @State private var showTheme = false
+    /// 有没有设过支付密码（设置页那一行显示「已设置 / 未设置」）
+    @State private var hasPay = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -263,6 +267,9 @@ struct SettingsView: View {
                         settingRow("聊天背景", (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
                         HairLine(inset: 16)
                         settingRow("账号与安全", "") { app.show("账号与安全排在下一批") }
+                        HairLine(inset: 16)
+                        /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
+                        settingLink("支付密码", hasPay ? "已设置" : "未设置", key: "paypwd")
                         HairLine(inset: 16)
                         settingRow("新消息通知", "") { app.show("通知设置排在下一批") }
                         HairLine(inset: 16)
@@ -318,6 +325,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showBgPick) {
             PhotoPicker { image in changeBg(image) }
         }
+        .task { hasPay = await API.shared.hasPayPassword() }
         .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) {
                 busy = true
@@ -344,6 +352,25 @@ struct SettingsView: View {
 
     private func settingRow(_ title: String, _ value: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title).font(pf(17)).foregroundColor(C.label)
+                Spacer(minLength: 0)
+                if !value.isEmpty {
+                    Text(value).font(pf(15)).foregroundColor(C.subLabel)
+                }
+                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 56)
+            .background(C.cardBg)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(MenuPressStyle())
+    }
+
+    /// 和 settingRow 长得一样，但点进去是下一个页面（用导航）
+    private func settingLink(_ title: String, _ value: String, key: String) -> some View {
+        NavigationLink(value: key) {
             HStack(spacing: 12) {
                 Text(title).font(pf(17)).foregroundColor(C.label)
                 Spacer(minLength: 0)

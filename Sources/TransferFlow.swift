@@ -34,6 +34,8 @@ struct TransferView: View {
     @State private var payHint: String?
     @State private var badPwd = false
     @State private var caretOn = true
+    /// 这台手机能不能用面容/指纹（不能用就不显示那颗按钮，直接输密码）
+    @State private var faceOK = false
     /// 金额输入交给原生键盘（藏起来的输入框收字，界面还是「一位一格」）
     @FocusState private var amountFocus: Bool
     /// 支付密码也交给原生键盘
@@ -80,6 +82,7 @@ struct TransferView: View {
         }
         .task {
             hasPwd = await API.shared.hasPayPassword()
+            faceOK = Biometrics.available
             // 金额后面那根绿色光标：1.05 秒一次亮灭（和网页版一样）
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 525_000_000)
@@ -326,14 +329,16 @@ struct TransferView: View {
                     .buttonStyle(.plain)
                     .padding(.leading, -6)
                     Spacer()
-                    Button {
-                        submit(face: true)
-                    } label: {
-                        Text("使用面容")
-                            .font(pf(14.3))
-                            .foregroundColor(C.link)
+                    if faceOK {
+                        Button {
+                            facePay()
+                        } label: {
+                            Text(Biometrics.label)
+                                .font(pf(14.3))
+                                .foregroundColor(C.link)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, L.v(14, 4.3, 18))
                 .frame(height: L.payHeadH)
@@ -653,6 +658,22 @@ struct TransferView: View {
     }
 
     /* ---------------------------------------------------------- 提交 */
+
+    /// 「使用面容」：先让系统真的验一次脸/指纹，过了才把 face=true 发给服务器
+    private func facePay() {
+        guard amount > 0 else { app.show("请先输入转账金额"); return }
+        Task {
+            let r = await Biometrics.authenticate(
+                reason: "验证身份，向 \(chat.name) 转账 ¥\(money(amount))")
+            if r.ok {
+                payHint = nil
+                submit(face: true)
+            } else if !r.message.isEmpty {
+                payHint = r.message                      // 失败就提示，让他直接输密码
+                payFocus = true
+            }
+        }
+    }
 
     private func submit(face: Bool) {
         guard amount > 0 else { return }

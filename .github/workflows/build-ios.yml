@@ -42,7 +42,8 @@ jobs:
             -F "$SDK/System/Library/Frameworks" \
             -o "$APP/CHRIS" \
             Sources/*.swift \
-            -framework SwiftUI -framework UIKit -framework Foundation
+            -framework SwiftUI -framework UIKit -framework Foundation \
+            -framework LocalAuthentication
           echo "编译完成，体积："
           ls -lh "$APP/CHRIS"
           zip -qry CHRISChat-unsigned.ipa Payload

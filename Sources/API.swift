@@ -508,6 +508,7 @@ struct BalanceStyle: Decodable, Hashable {
     var yenColor: String?
     var titleSize: Double?
     var amountSize: Double?
+    var curSize: Double?
     var noteSize: Double?
     var noteColor: String?
     var padTop: Double?

@@ -195,6 +195,20 @@ final class AppState: ObservableObject {
         moments = []
     }
 
+    /// 一键登录：用这台设备上保存的登录令牌直接进去（登录页点头像就用这个）
+    func quickLogin() async -> Bool {
+        guard !API.shared.token.isEmpty else { return false }
+        guard let s = try? await API.shared.session(), s.ok, let user = s.user else {
+            API.shared.clearToken()      // 令牌过期/失效：清掉，让用户重新输密码
+            return false
+        }
+        me = user
+        rememberLastUser()
+        await refreshAll()
+        Realtime.shared.start()
+        return true
+    }
+
     func contact(for id: String) -> User? {
         if me?.id == id { return me }
         return contacts.first { $0.id == id }
@@ -652,6 +666,8 @@ struct LoginView: View {
     @State private var bgImage = ""
     /// 后台配置一拉到就 +1，让配色/背景跟着重绘一次
     @State private var themeTick = 0
+    /// 一键登录进行中
+    @State private var quickBusy = false
 
     enum Way: String, Identifiable { case phone, password; var id: String { rawValue } }
 
@@ -683,6 +699,15 @@ struct LoginView: View {
                                 .frame(width: 80, height: 80)
                                 .foregroundColor(.gray.opacity(0.2))
                         }
+                    }
+                    /* 登录过的人：点头像直接一键登录（用这台设备上保存的登录态） */
+                    .contentShape(Circle())
+                    .onTapGesture { if hasSavedLogin { quickLogin() } }
+                    if hasSavedLogin {
+                        Text(quickBusy ? "正在登录…" : "点一下头像，快捷登录")
+                            .font(.system(size: 12))
+                            .foregroundColor(LoginTheme.accent)
+                            .padding(.top, 8)
                     }
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
@@ -803,6 +828,23 @@ struct LoginView: View {
     func loginWithWechat() {
         // 按最新要求：点「微信登录」直接进入账号密码登录页
         sheet = .password
+    }
+
+    /// 这台设备上有没有可以「一键登录」的登录态
+    private var hasSavedLogin: Bool {
+        !API.shared.token.isEmpty || !app.lastAvatar.isEmpty
+    }
+
+    /// 点头像一键登录：用保存的令牌直接进去；过期了就提示重新输密码
+    private func quickLogin() {
+        guard !quickBusy else { return }
+        quickBusy = true
+        error = nil
+        Task {
+            let ok = await app.quickLogin()
+            quickBusy = false
+            if !ok { error = "登录状态已过期，请重新输入密码登录" }
+        }
     }
 }
 

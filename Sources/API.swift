@@ -220,6 +220,40 @@ private struct StickersPayload: Decodable { var packs: [StickerPack]? }
 private struct StatusesPayload: Decodable { var categories: [StatusCategory]? }
 private struct DiscoverPayload: Decodable { var items: [DiscoverItem] }
 
+/* ---------------- 服务页（我 → 服务，后台「服务页」模块下发） ---------------- */
+
+/// 绿卡的一半：收付款 / 钱包
+struct ServiceHalf: Decodable, Hashable {
+    var label: String
+    var sub: String?
+    var icon: String?
+    var svg: String?
+    var action: String?
+}
+
+/// 绿卡本身（底色 + 左右两半）
+struct ServiceCard: Decodable, Hashable {
+    var enabled: Bool?
+    var bg: String?
+    var left: ServiceHalf?
+    var right: ServiceHalf?
+}
+
+/// 一个分类：标题 + 里面的格子（格子复用发现页那套字段）
+struct ServiceGroup: Decodable, Identifiable, Hashable {
+    var id: String
+    var title: String
+    var enabled: Bool?
+    var items: [DiscoverItem]?
+}
+
+/// 整页服务页的配置
+struct ServiceConfig: Decodable, Hashable {
+    var title: String?
+    var card: ServiceCard?
+    var groups: [ServiceGroup]?
+}
+
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
 private struct GiftsPayload: Decodable { var gifts: [Gift]? }
 private struct UploadPayload: Decodable {
@@ -691,6 +725,11 @@ final class API {
     func mePage() async throws -> [DiscoverItem] {
         let payload: DiscoverPayload = try await get("/api/me-page", as: DiscoverPayload.self)
         return payload.items.filter { $0.enabled != false }
+    }
+
+    /// 服务页整页配置（后台「服务页」模块配的，网页版和 App 共用一份）
+    func serviceConfig() async throws -> ServiceConfig {
+        try await get("/api/service", as: ServiceConfig.self)
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）

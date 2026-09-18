@@ -409,17 +409,26 @@ struct GroupCreateView: View {
     }
 }
 
-/* ============================================================ 服务（零钱 / 账单） */
+/* ============================================================ 服务（照微信参考图重做）
+   尺寸全部对着参考图量出来的数字（iPhone @3x，420×912pt）：
+     · 卡片左右各内缩 8、卡与卡之间空 8、圆角 7
+     · 绿卡：高 144，底色 #2AAE67；左右两半居中（图标 28 / 名字 18 / 小字 12 白 50%）
+     · 白卡：分类标题行 48（灰 14）+ 每行格子 92 + 底部 20
+     · 格子：4 列均分，图标 28、图标下 18.5、文字 13（黑）
+   内容全部来自后台「服务页」模块（GET /api/service），拉不到就用内置那套兜底；
+   钱包那一半显示零钱余额，账单列表接在所有分类下面（原来的功能没丢）。 */
 
 struct ServiceView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var realtime = Realtime.shared
 
+    @State private var cfg: ServiceConfig?
     @State private var bills: [BillItem] = []
     @State private var loading = true
     @State private var rechargeAmount = ""
     @State private var showRecharge = false
+    @State private var showMore = false
     @State private var detailChat: Chat?
     @State private var detailInfo: TransferInfo?
 
@@ -433,89 +442,69 @@ struct ServiceView: View {
         var info: TransferInfo? = nil
     }
 
+    /// 一格（四列网格里的一个）
+    private struct Cell: Identifiable {
+        let id: String
+        let label: String
+        let color: Color
+        let svg: String
+        let action: String
+    }
+
+    /// 一张白卡 = 一个分类
+    private struct Group: Identifiable {
+        let id: String
+        let title: String
+        let cells: [Cell]
+    }
+
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 4)
+
+    /// 分类：后台配的优先，没有就用内置那套（内容和参考图一致）
+    private var groups: [Group] {
+        if let list = cfg?.groups, !list.isEmpty {
+            return list.compactMap { g in
+                let cells = (g.items ?? []).filter { $0.enabled != false }.map { it in
+                    Cell(id: it.id,
+                         label: it.label,
+                         color: Color(hexString: it.color ?? "#1180E0", fallback: 0x1180E0),
+                         svg: SvcIcon.markup(it.icon, it.svg),
+                         action: it.action ?? "soon")
+                }
+                return cells.isEmpty ? nil : Group(id: g.id, title: g.title, cells: cells)
+            }
+        }
+        return ServiceFallback.groups.map { pair in
+            Group(id: pair.0, title: pair.0, cells: pair.1.map { row in
+                Cell(id: row.0, label: row.0,
+                     color: Color(hexString: row.2, fallback: 0x1180E0),
+                     svg: SvcIcon.markup(row.1, nil), action: "soon")
+            })
+        }
+    }
+
+    private var balanceText: String { "¥" + String(format: "%.2f", app.me?.balance ?? 0) }
+
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "服务", back: { dismiss() })
-            ScrollView {
+            NavBar(title: cfg?.title ?? "服务", back: { dismiss() }) {
+                Button { showMore = true } label: {
+                    Text("⋯")
+                        .font(pf(22))
+                        .foregroundColor(C.label)
+                        .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
+            }
+
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("零钱").font(pf(15)).foregroundColor(C.subLabel)
-                        Text("¥\(String(format: "%.2f", app.me?.balance ?? 0))")
-                            .font(pf(30, .medium))
-                            .foregroundColor(C.label)
-                        HStack(spacing: 10) {
-                            Button {
-                                rechargeAmount = ""
-                                showRecharge = true
-                            } label: {
-                                Text("充值")
-                                    .font(pf(15))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 18)
-                                    .frame(height: 34)
-                                    .background(RoundedRectangle(cornerRadius: 6).fill(C.green))
-                            }
-                            Button {
-                                Task { await loadBills() }
-                            } label: {
-                                Text("刷新账单")
-                                    .font(pf(15))
-                                    .foregroundColor(C.label)
-                                    .padding(.horizontal, 18)
-                                    .frame(height: 34)
-                                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.dyn(0xF2F2F2, 0x2C2C2E)))
-                            }
-                        }
-                        .padding(.top, 4)
+                    if cfg?.card?.enabled != false { greenCard.padding(.top, 13) }
+                    ForEach(groups) { g in
+                        groupCard(g).padding(.top, 8)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
-                    .background(C.cardBg)
-
-                    Rectangle().fill(C.pageBg).frame(height: 8)
-
-                    if loading {
-                        ProgressView().padding(.vertical, 30)
-                    } else if bills.isEmpty {
-                        Text("还没有账单项")
-                            .font(pf(15))
-                            .foregroundColor(C.subLabel)
-                            .padding(.vertical, 30)
-                    } else {
-                        ForEach(bills) { bill in
-                            Button {
-                                if let chat = bill.chat, let info = bill.info {
-                                    detailChat = chat
-                                    detailInfo = info
-                                }
-                            } label: {
-                                VStack(spacing: 0) {
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(bill.title).font(pf(16)).foregroundColor(C.label)
-                                            Text(bill.date).font(pf(12.5)).foregroundColor(C.subLabel)
-                                        }
-                                        Spacer()
-                                        VStack(alignment: .trailing, spacing: 3) {
-                                            Text("¥\(String(format: "%.2f", bill.amount))")
-                                                .font(pf(16, .medium))
-                                                .foregroundColor(C.label)
-                                            Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
-                                        }
-                                        Chevron(size: 9, line: 1.6)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .frame(height: 66)
-                                    .background(C.cardBg)
-                                    HairLine(inset: 16)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Spacer().frame(height: 30)
+                    billsCard.padding(.top, 8)
+                    Color.clear.frame(height: 24)
                 }
             }
             .background(C.pageBg)
@@ -524,6 +513,11 @@ struct ServiceView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
+        .confirmationDialog("服务", isPresented: $showMore, titleVisibility: .hidden) {
+            Button("刷新账单") { Task { await loadBills() } }
+            Button("充值") { rechargeAmount = ""; showRecharge = true }
+            Button("取消", role: .cancel) { }
+        }
         .sheet(isPresented: Binding(
             get: { detailInfo != nil },
             set: { if !$0 { detailInfo = nil; detailChat = nil } }
@@ -537,10 +531,188 @@ struct ServiceView: View {
             Button("充值") { doRecharge() }
             Button("取消", role: .cancel) { }
         }
-        .task { await loadBills() }
+        .task {
+            await loadConfig()
+            await loadBills()
+        }
         // 有转账 / 余额变动 → 账单立刻刷新
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" { Task { await loadBills() } }
+            if ev.type == "ui" { Task { await loadConfig() } }
+        }
+    }
+
+    /* ---------------------------------------------------------- 绿卡：收付款 / 钱包 */
+
+    private var greenCard: some View {
+        let c = cfg?.card
+        let bg = Color(hexString: c?.bg ?? "#2AAE67", fallback: 0x2AAE67)
+        return ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(bg)
+            HStack(alignment: .top, spacing: 0) {
+                halfView(c?.left, label: "收付款", icon: "svc.pay", action: "pay", sub: "")
+                halfView(c?.right, label: "钱包", icon: "svc.wallet", action: "wallet", sub: balanceText)
+            }
+            .padding(.horizontal, 25)
+            .padding(.top, 33)
+        }
+        .frame(height: 144)
+        .padding(.horizontal, 8)
+    }
+
+    private func halfView(_ h: ServiceHalf?, label fallbackLabel: String,
+                          icon fallbackIcon: String, action fallbackAction: String, sub fallbackSub: String) -> some View {
+        let rawLabel = h?.label ?? ""
+        let label = rawLabel.isEmpty ? fallbackLabel : rawLabel
+        let rawSub = h?.sub ?? ""
+        let sub = rawSub.isEmpty ? fallbackSub : rawSub
+        return Button {
+            run(h?.action ?? fallbackAction, label)
+        } label: {
+            VStack(spacing: 0) {
+                SVGIcon(markup: SvcIcon.markup(h?.icon ?? fallbackIcon, h?.svg), size: 28, color: .white)
+                    .frame(width: 28, height: 28)
+                Text(label)
+                    .font(pf(18))
+                    .foregroundColor(.white)
+                    .padding(.top, 17)
+                if !sub.isEmpty {
+                    Text(sub)
+                        .font(pf(12))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.top, 10)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /* ---------------------------------------------------------- 白卡：分类标题 + 四列格子 */
+
+    private func groupCard(_ g: Group) -> some View {
+        VStack(spacing: 0) {
+            Text(g.title)
+                .font(pf(14))
+                .foregroundColor(Color.dyn(0x7A7A7A, 0x8A8A8A))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 16.7)
+                .frame(height: 48)
+
+            LazyVGrid(columns: cols, spacing: 0) {
+                ForEach(g.cells) { c in
+                    Button {
+                        run(c.action, c.label)
+                    } label: {
+                        VStack(spacing: 0) {
+                            SVGIcon(markup: c.svg, size: 28, color: c.color)
+                                .frame(width: 28, height: 28)
+                            Text(c.label)
+                                .font(pf(13))
+                                .foregroundColor(C.label)
+                                .lineLimit(1)
+                                .padding(.top, 18.5)
+                        }
+                        .padding(.top, 14)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 92, alignment: .top)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.bottom, 20)
+        }
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(C.cardBg))
+        .padding(.horizontal, 8)
+    }
+
+    /* ---------------------------------------------------------- 账单（原来那一套，接在下面） */
+
+    private var billsCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Text("账单")
+                    .font(pf(14))
+                    .foregroundColor(Color.dyn(0x7A7A7A, 0x8A8A8A))
+                Spacer(minLength: 0)
+                Text(balanceText)
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+                Button {
+                    rechargeAmount = ""
+                    showRecharge = true
+                } label: {
+                    Text("充值")
+                        .font(pf(13))
+                        .foregroundColor(C.green)
+                        .padding(.leading, 14)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16.7)
+            .frame(height: 48)
+
+            if loading {
+                ProgressView().padding(.vertical, 26)
+            } else if bills.isEmpty {
+                Text("还没有账单项")
+                    .font(pf(14))
+                    .foregroundColor(C.subLabel)
+                    .padding(.vertical, 26)
+            } else {
+                ForEach(bills) { bill in
+                    Button {
+                        if let chat = bill.chat, let info = bill.info {
+                            detailChat = chat
+                            detailInfo = info
+                        }
+                    } label: {
+                        VStack(spacing: 0) {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(bill.title).font(pf(16)).foregroundColor(C.label)
+                                    Text(bill.date).font(pf(12.5)).foregroundColor(C.subLabel)
+                                }
+                                Spacer(minLength: 0)
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text("¥\(String(format: "%.2f", bill.amount))")
+                                        .font(pf(16, .medium))
+                                        .foregroundColor(C.label)
+                                    Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
+                                }
+                                Chevron(size: 9, line: 1.6)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 66)
+                            HairLine(inset: 16)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(C.cardBg))
+        .padding(.horizontal, 8)
+        .padding(.bottom, 20)
+    }
+
+    /* ---------------------------------------------------------- 动作 */
+
+    private func run(_ action: String, _ label: String) {
+        switch action {
+        case "wallet":
+            app.show("零钱 \(balanceText)")
+        case "pay":
+            app.show("收付款：还没接后端，先把页面做出来")
+        default:
+            app.show("「\(label)」还没接后端，先把页面做出来")
+        }
+    }
+
+    private func loadConfig() async {
+        if let got = try? await API.shared.serviceConfig() {
+            cfg = got
         }
     }
 
@@ -570,7 +742,7 @@ struct ServiceView: View {
                 let mine = (o["fromId"] as? String) == app.me?.id
                 let amount = (o["amount"] as? Double) ?? 0
                 let status = (o["status"] as? String) ?? "pending"
-                let state = status == "received" ? (mine ? "已收款" : "已收款") :
+                let state = status == "received" ? "已收款" :
                             (status == "refunded" ? "已退回" : "待收款")
                 found.append(BillItem(id: (o["id"] as? String) ?? m.id,
                                       title: mine ? "转账给 \(chat.name)" : "\(chat.name) 转账给你",

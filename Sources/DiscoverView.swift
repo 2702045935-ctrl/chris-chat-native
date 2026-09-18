@@ -228,6 +228,11 @@ struct MomentsView: View {
     @State private var hasMoreMoments = false
     @State private var loadingMore = false
     @State private var momentTotal = 0
+    /// 下拉刷新：拉出来的距离 / 正在刷新 / 彩球自转角度
+    @State private var pullY: CGFloat = 0
+    @State private var pulling = false
+    @State private var spin: Double = 0
+    @State private var spinTask: Task<Void, Never>?
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
@@ -271,14 +276,26 @@ struct MomentsView: View {
             .onPreferenceChange(OffsetKey.self) { y in
                 if baseTop == nil { baseTop = y }
                 topY = y
+                updatePull()
             }
             .onPreferenceChange(OffsetKey2.self) { y in
                 if baseBlock == nil { baseBlock = y }
                 blockY = y
+                updatePull()
             }
             .ignoresSafeArea(edges: .top)
 
             navBar
+
+            /* 下拉那个彩球：往下拉到一定程度就转圈刷新（和网页版那个球一样） */
+            if pullY > 0 || pulling {
+                ColorBall(size: 34, spin: spin)
+                    .scaleEffect(0.72 + min(1, pullY / 90) * 0.28)
+                    .offset(y: min(96, pullY * 0.8) + L.safeTop + 6)
+                    .animation(.easeOut(duration: 0.12), value: pullY)
+                    .allowsHitTesting(false)
+                    .zIndex(30)
+            }
 
             if let i = viewerIndex, !viewerPaths.isEmpty {
                 PhotoPager(paths: viewerPaths, startIndex: i) { viewerIndex = nil }
@@ -554,6 +571,38 @@ struct MomentsView: View {
         }
     }
 
+    /// 下拉的时候更新彩球的位置和自转；拉过 70 就自动刷新一次
+    private func updatePull() {
+        let a = baseTop.map { topY - $0 } ?? 0
+        let b = baseBlock.map { blockY - $0 } ?? 0
+        let d = max(0, max(a, b))                       // 往下拉出来多少
+        pullY = min(140, d)
+        if !pulling { spin = Double(pullY) * 3.2 }      // 跟着手指转，和网页版一样
+        if pullY > 70 && !pulling && !loadingMore {
+            startPullRefresh()
+        }
+    }
+
+    /// 松手刷新：彩球转圈，同时把封面 + 动态重新拉一遍
+    private func startPullRefresh() {
+        pulling = true
+        spinTask?.cancel()
+        spinTask = Task { @MainActor in
+            var angle = spin
+            let started = Date()
+            while !Task.isCancelled {
+                angle += 14
+                spin = angle
+                try? await Task.sleep(nanoseconds: 16_000_000)
+                if Date().timeIntervalSince(started) > 0.9 { break }   // 至少转 0.9 秒
+                if pullY < 12 { break }
+            }
+            if target == nil { app.me = try? await API.shared.me() }    // 封面也一起更新
+            await reload()
+            pulling = false
+        }
+    }
+
     private func reload() async {
         if let feed = try? await API.shared.momentsFeed(limit: 30, userId: target?.id) {
             moments = feed.moments
@@ -750,8 +799,33 @@ struct MomentRow: View {
     }
 }
 
+/* 下拉刷新那个彩色球（和网页版 .ptr-ball 一模一样：七色渐变 + 左上高光 + 投影） */
+struct ColorBall: View {
+    var size: CGFloat = 34
+    var spin: Double = 0
+
+    var body: some View {
+        ZStack {
+            Circle().fill(AngularGradient(
+                gradient: Gradient(colors: [
+                    Color(hex: 0xFF6B6B), Color(hex: 0xFFD166), Color(hex: 0x5FD07A),
+                    Color(hex: 0x4AB6FF), Color(hex: 0xA06DE0), Color(hex: 0xFF6BD6),
+                    Color(hex: 0xFF6B6B)
+                ]),
+                center: .center))
+            Circle().fill(RadialGradient(
+                gradient: Gradient(colors: [.white.opacity(0.95), .white.opacity(0)]),
+                center: UnitPoint(x: 0.37, y: 0.3), startRadius: 0.5, endRadius: size * 0.36))
+                .padding(size * 0.14)
+        }
+        .frame(width: size, height: size)
+        .rotationEffect(.degrees(spin))
+        .shadow(color: Color.black.opacity(0.28), radius: 7, y: 4)
+    }
+}
+
 /* ============================================================
-   朋友圈图片排列（严格按规格）：
+  朋友圈图片排列（严格按规格）：
    1 张 → 不进九宫格，按原图比例自适应（比例限制 3:4 ~ 2:1，超出的居中裁切，最高 300）
    2 / 4 张 → 2 列；3 张 → 3 列；5~9 张 → 统一 3 列
    正方形缩略图居中裁切 · 间隙 6 · 圆角 4 · 顺序 = 发的人选图顺序

@@ -248,18 +248,20 @@ struct ChatsView: View {
                     .background(C.chatRowBg)
                     .refreshable { await app.loadChats() }
                     .coordinateSpace(name: "chatsScroll")
-                    /* 下拉时浮出「微信(数字)」——和朋友圈下拉出现「朋友圈」一样 */
+                    /* 下拉时「微信(数字)」跟着手往下走（和朋友圈那个不一样，它不是淡入出来的）：
+                       文字就压在列表顶边上面一点，拉多少就往下走多少，再往上拉就自己躲回去。
+                       最外层 .clipped() 负责把藏在上面的部分裁掉，所以不会盖到搜索框。 */
                     .overlay(alignment: .top) {
-                        if pullY > 1 {
+                        if pullY > 0.5 {
                             Text(navTitle)
                                 .font(pf(UIConfig.num("navTitle", 17), .semibold))
                                 .foregroundColor(C.label)
-                                .padding(.top, 6)
-                                .opacity(Double(min(1, pullY / 36)))
-                                .offset(y: min(18, pullY * 0.35))
+                                .frame(maxWidth: .infinity)
+                                .offset(y: pullY - 28)      // 1:1 跟手，没有阻尼也没有淡入
                                 .allowsHitTesting(false)
                         }
                     }
+                    .clipped()
                 }
             }
             .background(C.chatsTopBg.ignoresSafeArea(edges: .bottom))

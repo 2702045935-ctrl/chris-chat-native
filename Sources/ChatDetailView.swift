@@ -93,12 +93,10 @@ struct ChatDetailView: View {
                 }
 
                 messageList
-                    // 表情 / ＋ 面板弹着的时候，点一下聊天区域就收回去（微信就是这样）
+                    // 点一下聊天区域：表情/＋ 面板收回去，打字键盘也一起收起来（微信就是这样）
                     .simultaneousGesture(TapGesture().onEnded {
-                        if panel != .none {
-                            panel = .none
-                            focused = false
-                        }
+                        if panel != .none { panel = .none }
+                        if focused { focused = false }
                     })
             }
 

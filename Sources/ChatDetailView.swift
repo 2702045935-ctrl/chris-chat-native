@@ -51,6 +51,7 @@ struct ChatDetailView: View {
     @State private var uploading = false
 
     @FocusState private var focused: Bool
+    @ObservedObject private var realtime = Realtime.shared
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -135,10 +136,14 @@ struct ChatDetailView: View {
             await app.loadChats()
             if plusItems.isEmpty { plusItems = (try? await API.shared.plusPanel()) ?? [] }
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
                 if Task.isCancelled { break }
                 await load(initial: false)
             }
+        }
+        // 服务器一推消息，立刻拉一次（不用等轮询）
+        .onChange(of: realtime.event) { _ in
+            Task { await load(initial: false) }
         }
     }
 

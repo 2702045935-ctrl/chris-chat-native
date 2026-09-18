@@ -263,7 +263,13 @@ struct ChatsView: View {
             Button("加好友") { path.append("addFriend") }
             Button("取消", role: .cancel) { }
         }
-        .task { await app.loadChats() }
+        .task {
+            // 进页面先拉一次，之后每 4 秒自动刷新一次（这样别人发消息不用切页就能看到）
+            while !Task.isCancelled {
+                await app.loadChats()
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+            }
+        }
     }
 
     private var emptyView: some View {

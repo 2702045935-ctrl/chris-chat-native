@@ -17,6 +17,29 @@ final class AppState: ObservableObject {
     @Published var uiVersion = 0
     private var lastUIConfig = ""
 
+    /// 长连接推过来的事情，安排界面去刷新
+    func handle(_ ev: PushEvent) {
+        if let b = ev.balance, var me = me {
+            me.balance = b
+            self.me = me
+        }
+        if !ev.announce.isEmpty && ev.type == "announce" {
+            show("系统公告：" + ev.announce)
+        }
+        switch ev.type {
+        case "message":
+            Task { await loadChats() }
+        case "chat":
+            Task { await loadChats() }
+        case "moment":
+            Task { await loadMoments() }
+        case "friend":
+            Task { await loadContacts() }
+        default:
+            break
+        }
+    }
+
     private var toastTask: Task<Void, Never>?
 
     func show(_ text: String) {
@@ -39,6 +62,7 @@ final class AppState: ObservableObject {
             if s.ok, let user = s.user {
                 me = user
                 await refreshAll()
+                Realtime.shared.start()
             } else {
                 API.shared.clearToken()
             }
@@ -64,11 +88,13 @@ final class AppState: ObservableObject {
     func login(username: String, password: String) async throws {
         me = try await API.shared.login(username: username, password: password)
         await refreshAll()
+        Realtime.shared.start()
     }
 
     func login(phone: String, code: String) async throws {
         me = try await API.shared.loginPhone(phone: phone, code: code)
         await refreshAll()
+        Realtime.shared.start()
     }
 
     func refreshAll() async {
@@ -98,6 +124,7 @@ final class AppState: ObservableObject {
 
     func logout() async {
         await API.shared.logout()
+        Realtime.shared.stop()
         me = nil
         chats = []
         contacts = []
@@ -126,6 +153,7 @@ struct CHRISApp: App {
 struct RootView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var realtime = Realtime.shared
 
     var body: some View {
         GeometryReader { geo in
@@ -162,8 +190,12 @@ struct RootView: View {
                 Task {
                     await app.refreshUI()
                     await app.loadChats()
+                    Realtime.shared.start()
                 }
             }
+        }
+        .onChange(of: realtime.event) { ev in
+            app.handle(ev)
         }
     }
 }

@@ -148,6 +148,7 @@ struct MomentsView: View {
     @State private var commenting: Moment?
     @State private var commentText = ""
     @State private var actionMoment: Moment?
+    @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
     private var solid: Bool { offset < -(L.coverH - 52) }
@@ -180,6 +181,22 @@ struct MomentsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .task { await reload() }
+        // 别人发朋友圈 / 换了封面，这边立刻跟着变
+        .onChange(of: realtime.event) { _ in
+            Task {
+                app.me = try? await API.shared.me()
+                await reload()
+            }
+        }
+        .task {
+            // 兜底：每 8 秒对一次（万一长连接断了）
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                if Task.isCancelled { break }
+                app.me = try? await API.shared.me()
+                await reload()
+            }
+        }
         .confirmationDialog("发表", isPresented: $cameraMenu, titleVisibility: .visible) {
             Button("拍摄") { showCamera = true }
             Button("从相册选择") { showPhoto = true }

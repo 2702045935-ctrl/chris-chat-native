@@ -141,7 +141,7 @@ struct ChatDetailView: View {
         }
         .sheet(isPresented: $showTransfer) {
             TransferPagesFlow(chatId: chat.id,
-                              peerName: chat.title,
+                              peerName: chat.title ?? chat.name,
                               peerAccount: peerAccount,
                               onClose: { showTransfer = false })
         }

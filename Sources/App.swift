@@ -758,13 +758,6 @@ struct LoginView: View {
             .background(Color.clear)
             .navigationTitle("账号登录")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { focus = nil } label: {
-                        Image(systemName: "chevron.left")
-                    }
-                }
-            }
         }
         .sheet(isPresented: $showPair) { PairSheet() }
         .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }

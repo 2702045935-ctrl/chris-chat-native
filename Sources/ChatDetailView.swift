@@ -554,8 +554,12 @@ struct ChatDetailView: View {
     private func load(initial: Bool) async {
         do {
             let result = try await API.shared.messages(chatId: chat.id, limit: 40)
+            /* 不能只看条数和最后一条的 id：对方收款以后转账卡片还是同一条消息，
+               只是 body 里的 status 从 pending 变成 received —— 以前这种情况会被
+               当成「没变化」跳过，气泡就一直停在「待对方确认收款」。 */
             let same = result.messages.count == messages.count
                 && result.messages.last?.id == messages.last?.id
+                && zip(result.messages, messages).allSatisfy { $0.id == $1.id && $0.body == $1.body }
             if initial || !same {
                 messages = result.messages
             }
@@ -715,6 +719,9 @@ struct MessageRow: View {
         let note = (o["note"] as? String) ?? ""
         let status = (o["status"] as? String) ?? "pending"
         let state = status == "received" ? "已收款" : (status == "refunded" ? "已退回" : "待对方确认收款")
+        /* 转账卡片配色跟网页版一致：待收款 = 微信橙 / 已收款 = 淡橙 / 已退回 = 灰 */
+        let card: Color = status == "received" ? Color(hex: 0xF0C69A)
+            : (status == "refunded" ? Color(hex: 0xC2C2C2) : Color(hex: 0xFF9500))
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "yensign.circle.fill")
@@ -738,7 +745,7 @@ struct MessageRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
         .frame(width: 216, alignment: .leading)
-        .background(Color(hex: 0xFA9D3C))
+        .background(card)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 

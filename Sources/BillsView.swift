@@ -15,6 +15,7 @@ import SwiftUI
 struct BillsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var realtime = Realtime.shared
 
     @State private var bills: [BillRecord] = []
     @State private var months: [String] = []
@@ -124,6 +125,10 @@ struct BillsView: View {
             if let b = openBill { billDetail(b) }
         }
         .task { await load("") }
+        /* 对方收款 / 退回：账单这一页也跟着刷（不然状态还停在「待对方收款」） */
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "transfer" || ev.type == "balance" { Task { await load(month) } }
+        }
     }
 
     /* ---------------------------------------------------------- 顶栏 */

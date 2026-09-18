@@ -102,9 +102,15 @@ final class AppState: ObservableObject {
             if changed { coalesce { [weak self] in await self?.loadContacts() } }
         }
         switch ev.type {
-        case "message":
+        case "message", "chat":
             coalesce { [weak self] in await self?.loadChats() }
-        case "chat":
+        case "transfer":
+            /* 转账状态变了（对方收款 / 24 小时自动退回）：
+               付款方这边弹一句提示，会话列表跟着刷一遍 */
+            if ev.transferStatus == "received", ev.transferFromId == me?.id,
+               let a = ev.transferAmount {
+                show("对方已收款 ¥" + money(a))
+            }
             coalesce { [weak self] in await self?.loadChats() }
         case "moment":
             momentsUnread = max(1, momentsUnread)          // 有人发朋友圈：先点红点，再拉一次

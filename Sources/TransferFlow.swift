@@ -10,82 +10,9 @@ import SwiftUI
    尺寸都能在服务器 data/ui.json 里调（tf / pay 开头那几个键）。
    ============================================================ */
 
-/// 转账页的数字键盘：4 列 —— 1…9、右上角删除、0 占两格、绿色「转账」占右边两行
-struct TransferPad: View {
-    var canSend: Bool
-    var onKey: (String) -> Void
-    var onSend: () -> Void
-
-    private var rowH: CGFloat { L.tfPadRowH }
-    private var colW: CGFloat { max(60, (L.width - 1.5) / 4) }
-    private let line = Color.dyn(0xE5E5E5, 0x3A3A3C)
-
-    var body: some View {
-        VStack(spacing: 0.5) {
-            HStack(spacing: 0.5) {
-                key("1"); key("2"); key("3"); delKey
-            }
-            HStack(spacing: 0.5) {
-                key("4"); key("5"); key("6"); fill
-            }
-            HStack(spacing: 0.5) {
-                VStack(spacing: 0.5) {
-                    HStack(spacing: 0.5) { key("7"); key("8"); key("9") }
-                    HStack(spacing: 0.5) {
-                        key("0", width: colW * 2 + 0.5)
-                        key(".")
-                    }
-                }
-                sendButton
-            }
-        }
-        .background(line)
-    }
-
-    private func key(_ k: String, width: CGFloat? = nil) -> some View {
-        Button {
-            onKey(k)
-        } label: {
-            Text(k)
-                .font(pf(L.tfKeySize))
-                .foregroundColor(C.label)
-                .frame(width: width ?? colW, height: rowH)
-                .background(C.cardBg)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var delKey: some View {
-        Button {
-            onKey("del")
-        } label: {
-            SVGIcon(markup: I.deleteKey, size: L.v(22, 6.4, 26), color: C.label)
-                .frame(width: colW, height: rowH)
-                .background(C.cardBg)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var fill: some View {
-        Rectangle().fill(line).frame(width: colW, height: rowH)
-    }
-
-    private var sendButton: some View {
-        Button {
-            onSend()
-        } label: {
-            Text("转账")
-                .font(pf(L.tfSendSize, .medium))
-                .foregroundColor(canSend ? .white : C.subLabel)
-                .frame(width: colW, height: rowH * 2 + 0.5)
-                .background(canSend ? C.green : line)
-        }
-        .buttonStyle(.plain)
-        .disabled(!canSend)
-    }
-}
-
-/* ============================================================ 转账页 */
+/* ============================================================ 转账页
+   键盘：用 iOS 原生的（金额 decimalPad / 支付密码 numberPad），
+   以前那两个自己画的数字键盘已经删掉，界面外观还是微信这一套。 */
 
 struct TransferView: View {
     let chat: Chat
@@ -97,7 +24,6 @@ struct TransferView: View {
     @State private var note = ""
     @State private var noteEditing = false
     @State private var method = "balance"
-    @State private var padOn = false
     @State private var showPay = false
     @State private var showMethod = false
     @State private var password = ""
@@ -108,6 +34,10 @@ struct TransferView: View {
     @State private var payHint: String?
     @State private var badPwd = false
     @State private var caretOn = true
+    /// 金额输入交给原生键盘（藏起来的输入框收字，界面还是「一位一格」）
+    @FocusState private var amountFocus: Bool
+    /// 支付密码也交给原生键盘
+    @FocusState private var payFocus: Bool
 
     private var amount: Double { Double(digits) ?? 0 }
     private var peerAvatar: String { chat.avatar ?? "" }
@@ -165,14 +95,49 @@ struct TransferView: View {
             head
             bodyArea
             Spacer(minLength: 0)
-            TransferPad(canSend: amount > 0,
-                        onKey: { press($0) },
-                        onSend: { openPay() })
-                .offset(y: padOn ? 0 : L.tfPadRowH * 4 + 2)
+
+            /* 藏起来的输入框：负责把原生键盘敲进来的字给到 digits */
+            TextField("", text: $digits)
+                .keyboardType(.decimalPad)
+                .focused($amountFocus)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .onChange(of: digits) { v in
+                    let clean = sanitizeAmount(v)
+                    if clean != v { digits = clean }
+                }
+
+            sendBar
         }
-        .animation(.easeOut(duration: 0.26), value: padOn)
-        /* 和微信一样：一进转账页数字键盘就弹出来（以前要先点一下金额，看着像下面没渲染） */
-        .onAppear { padOn = true }
+        /* 一进转账页原生键盘就弹出来（和微信一样） */
+        .onAppear {
+            Task {
+                try? await Task.sleep(nanoseconds: 320_000_000)
+                amountFocus = true
+            }
+        }
+    }
+
+    /// 底部绿色「转账」按钮（原生键盘上面那颗）
+    private var sendBar: some View {
+        Button {
+            amountFocus = false
+            openPay()
+        } label: {
+            Text("转账")
+                .font(pf(17.5, .medium))
+                .foregroundColor(amount > 0 ? .white : Color.dyn(0x9A9A9A, 0x8A8A8E))
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(amount > 0 ? C.green : Color.dyn(0xDCDCDC, 0x3A3A3C)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(amount <= 0)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 
     private var head: some View {
@@ -239,7 +204,7 @@ struct TransferView: View {
                 Rectangle().fill(C.hairline).frame(height: 0.5)
             }
             .contentShape(Rectangle())
-            .onTapGesture { padOn = true }
+            .onTapGesture { amountFocus = true }
 
             HStack(alignment: .top, spacing: 5) {
                 Text("¥")
@@ -308,24 +273,27 @@ struct TransferView: View {
         }
     }
 
-    /* ---------------------------------------------------------- 数字键 */
+    /* ---------------------------------------------------------- 金额输入 */
 
-    private func press(_ key: String) {
-        padOn = true
-        if key == "del" {
-            if !digits.isEmpty { digits.removeLast() }
-            return
+    /// 原生键盘敲进来的东西过一遍：只留数字和一个小数点、最多两位小数、最多 10 位
+    private func sanitizeAmount(_ raw: String) -> String {
+        var out = ""
+        var seenDot = false
+        var decimals = 0
+        for ch in raw {
+            if ch >= "0" && ch <= "9" {
+                if seenDot {
+                    if decimals >= 2 { continue }
+                    decimals += 1
+                }
+                out.append(ch)
+            } else if ch == "." || ch == "," {
+                if seenDot { continue }
+                seenDot = true
+                out.append(".")
+            }
         }
-        if key == "." {
-            if digits.contains(".") { return }
-            digits = (digits.isEmpty ? "0" : digits) + "."
-            return
-        }
-        if let dot = digits.firstIndex(of: "."), digits.distance(from: dot, to: digits.endIndex) > 2 {
-            return                                   // 最多两位小数
-        }
-        if digits == "" || digits == "0" { digits = key } else { digits += key }
-        if digits.count > 10 { digits = String(digits.prefix(10)) }
+        return out.count > 10 ? String(out.prefix(10)) : out
     }
 
     private func openPay() {
@@ -478,7 +446,18 @@ struct TransferView: View {
                 }
                 .padding(.top, L.v(24, 8.4, 35))
 
-                payPad
+                /* 支付密码也用原生键盘：藏起来的输入框收字 */
+                TextField("", text: $password)
+                    .keyboardType(.numberPad)
+                    .focused($payFocus)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+                    .onChange(of: password) { v in
+                        let clean = String(v.filter { $0 >= "0" && $0 <= "9" }.prefix(6))
+                        if clean != v { password = clean; return }
+                        payHint = nil
+                        if clean.count == 6 && !busy { payFocus = false; submit(face: false) }
+                    }
                     .padding(.top, L.v(12, 5.5, 23))
 
                 Rectangle()
@@ -488,69 +467,19 @@ struct TransferView: View {
             .background(C.cardBg)
             .clipShape(TopRounded(radius: L.paySheetRadius))
         }
+        .onAppear { focusPaySoon() }
     }
 
-    /// 支付面板的数字键盘：3 列，左下角一块灰的，中间 0，右下角删除
-    private var payPad: some View {
-        let keys: [[String]] = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]
-        return VStack(spacing: 0) {
-            Rectangle().fill(Color.dyn(0xE5E5E5, 0xFFFFFF)).frame(height: 0.5).opacity(0.9)
-            ForEach(keys.indices, id: \.self) { r in
-                HStack(spacing: 0) {
-                    ForEach(keys[r], id: \.self) { k in
-                        payKey(k)
-                        Rectangle().fill(Color.dyn(0xE5E5E5, 0xFFFFFF)).frame(width: 0.5).opacity(0.9)
-                    }
-                }
-            }
-            HStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color.dyn(0xEDEDED, 0x232325))
-                    .frame(height: L.payPadH)
-                    .frame(maxWidth: .infinity)
-                payKey("0")
-                Rectangle().fill(Color.dyn(0xE5E5E5, 0xFFFFFF)).frame(width: 0.5).opacity(0.9)
-                Button {
-                    payKeyPress("del")
-                } label: {
-                    SVGIcon(markup: I.deleteKey, size: L.v(21, 6, 25), color: C.label)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: L.payPadH)
-                        .background(Color.dyn(0xEDEDED, 0x232325))
-                }
-                .buttonStyle(.plain)
-            }
+    /// 支付面板一出来就弹原生键盘（没设支付密码就不用弹）
+    private func focusPaySoon() {
+        Task {
+            try? await Task.sleep(nanoseconds: 320_000_000)
+            if hasPwd { payFocus = true }
         }
-        .overlay(Rectangle().fill(Color.dyn(0xE5E5E5, 0xFFFFFF)).frame(height: 0.5).opacity(0.9),
-                 alignment: .bottom)
-    }
-
-    private func payKey(_ k: String) -> some View {
-        Button {
-            payKeyPress(k)
-        } label: {
-            Text(k)
-                .font(pf(L.payPadFont))
-                .foregroundColor(C.label)
-                .frame(maxWidth: .infinity)
-                .frame(height: L.payPadH)
-                .background(C.cardBg)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func payKeyPress(_ k: String) {
-        payHint = nil
-        if k == "del" {
-            if !password.isEmpty { password.removeLast() }
-            return
-        }
-        guard password.count < 6 else { return }
-        password += k
-        if password.count == 6 { submit(face: false) }
     }
 
     private func closePay() {
+        payFocus = false
         withAnimation(.easeOut(duration: 0.22)) {
             showPay = false
             showMethod = false
@@ -737,6 +666,7 @@ struct TransferView: View {
                 password = ""
                 badPwd = true
                 payHint = (error as? APIError)?.errorDescription ?? "转账失败"
+                if hasPwd { payFocus = true }          // 密码错了：键盘留着，直接重输
                 try? await Task.sleep(nanoseconds: 420_000_000)
                 badPwd = false
             }

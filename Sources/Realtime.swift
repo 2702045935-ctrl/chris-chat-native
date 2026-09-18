@@ -13,6 +13,10 @@ struct PushEvent: Equatable {
     var momentUnread: Int? = nil
     /// 待处理的好友申请数量（服务器在 ready 里给；手机在后台没收到推送时靠它补上通讯录红点）
     var friendRequests: Int? = nil
+    /// 转账推过来的东西（谁发的、什么状态、多少钱）：对方收款时付款方这边要变气泡 + 弹提示
+    var transferFromId = ""
+    var transferStatus = ""
+    var transferAmount: Double? = nil
     var callId = ""
     var callAction = ""
     var callMedia = ""
@@ -107,6 +111,13 @@ final class Realtime: ObservableObject {
         ev.announce = (obj["text"] as? String) ?? ""
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
         if let n = obj["friendRequests"] as? Int { ev.friendRequests = n }
+        // 转账状态变化（对方收款 / 24 小时退回）
+        if let t = obj["transfer"] as? [String: Any] {
+            ev.transferFromId = (t["fromId"] as? String) ?? ""
+            ev.transferStatus = (t["status"] as? String) ?? ""
+            if let a = t["amount"] as? Double { ev.transferAmount = a }
+            else if let a = t["amount"] as? Int { ev.transferAmount = Double(a) }
+        }
         // 通话信令（invite/incoming/ringing/accept/reject/cancel/hangup）
         ev.callId = (obj["callId"] as? String) ?? ""
         ev.callAction = (obj["action"] as? String) ?? ""

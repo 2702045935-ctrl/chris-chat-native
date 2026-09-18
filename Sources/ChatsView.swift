@@ -222,13 +222,12 @@ struct ChatsView: View {
                         .buttonStyle(.plain)
                     }
                     .offset(y: pullY)          // 1:1 跟手，拉多少滑多少
-                    .zIndex(1)                 // 画在搜索框上面，滑过去的时候看得见
 
                     SearchBoxCenter(text: $keyword)
                         .padding(L.searchPad)
                         .background(C.chatsTopBg)      // 顶部（导航栏+搜索框）底色 #F7F7F7
+                        .zIndex(1)                     // 压在上面：顶栏滑过来是钻到它后面，不会糊住搜索框
                 }
-                .clipped()
 
                 if app.chats.isEmpty {
                     emptyView

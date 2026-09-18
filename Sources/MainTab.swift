@@ -166,7 +166,8 @@ struct NavBar<Right: View>: View {
         let base = UIConfig.num("navTitle", 17)
         return title == "发现" ? base - 1 : base
     }
-    private var weight: Font.Weight { .regular }
+    /// 顶部标题字重：明显加黑（苹方 Semibold，和手机微信一致）
+    private var weight: Font.Weight { .semibold }
 }
 
 extension NavBar where Right == EmptyView {

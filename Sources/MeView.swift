@@ -272,7 +272,7 @@ struct SettingsView: View {
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
-                        settingRow("关于 CHRIS聊天", "原生版 1.0") { }
+                        settingRow("关于 CHRIS聊天", "原生版 1.0 · 打包 " + AppInfo.build) { }
                     }
 
                     Button {

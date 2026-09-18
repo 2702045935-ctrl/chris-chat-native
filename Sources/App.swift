@@ -230,6 +230,8 @@ struct RootView: View {
                 }
             }
             .id(app.uiVersion)
+            // 根视图也铺一层底色：万一哪个页面没铺满，顶上也不会露出系统窗口的白色
+            .background(C.pageBg.ignoresSafeArea())
             .onAppear { L.width = geo.size.width }
             .onChange(of: geo.size.width) { w in L.width = w }
         }

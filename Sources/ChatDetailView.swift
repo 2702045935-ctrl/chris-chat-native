@@ -77,41 +77,41 @@ struct ChatDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            /* ① 背景 + 消息区：整块往上顶到状态栏（和朋友圈封面一个写法），
-                  所以顶部那一条也是这张背景，不会露出窗口的白色 */
+        ZStack {
             VStack(spacing: 0) {
-                Color.clear.frame(height: L.safeTop + L.navH)      // 给顶栏让出位置（背景照铺）
+                /* 顶栏：单独一个实心颜色（后台可调 ui.json 的 chatNavBg），
+                   不跟聊天背景图同色 —— 和微信一样，背景图从顶栏下面才开始铺 */
+                NavBar(title: chat.name, back: { dismiss() }) {
+                    Button {
+                        app.show("聊天设置排在下一批")
+                    } label: {
+                        Text("⋯")
+                            .font(pf(22))
+                            .foregroundColor(C.label)
+                            .frame(width: 44, height: L.navH)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .background(
+                    UIConfig.color("chatNavBg", 0xEDEDED, 0x18181A)
+                        .ignoresSafeArea(edges: .top)
+                )
 
+                /* 聊天区：页面底色 +（有的话）聊天背景图 */
                 messageList
                     // 点一下（哪怕是空白处）：表情/＋ 面板收回去，打字键盘也收起来
                     // 再叠一层：手一滑动也收（微信就是这样）
                     .contentShape(Rectangle())
                     .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
                     .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                ZStack {
-                    C.pageBg
-                    if !backgroundPath.isEmpty {
-                        RemoteImage(path: backgroundPath)
+                    .background {
+                        ZStack {
+                            C.pageBg
+                            if !backgroundPath.isEmpty {
+                                RemoteImage(path: backgroundPath)
+                            }
+                        }
                     }
-                }
-            }
-            .ignoresSafeArea(edges: .top)
-
-            /* ② 导航栏：单独浮在安全区里（标题不会被状态栏压住） */
-            NavBar(title: chat.name, back: { dismiss() }) {
-                Button {
-                    app.show("聊天设置排在下一批")
-                } label: {
-                    Text("⋯")
-                        .font(pf(22))
-                        .foregroundColor(C.label)
-                        .frame(width: 44, height: L.navH)
-                }
-                .buttonStyle(.plain)
             }
 
             if uploading {

@@ -746,7 +746,9 @@ struct LoginView: View {
         }
         .sheet(isPresented: $showPair) { PairSheet() }
         .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }
-        .sheet(item: $sheet) { w in AccountLoginSheet(mode: w) }
+        .sheet(item: $sheet) { w in
+            if w == .phone { PhoneLoginView() } else { AccountLoginSheet(mode: w) }
+        }
         .onAppear {
             Task {
                 if let b = await API.shared.branding() {
@@ -1067,6 +1069,175 @@ struct TermsSheet: View {
             .background(C.loginBg.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("好") { dismiss() } } }
+        }
+    }
+}
+
+/* ============================================================
+   手机号登录（按你给的 PhoneLoginView 代码原样实现）
+   同样只有两处 iOS 上不能用、做了同款外观的等价替换：
+     · .toggleStyle(.checkbox) 是 macOS 专有 → 同外观方框勾选
+     · Text.rich(TextSpan{...}) 不是 SwiftUI 类型 → 等价富文本写法
+   业务动作接的是真的接口：发验证码 → 服务器；点登录 → 登录并进入 App
+   ============================================================ */
+
+struct PhoneLoginView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) var dismiss
+    @State private var phone = ""
+    @State private var code = ""
+    @State private var isAgree = false
+    @State private var countDown = 0
+    @State private var timer: Timer?
+    @State private var error: String?
+    @State private var busy = false
+    @State private var showTerms = false
+    @State private var termsKind = 0
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    Spacer(minLength: 30)
+                    Text("手机号登录")
+                        .font(.system(size: 24, weight: .semibold))
+
+                    // 手机号输入框
+                    TextField("请输入手机号", text: $phone)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 16))
+                        .padding(16)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .focused($focused)
+
+                    // 验证码行
+                    HStack(spacing: 12) {
+                        TextField("请输入验证码", text: $code)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 16))
+                            .padding(16)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+
+                        Button {
+                            sendCode()
+                        } label: {
+                            Text(countDown > 0 ? "\(countDown)s" : "获取验证码")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 100, height: 52)
+                                .background(countDown > 0 ? Color(.systemGray3) : Color(hexString: "#007AFF"))
+                                .cornerRadius(12)
+                        }
+                        .disabled(countDown > 0 || phone.count != 11)
+                    }
+
+                    // 登录按钮
+                    Button {
+                        phoneLogin()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
+                            Text("登录")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(canSubmit ? Color(hexString: "#007AFF") : Color(.systemGray3))
+                        .cornerRadius(16)
+                    }
+                    .disabled(!canSubmit)
+
+                    if let e = error {
+                        Text(e).font(.system(size: 13)).foregroundColor(C.red)
+                    }
+
+                    // 协议勾选
+                    HStack(alignment: .top, spacing: 8) {
+                        Button { isAgree.toggle() } label: {
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(isAgree ? Color(hexString: "#007AFF") : Color(hexString: "#C7C7CC"), lineWidth: 1.4)
+                                .background(RoundedRectangle(cornerRadius: 3)
+                                    .fill(isAgree ? Color(hexString: "#007AFF") : Color.clear))
+                                .frame(width: 16, height: 16)
+                                .overlay(isAgree
+                                         ? Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundColor(.white)
+                                         : nil)
+                        }
+                        .padding(.top, 1)
+
+                        Text(.init("我已阅读并同意 [《用户协议》](terms://0) 和 [《隐私政策》](terms://1)"))
+                            .font(.system(size: 12))
+                            .tint(Color(hexString: "#007AFF"))
+                            .environment(\.openURL, OpenURLAction { url in
+                                if url.scheme == "terms" {
+                                    termsKind = Int(url.host ?? "0") ?? 0
+                                    showTerms = true
+                                }
+                                return .handled
+                            })
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { dismiss() } label: { Image(systemName: "chevron.left") }
+                }
+            }
+        }
+        .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }
+        .onDisappear {
+            timer?.invalidate()
+        }
+    }
+
+    var canSubmit: Bool {
+        isAgree && phone.count == 11 && code.count >= 4 && !busy
+    }
+
+    func sendCode() {
+        error = nil
+        Task {
+            do {
+                if let dev = try await API.shared.phoneCode(phone: phone) {
+                    code = dev
+                    app.show("验证码：\(dev)")
+                } else {
+                    app.show("验证码已发送")
+                }
+            } catch {
+                self.error = (error as? APIError)?.errorDescription ?? "发送失败"
+            }
+        }
+        countDown = 60
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { t in
+            if countDown > 0 {
+                countDown -= 1
+            } else {
+                t.invalidate()
+            }
+        }
+    }
+
+    func phoneLogin() {
+        busy = true
+        error = nil
+        Task {
+            do {
+                try await app.login(phone: phone, code: code)
+                dismiss()
+            } catch {
+                self.error = (error as? APIError)?.errorDescription ?? "登录失败"
+            }
+            busy = false
         }
     }
 }

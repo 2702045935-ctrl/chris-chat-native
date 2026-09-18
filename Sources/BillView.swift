@@ -105,7 +105,7 @@ struct BillDetailView: View {
                             .foregroundColor(C.label)
                             .padding(.top, 14)
                         Text((mine ? "-" : "+") + "¥" + String(format: "%.2f", t.amount))
-                            .font(pf(30, .medium))
+                            .font(pfMoney(30))
                             .foregroundColor(C.label)
                             .padding(.top, 16)
                     }

@@ -75,7 +75,7 @@ struct BalancePageView: View {
             ZStack {
                 Circle().fill(st.circleColorV)
                 Text("¥")
-                    .font(pf(st.yenFont, .medium))
+                    .font(pfMoney(st.yenFont))
                     .foregroundColor(st.yenColorV)
             }
             .frame(width: st.circle, height: st.circle)
@@ -87,7 +87,7 @@ struct BalancePageView: View {
                 .padding(.top, st.gapTitleV)
 
             Text(money(cfg?.balance ?? app.me?.balance ?? 0))
-                .font(pf(st.amountFont, .medium))
+                .font(pfMoney(st.amountFont))
                 .monospacedDigit()          // 钱用等宽数字
                 .kerning(-1)
                 .foregroundColor(Color.dyn(0x000000, 0xEDEDED))

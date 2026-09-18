@@ -718,7 +718,7 @@ struct MessageRow: View {
                     .foregroundColor(Color(hex: 0xFFFFFF))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("¥\(String(format: "%.2f", amount))")
-                        .font(pf(19, .medium))
+                        .font(pfMoney(19))
                         .foregroundColor(.white)
                     Text(note.isEmpty ? (mine ? "你发起了一笔转账" : "转账给你") : note)
                         .font(pf(12))

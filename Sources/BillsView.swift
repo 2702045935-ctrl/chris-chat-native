@@ -172,7 +172,7 @@ struct BillsView: View {
             .buttonStyle(.plain)
             Spacer(minLength: 0)
             Text("支出 \(money(s.out)) 收入 \(money(s.income))")
-                .font(pf(style.sumFont))
+                .font(pfMoney(style.sumFont))
                 .foregroundColor(sumGray)
         }
         .padding(.leading, 17)
@@ -202,7 +202,7 @@ struct BillsView: View {
                 .padding(.leading, 17)
                 Spacer(minLength: 8)
                 Text((b.mine ? "-" : "+") + money(b.amount))
-                    .font(pf(style.amountFont))
+                    .font(pfMoney(style.amountFont))
                     .fontWeight(.medium)
                     .monospacedDigit()
                     .foregroundColor(b.mine ? C.label : incomeGold)

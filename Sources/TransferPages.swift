@@ -72,7 +72,7 @@ struct TransferHomeView: View {
 
                     HStack {
                         Text("¥")
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(pfMoney(24))
                         TextField("0.00", text: $amount)
                             .font(.system(size: 24, weight: .semibold))
                             .keyboardType(.decimalPad)
@@ -194,7 +194,7 @@ struct TransferConfirmView: View {
                     HStack {
                         Text("转账金额").foregroundColor(.secondary)
                         Spacer()
-                        Text("¥\(amount)").font(.system(size: 16, weight: .semibold))
+                        Text("¥\(amount)").font(pfMoney(16))
                     }
                     HStack {
                         Text("手续费").foregroundColor(.secondary)
@@ -215,7 +215,7 @@ struct TransferConfirmView: View {
                         Text("合计").font(.system(size: 16, weight: .semibold))
                         Spacer()
                         Text("¥\(amount)")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(pfMoney(18))
                             .foregroundColor(TransferTheme.accent)
                     }
                 }
@@ -272,7 +272,7 @@ struct TransferPasswordView: View {
             Text("请输入支付密码")
                 .font(.system(size: 18, weight: .semibold))
             Text("转账金额 ¥\(amount)")
-                .font(.system(size: 14))
+                .font(pfMoney(14))
                 .foregroundColor(.secondary)
 
             // 密码格子
@@ -377,7 +377,7 @@ struct TransferSuccessView: View {
             Text("转账成功")
                 .font(.system(size: 22, weight: .semibold))
             Text("¥\(amount)")
-                .font(.system(size: 28, weight: .semibold))
+                .font(pfMoney(28))
             Text("预计实时到账")
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)

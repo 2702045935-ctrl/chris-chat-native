@@ -717,7 +717,7 @@ struct ServiceView: View {
                                 Spacer(minLength: 0)
                                 VStack(alignment: .trailing, spacing: 3) {
                                     Text("¥\(String(format: "%.2f", bill.amount))")
-                                        .font(pf(16, .medium))
+                                        .font(pfMoney(16))
                                         .foregroundColor(C.label)
                                     Text(bill.status).font(pf(12.5)).foregroundColor(C.subLabel)
                                 }

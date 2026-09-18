@@ -219,7 +219,7 @@ struct TransferView: View {
             HStack(alignment: .center, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text("¥")
-                        .font(pf(L.tfCnySize, .medium))
+                        .font(pfMoney(L.tfCnySize))
                         .foregroundColor(C.label)
                     digitCells
                 }
@@ -241,7 +241,7 @@ struct TransferView: View {
 
             HStack(alignment: .top, spacing: 5) {
                 Text("¥")
-                    .font(pf(L.tfCnySize, .medium))
+                    .font(pfMoney(L.tfCnySize))
                     .foregroundColor(.clear)
                 unitCells
                 Spacer(minLength: 0)
@@ -374,7 +374,7 @@ struct TransferView: View {
                     .padding(.top, L.v(9, 3.1, 13))
 
                 Text("¥" + money(amount))
-                    .font(pf(38, .semibold))
+                    .font(pfMoney(38))
                     .foregroundColor(C.label)
                     .padding(.top, 2)
 
@@ -470,7 +470,7 @@ struct TransferView: View {
                         .buttonStyle(.plain)
                     } else {
                         Text(amount > balance ? "余额只剩 ¥\(money(balance))，点这里去充值" : "请输入 6 位支付密码")
-                            .font(pf(13.5))
+                            .font(pfMoney(13.5))
                             .foregroundColor(amount > balance ? C.link : C.subLabel)
                     }
                 }
@@ -666,7 +666,7 @@ struct TransferView: View {
                 .foregroundColor(C.label)
                 .padding(.top, 14)
             Text("¥" + money(doneAmount))
-                .font(pf(34, .medium))
+                .font(pfMoney(34))
                 .foregroundColor(C.label)
                 .padding(.top, 10)
 

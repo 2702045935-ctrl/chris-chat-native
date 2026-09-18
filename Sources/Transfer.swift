@@ -21,7 +21,7 @@ struct TransferSheet: View {
                 Section(header: Text("转账给 \(chat.name)")) {
                     HStack {
                         Text("¥")
-                            .font(pf(22, .medium))
+                            .font(pfMoney(22))
                             .foregroundColor(C.label)
                         TextField("0.00", text: $amount)
                             .font(pf(26, .medium))
@@ -38,7 +38,7 @@ struct TransferSheet: View {
                             Text("零钱").foregroundColor(C.label)
                             Spacer()
                             Text("¥\(String(format: "%.2f", app.me?.balance ?? 0))")
-                                .font(pf(14))
+                                .font(pfMoney(14))
                                 .foregroundColor(C.subLabel)
                             if method == "balance" {
                                 Image(systemName: "checkmark").foregroundColor(C.green)

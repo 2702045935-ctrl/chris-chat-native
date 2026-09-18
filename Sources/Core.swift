@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-18 22:25 图标缩小+账单页样式进后台"
+    static let build = "2026-09-18 22:40 金额统一SFProDisplayMedium"
 }
 
 /* ============================================================
@@ -318,6 +318,16 @@ func pfExact(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         return .custom(name, size: size)
     }
     return .system(size: size, weight: weight)
+}
+
+/// 金额专用字体：**SF Pro Display Medium**（所有金融数字统一走这个）
+/// 大字号系统会自动用 SF Pro Display；小字号如果拿不到 Display 就退回系统中等字重。
+func pfMoney(_ size: CGFloat) -> Font {
+    let s = max(9, (size * fontScale).rounded())
+    for name in ["SFProDisplay-Medium", "SF Pro Display", ".SFUI-Display-Medium"] {
+        if let f = UIFont(name: name, size: s) { return Font(f) }
+    }
+    return .system(size: s, weight: .medium, design: .default)
 }
 
 enum AppIconImage {

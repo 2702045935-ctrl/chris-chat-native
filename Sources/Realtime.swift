@@ -26,6 +26,10 @@ final class Realtime: ObservableObject {
     private var socket: URLSessionWebSocketTask?
     private var loop: Task<Void, Never>?
     private var tick = 0
+    /// 推送洪水的节流：消息一秒钟来几千条时，不能每条都去通知界面（会把手机刷死）。
+    /// 这里最多每 0.25 秒往界面发一次，攒着的那条在稍后合并发出去。
+    private var pending: PushEvent?
+    private var publishTask: Task<Void, Never>?
 
     func start() {
         stop()
@@ -85,8 +89,26 @@ final class Realtime: ObservableObject {
         }
         ev.announce = (obj["text"] as? String) ?? ""
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
-        tick += 1
-        ev.tick = tick
-        event = ev
+        /* 推送洪水节流：每条都通知界面的话，几千条一来手机就卡死/崩。
+           有任务在跑就先攒着，最多每 0.25 秒发一次（最后那条一定会发出去）。 */
+        if publishTask == nil {
+            tick += 1
+            ev.tick = tick
+            event = ev
+            publishTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard let self = self, !Task.isCancelled else { return }
+                self.publishTask = nil
+                if let p = self.pending {
+                    self.pending = nil
+                    self.tick += 1
+                    var merged = p
+                    merged.tick = self.tick
+                    self.event = merged
+                }
+            }
+        } else {
+            pending = ev
+        }
     }
 }

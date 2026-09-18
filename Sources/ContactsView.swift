@@ -199,6 +199,16 @@ struct ContactsView: View {
                     .font(pf(L.ctNameSize))
                     .foregroundColor(C.label)
                 Spacer(minLength: 0)
+                /* 「新的朋友」右边：有待处理的好友申请就显示微信同款红点数字 */
+                if item.3 == "newFriends" && app.friendRequests > 0 {
+                    Text(app.friendRequests > 99 ? "99+" : "\(app.friendRequests)")
+                        .font(pf(12.5, .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, app.friendRequests > 9 ? 6 : 0)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Capsule().fill(C.red))
+                        .padding(.trailing, 16)
+                }
             }
             .padding(.leading, L.ctPadL)
             .frame(height: L.ctRowH)

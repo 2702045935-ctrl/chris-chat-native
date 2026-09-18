@@ -160,6 +160,8 @@ struct LoginBrand: Decodable, Hashable {
     var appName: String?
     var subTitle: String?
     var logo: String?
+    var terms: String?
+    var privacy: String?
 }
 
 

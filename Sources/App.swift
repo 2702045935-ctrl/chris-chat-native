@@ -1074,14 +1074,8 @@ struct TermsSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(kind == 0 ? "用户协议" : "隐私政策").font(.system(size: 19, weight: .semibold))
-                    Text("""
-                    1. 本应用是自建的即时通讯软件，账号与数据都保存在你自己的服务器上。
-                    2. 请勿使用本应用传播违法违规内容；一经发现，管理员有权封禁账号。
-                    3. 你的昵称、头像、朋友圈等资料仅用于本应用内的展示，不会提供给第三方。
-                    4. 聊天内容保存在你自己的服务器数据库中，用于在登录设备之间同步。
-                    5. 修改密码后，之前的登录令牌会立即失效，需要重新登录。
-                    6. 如不同意以上条款，请不要使用本应用。
-                    """)
+                    /* 内容由后台「🎨 登录页 → 用户协议 / 隐私政策」配置 */
+                    Text(LoginTheme.text(kind: kind))
                     .font(.system(size: 14)).lineSpacing(6)
                 }
                 .padding(20)

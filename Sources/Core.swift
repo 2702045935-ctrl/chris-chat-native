@@ -802,6 +802,17 @@ enum LoginTheme {
     static var text: Color? = nil
     static var sub: Color? = nil
     static var pageBg: Color? = nil
+    /// 用户协议 / 隐私政策全文（后台可改）
+    static var terms = ""
+    static var privacy = ""
+
+    static func text(kind: Int) -> String {
+        let custom = (kind == 0 ? terms : privacy).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !custom.isEmpty { return custom }
+        return kind == 0
+            ? "1. 本应用是自建的即时通讯软件，账号与数据都保存在你自己的服务器上。\n2. 请勿传播违法违规内容；一经发现，管理员有权封禁账号。\n3. 你的资料仅用于本应用内展示，不会提供给第三方。\n4. 修改密码后，之前的登录令牌会立即失效。"
+            : "1. 我们只收集昵称、头像、地区、个性签名和你主动发送的消息与图片。\n2. 这些信息仅用于在本应用内展示和在你的设备之间同步。\n3. 全部保存在你自己的服务器上，不会上传到第三方服务。\n4. 你可以随时修改资料、清空聊天记录，或让管理员删除账号。"
+    }
 
     static func apply(_ b: BrandInfo?) {
         guard let l = b?.login else { return }
@@ -812,6 +823,8 @@ enum LoginTheme {
         if let v = l.text, !v.isEmpty { text = Color(hexString: v) }
         if let v = l.sub, !v.isEmpty { sub = Color(hexString: v) }
         if let v = l.bg, !v.isEmpty { pageBg = Color(hexString: v) }
+        terms = l.terms ?? ""
+        privacy = l.privacy ?? ""
     }
 }
 /// 转账页颜色（默认 #007AFF / #34C759，后台「🎨 登录页」里改「手机号登录色」即可一起变）

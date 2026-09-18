@@ -408,6 +408,7 @@ struct Avatar: View {
 
     var body: some View {
         RemoteImage(path: path, icon: "person.fill")
+            .id(path)                 // 换了头像立刻生效（不然会一直显示旧图）
             .frame(width: size, height: size)
             .clipShape(shape)
             .overlay(shape.stroke(Color.black.opacity(0.05), lineWidth: 0.5))

@@ -109,6 +109,7 @@ struct ChatDetailView: View {
                             C.pageBg
                             if !backgroundPath.isEmpty {
                                 RemoteImage(path: backgroundPath)
+                                    .id(backgroundPath)     // 换聊天背景立刻生效
                             }
                         }
                     }

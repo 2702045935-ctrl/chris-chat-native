@@ -276,12 +276,10 @@ struct MomentsView: View {
             .onPreferenceChange(OffsetKey.self) { y in
                 if baseTop == nil { baseTop = y }
                 topY = y
-                updatePull()
             }
             .onPreferenceChange(OffsetKey2.self) { y in
                 if baseBlock == nil { baseBlock = y }
                 blockY = y
-                updatePull()
             }
             /* 备用的下拉检测：手指往下拖 + 封面还没滚走（说明在最顶上）→ 拉出彩球。
                这套不依赖几何坐标，真机上一定有效。 */
@@ -410,6 +408,7 @@ struct MomentsView: View {
                                startPoint: .topLeading, endPoint: .bottomTrailing)
             } else {
                 RemoteImage(path: cover, icon: "photo")
+                    .id(cover)        // 换封面立刻生效
             }
 
             LinearGradient(colors: [Color.black.opacity(0), Color.black.opacity(0.34), Color.black.opacity(0.52)],
@@ -595,18 +594,6 @@ struct MomentsView: View {
         }
     }
 
-    /// 下拉的时候更新彩球的位置和自转；拉过 70 就自动刷新一次
-    private func updatePull() {
-        let a = baseTop.map { topY - $0 } ?? 0
-        let b = baseBlock.map { blockY - $0 } ?? 0
-        let d = max(0, max(a, b))                       // 往下拉出来多少
-        pullY = min(140, d)
-        if !pulling { spin = Double(pullY) * 3.2 }      // 跟着手指转，和网页版一样
-        if pullY > 70 && !pulling && !loadingMore {
-            startPullRefresh()
-        }
-    }
-
     /// 松手刷新：彩球转圈，同时把封面 + 动态重新拉一遍
     private func startPullRefresh() {
         pulling = true
@@ -618,13 +605,12 @@ struct MomentsView: View {
                 angle += 14
                 spin = angle
                 try? await Task.sleep(nanoseconds: 16_000_000)
-                if Date().timeIntervalSince(started) > 0.9 { break }   // 至少转 0.9 秒
-                if pullY < 12 { break }
+                if Date().timeIntervalSince(started) > 1.0 { break }   // 至少转 1 秒
             }
             if target == nil { app.me = try? await API.shared.me() }    // 封面也一起更新
             await reload()
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            pullY = 0                       // 转完收回去
+            pullY = 0                       // 转完收回去（一定收）
+            spin = 0
             pulling = false
         }
     }

@@ -489,7 +489,7 @@ struct ServiceView: View {
 
     private var balanceText: String { "¥" + String(format: "%.2f", app.me?.balance ?? 0) }
     /// 绿卡右边的零钱：后台开了「金额打星号」就显示 ¥****
-    private var walletSubText: String { (st.maskAmount ?? false) ? "¥****" : balanceText }
+    private var walletSubText: String { (st.maskAmount ?? true) ? "¥****" : balanceText }
 
     var body: some View {
         VStack(spacing: 0) {

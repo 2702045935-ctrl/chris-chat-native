@@ -268,7 +268,7 @@ struct TransferView: View {
     /// 金额数字：一位一格（网页里每格 28 宽、42 号字，和下面单位行对齐）
     private var digitCells: some View {
         let chars = Array(digits)
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             ForEach(chars.indices, id: \.self) { i in
                 Text(String(chars[i]))
                     .font(pf(L.tfDigitSize, .semibold))

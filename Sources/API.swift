@@ -458,6 +458,7 @@ struct BillsPayload: Decodable, Hashable {
     var summary: BillSummary?
     var month: String?
     var style: BillsPageStyle?
+    var faq: [BalanceFaq]?
 }
 
 /// 账单页外观（后台「账单页」里调）

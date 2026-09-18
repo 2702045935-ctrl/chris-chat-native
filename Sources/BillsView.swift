@@ -30,6 +30,9 @@ struct BillsView: View {
     @State private var openBill: BillRecord?
     @State private var showDetail = false
     @State private var style = BillsPageStyle()
+    @State private var faq: [BalanceFaq] = []
+    @State private var showFaq = false
+    @State private var faqAnswer: String?
 
     private let fieldBg = Color.dyn(0xE3E3E3, 0x2C2C2E)
     private let fieldInk = Color.dyn(0x3A3A3A, 0xEDEDED)
@@ -102,9 +105,20 @@ struct BillsView: View {
             Button("关闭", role: .cancel) { }
         }
         .confirmationDialog("账单", isPresented: $showMore, titleVisibility: .hidden) {
-            Button("账单常见问题") { app.show("账单常见问题：还没做，排在下一批") }
+            Button("账单常见问题") { showFaq = true }
             Button("导出账单（CSV）") { exportCsv() }
             Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("账单常见问题", isPresented: $showFaq, titleVisibility: .visible) {
+            ForEach(faq.indices, id: \.self) { i in
+                Button(faq[i].q) { faqAnswer = faq[i].a }
+            }
+            Button("关闭", role: .cancel) { }
+        }
+        .alert("账单常见问题", isPresented: Binding(get: { faqAnswer != nil }, set: { if !$0 { faqAnswer = nil } })) {
+            Button("知道了", role: .cancel) { faqAnswer = nil }
+        } message: {
+            Text(faqAnswer ?? "")
         }
         .navigationDestination(isPresented: $showDetail) {
             if let b = openBill { billDetail(b) }
@@ -319,6 +333,7 @@ struct BillsView: View {
             summary = d.summary
             month = m
             if let s = d.style { style = s }
+            faq = d.faq ?? []
         }
         loading = false
     }

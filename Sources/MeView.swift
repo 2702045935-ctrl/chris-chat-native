@@ -246,6 +246,7 @@ struct SettingsView: View {
     @State private var busy = false
     @State private var showBg = false
     @State private var showBgPick = false
+    @State private var showTheme = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -253,6 +254,10 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     GroupCard {
+                        settingRow("外观", app.appearance == "dark" ? "深色" : (app.appearance == "light" ? "浅色" : "跟随系统")) {
+                            showTheme = true
+                        }
+                        HairLine(inset: 16)
                         settingRow("个人信息", app.me?.name ?? "") { app.show("个人信息排在下一批") }
                         HairLine(inset: 16)
                         settingRow("聊天背景", (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
@@ -302,6 +307,12 @@ struct SettingsView: View {
                     app.show("已恢复默认背景")
                 }
             }
+            Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("外观", isPresented: $showTheme, titleVisibility: .visible) {
+            Button("跟随系统") { app.setAppearance("auto") }
+            Button("浅色") { app.setAppearance("light") }
+            Button("深色") { app.setAppearance("dark") }
             Button("取消", role: .cancel) { }
         }
         .sheet(isPresented: $showBgPick) {

@@ -23,6 +23,15 @@ final class AppState: ObservableObject {
     /// 用「层数」而不是布尔：从第三层返回第二层时，底栏不能错误地冒出来。
     @Published var tabBarDepth = 0
     var tabBarHidden: Bool { tabBarDepth > 0 }
+    /// 外观：auto=跟随系统 · light=浅色 · dark=深色（存在本机，和网页版那个「切换外观」一样）
+    @Published var appearance: String = UserDefaults.standard.string(forKey: "chris.appearance") ?? "auto"
+    func setAppearance(_ v: String) {
+        appearance = v
+        UserDefaults.standard.set(v, forKey: "chris.appearance")
+    }
+    var preferredScheme: ColorScheme? {
+        appearance == "light" ? .light : (appearance == "dark" ? .dark : nil)
+    }
     private var lastUIConfig = ""
     private var refreshTask: Task<Void, Never>?
 
@@ -183,7 +192,9 @@ struct CHRISApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(app)
+            RootView()
+                .environmentObject(app)
+                .preferredColorScheme(app.preferredScheme)   // 跟随系统 / 强制浅色 / 强制深色
         }
     }
 }

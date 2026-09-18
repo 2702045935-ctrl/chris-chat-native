@@ -648,12 +648,18 @@ struct LoginView: View {
     @State private var sheet: Way? = nil
     @State private var appName = "我的App"
     @State private var logoPath: String?
+    /// 登录页背景图（后台配的）—— 用 @State 才能刷新生效
+    @State private var bgImage = ""
+    /// 后台配置一拉到就 +1，让配色/背景跟着重绘一次
+    @State private var themeTick = 0
 
     enum Way: String, Identifiable { case phone, password; var id: String { rawValue } }
 
     var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
+        ZStack {
+            loginBackground
+            NavigationStack {
+                ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     Spacer(minLength: 40)
 
@@ -756,35 +762,42 @@ struct LoginView: View {
                 .frame(minHeight: UIScreen.main.bounds.height - 120, alignment: .top)
             }
             .background(Color.clear)
+            .scrollContentBackground(.hidden)
             .navigationTitle("账号登录")
             .navigationBarTitleDisplayMode(.inline)
+            }
+            .background(Color.clear)
         }
         .sheet(isPresented: $showPair) { PairSheet() }
         .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }
         .sheet(item: $sheet) { w in
             if w == .phone { PhoneLoginView() } else { AccountLoginSheet(mode: w) }
         }
-        /* 登录页背景：后台配了背景图就用它（压一层薄薄的底色保证文字看得清），否则用系统背景 */
-        .background(
-            ZStack {
-                if !LoginTheme.bgImage.isEmpty {
-                    RemoteImage(path: LoginTheme.bgImage, icon: "photo", mode: .fill)
-                        .ignoresSafeArea()
-                    Color(.systemBackground).opacity(0.30).ignoresSafeArea()
-                } else {
-                    Color(.systemBackground).ignoresSafeArea()
-                }
-            }
-        )
         .onAppear {
             Task {
                 if let b = await API.shared.branding() {
                     LoginTheme.apply(b)
                     if let n = b.login?.appName ?? b.appName, !n.isEmpty { appName = n }
                     if let lg = b.login?.logo ?? b.logo, !lg.isEmpty { logoPath = lg }
+                    bgImage = b.login?.bgImage ?? ""      // 背景图（用状态存，才能刷新生效）
+                    themeTick += 1
                 }
             }
         }
+    }
+
+    /// 登录页背景：后台配了背景图就铺满整屏（压一层很淡的底色保证文字看得清），否则用系统背景
+    private var loginBackground: some View {
+        ZStack {
+            if !bgImage.isEmpty {
+                RemoteImage(path: bgImage, icon: "photo", mode: .fill)
+                    .ignoresSafeArea()
+                Color(.systemBackground).opacity(0.30).ignoresSafeArea()
+            } else {
+                Color(.systemBackground).ignoresSafeArea()
+            }
+        }
+        .id(themeTick)
     }
 
     func loginWithWechat() {

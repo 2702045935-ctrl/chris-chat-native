@@ -132,6 +132,60 @@ enum L {
     static var coverAvatar: CGFloat { v(52, 17.1, 72) }
     static var momentPadH: CGFloat { o("momentPadH", 22) }
     static var momentAvatar: CGFloat { o("momentAvatar", 44) }
+
+    /* ---------------- 个人名片（照网页版 #cardScreen 逐条量）----------------
+       头像 64×64 圆角 6 · 头部内边距 27/16/29.5 · 名字 20 · 三行资料 15/行高 22
+       行内标签宽 80 · 缩略图 48 圆角 3 · 底部按钮两行各 55.6、字 17 */
+    static var cdAvatar: CGFloat { o("cdAvatar", 64) }
+    static var cdAvatarRadius: CGFloat { o("cdAvatarRadius", 6) }
+    static var cdHeroPadTop: CGFloat { o("cdHeroPadTop", 27) }
+    static var cdHeroPadBottom: CGFloat { o("cdHeroPadBottom", 29.5) }
+    static var cdHeroPadH: CGFloat { o("cdHeroPadH", 16) }
+    static var cdHeroGap: CGFloat { o("cdHeroGap", 16) }
+    static var cdNameSize: CGFloat { o("cdNameSize", 20) }
+    static var cdNameRowH: CGFloat { o("cdNameRowH", 22) }
+    static var cdGender: CGFloat { o("cdGender", 14) }
+    static var cdLineSize: CGFloat { o("cdLineSize", 15) }
+    static var cdLineH: CGFloat { o("cdLineH", 22) }
+    static var cdLineGap: CGFloat { o("cdLineGap", 6) }
+    static var cdLabelW: CGFloat { o("cdLabelW", 80) }
+    static var cdRowH: CGFloat { o("cdRowH", 22) }
+    static var cdRowGap: CGFloat { o("cdRowGap", 8) }
+    static var cdRowsPadV: CGFloat { o("cdRowsPadV", 13.5) }
+    static var cdPadH: CGFloat { o("cdPadH", 16) }
+    static var cdCardGap: CGFloat { o("cdCardGap", 8) }
+    static var cdThumbRowTop: CGFloat { o("cdThumbRowTop", 15) }
+    static var cdThumbRowBottom: CGFloat { o("cdThumbRowBottom", 15.5) }
+    static var cdThumb: CGFloat { o("cdThumb", 48) }
+    static var cdThumbGap: CGFloat { o("cdThumbGap", 8) }
+    static var cdActH: CGFloat { o("cdActH", 55.6) }
+    static var cdActSize: CGFloat { o("cdActSize", 17) }
+    static var cdActGap: CGFloat { o("cdActGap", 6.5) }
+    static var cdIcChatW: CGFloat { o("cdIcChatW", 19) }
+    static var cdIcChatH: CGFloat { o("cdIcChatH", 19.7) }
+    static var cdIcVideoW: CGFloat { o("cdIcVideoW", 20) }
+    static var cdIcVideoH: CGFloat { o("cdIcVideoH", 21) }
+
+    /* ---------------- 转账页（照网页版 .tf-* 逐条量）---------------- */
+    static var tfPadRowH: CGFloat { o("tfPadRowH", v(50, 13.6, 58)) }
+    static var tfKeySize: CGFloat { o("tfKeySize", v(20, 6, 24)) }
+    static var tfSendSize: CGFloat { o("tfSendSize", v(15, 4.3, 17)) }
+    static var tfCnySize: CGFloat { o("tfCnySize", v(26, 7.6, 32)) }
+    static var tfDigitSize: CGFloat { o("tfDigitSize", v(34, 10, 42)) }
+    static var tfCellW: CGFloat { o("tfCellW", v(21, 6.6, 28)) }
+    static var tfUnitSize: CGFloat { o("tfUnitSize", v(10.5, 3, 12.5)) }
+    static var tfCaretH: CGFloat { o("tfCaretH", v(30, 9.4, 40)) }
+    static var tfCaretW: CGFloat { o("tfCaretW", 2.5) }
+    static var tfAvatar: CGFloat { o("tfAvatar", v(30, 9, 34)) }
+
+    /* ---------------- 支付 / 付款方式 半屏面板（照网页版 .pay-* .pm-*）---------------- */
+    static var payHeadH: CGFloat { o("payHeadH", v(46, 12.9, 54)) }
+    static var payPadH: CGFloat { o("payPadH", v(46, 13.1, 55)) }
+    static var payPadFont: CGFloat { o("payPadFont", v(20, 5.7, 24)) }
+    static var paySheetRadius: CGFloat { o("paySheetRadius", v(10, 3.2, 14)) }
+    static var payPwdW: CGFloat { o("payPwdW", v(238, 70.8, 297)) }
+    static var payPwdH: CGFloat { o("payPwdH", v(46, 12.4, 52)) }
+    static var safeStripH: CGFloat { o("safeStripH", max(34, safeBottom)) }
 }
 
 /* ============================================================ 颜色 */

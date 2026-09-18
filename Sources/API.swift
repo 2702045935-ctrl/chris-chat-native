@@ -23,6 +23,10 @@ struct User: Decodable, Identifiable, Hashable {
     var bot: Bool?
     var online: Bool?
     var balance: Double?
+    /// 我和他的关系：self / friend / incoming / requested / none（名片页按钮按它变）
+    var relation: String?
+    /// 他发过几条朋友圈（名片上朋友圈那一行有没有）
+    var momentCount: Int?
 
     var name: String {
         if let n = nickname, !n.isEmpty { return n }
@@ -116,6 +120,7 @@ private struct ContactsPayload: Decodable {
     var outgoing: [User]?
 }
 private struct MePayload: Decodable { var user: User? }
+private struct UserPayload: Decodable { var user: User? }
 private struct LoginPayload: Decodable { var user: User? }
 private struct SessionPayload: Decodable { var authenticated: Bool?; var user: User? }
 private struct PhoneCodePayload: Decodable { var sent: Bool?; var devCode: String?; var nickname: String? }
@@ -407,6 +412,13 @@ final class API {
         return payload.user
     }
 
+    /// 个人名片要的完整资料（带 relation / online / phone / momentCount）
+    func user(id: String) async throws -> User {
+        let payload: UserPayload = try await get("/api/users/\(id)", as: UserPayload.self)
+        guard let user = payload.user else { throw APIError.message("用户不存在") }
+        return user
+    }
+
     func chats() async throws -> [Chat] {
         let payload: ChatsPayload = try await get("/api/chats", as: ChatsPayload.self)
         return payload.chats
@@ -593,13 +605,14 @@ final class API {
     }
 
     func transfer(chatId: String, amount: Double, note: String,
-                  method: String, password: String) async throws {
+                  method: String, password: String, face: Bool = false) async throws {
         _ = try await request("POST", "/api/pay/transfer", body: [
             "chatId": chatId,
             "amount": amount,
             "note": note,
             "method": method,
-            "password": password
+            "password": password,
+            "face": face
         ])
     }
 

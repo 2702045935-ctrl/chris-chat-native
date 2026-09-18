@@ -245,7 +245,12 @@ struct ContactsView: View {
     }
 }
 
-/* ============================================================ 个人名片 */
+/* ============================================================
+   个人名片 —— 照网页版 #cardScreen 一条条量出来的（不是原生那套）：
+   头部内边距 27/16/29.5 · 头像 64 圆角 6 · 名字 20 · 三行资料 15/行高 22
+   标签列 80 · 行高 22 · 行距 8 · 缩略图 48 圆角 3 · 底部按钮两行各 55.6 字 17
+   尺寸都能在服务器 data/ui.json 里调（cd 开头那几个键），改完重开 App 就生效。
+   ============================================================ */
 
 struct ContactCardView: View {
     let user: User
@@ -254,121 +259,445 @@ struct ContactCardView: View {
 
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var busy = false
+    @Environment(\.colorScheme) private var scheme
+
+    @State private var full: User?
     @State private var thumbs: [String] = []
+    @State private var hasMoments = false
+    @State private var busy = false
+    @State private var showMore = false
+    @State private var showInfo = false
+    @State private var showPhone = false
+    @State private var viewer: Int?
+
+    private var u: User { full ?? user }
+    private var phone: String { (u.phone ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var relation: String {
+        if let r = u.relation, !r.isEmpty { return r }
+        return u.id == app.me?.id ? "self" : "none"
+    }
+
+    /* 名片这一页的颜色（参考图上取的原值） */
+    private var sheetBg: Color { scheme == .dark ? Color(hex: 0x1C1C1E) : .white }
+    private var scrollBg: Color { scheme == .dark ? Color(hex: 0x111111) : Color(hex: 0xEDEDED) }
+    private var ink: Color { scheme == .dark ? Color(hex: 0xEDEDED) : Color(hex: 0x1A1A1A) }
+    private var gray: Color { scheme == .dark ? Color(hex: 0x8E8E93) : Color(hex: 0x737373) }
+    private var link: Color { scheme == .dark ? Color(hex: 0x7D90B8) : Color(hex: 0x576B95) }
+    private var lineColor: Color { scheme == .dark ? Color(white: 1, opacity: 0.09) : Color(hex: 0xE5E5E5) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            NavBar(title: "", back: nil) {
-                EmptyView()
-            }
-            ScrollView {
-                VStack(spacing: 0) {
-                    VStack(spacing: 10) {
-                        Avatar(path: user.avatarPath, size: 64, radius: 8)
-                        HStack(spacing: 6) {
-                            Text(user.name)
-                                .font(pf(20, .medium))
-                                .foregroundColor(C.label)
-                            if user.gender == "male" {
-                                Circle().fill(Color(hex: 0x10AEFF)).frame(width: 14, height: 14)
-                                    .overlay(Image(systemName: "person.fill").font(pf(8)).foregroundColor(.white))
-                            } else if user.gender == "female" {
-                                Circle().fill(Color(hex: 0xFA6E9A)).frame(width: 14, height: 14)
-                                    .overlay(Image(systemName: "person.fill").font(pf(8)).foregroundColor(.white))
-                            }
+        ZStack {
+            VStack(spacing: 0) {
+                nav
+                ScrollView {
+                    VStack(spacing: 0) {
+                        hero
+                        infoCard
+                        if hasMoments {
+                            Rectangle().fill(scrollBg).frame(height: L.cdCardGap)
+                            momentsCard
                         }
-                        if let bio = user.bio, !bio.isEmpty {
-                            Text(bio).font(pf(14)).foregroundColor(C.subLabel)
-                        }
+                        Rectangle().fill(scrollBg).frame(height: L.cdCardGap)
+                        acts
+                        Spacer(minLength: 0)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 26)
-                    .background(C.cardBg)
-
-                    Spacer().frame(height: 8)
-
-                    GroupCard {
-                        infoRow("微信号", user.username ?? "-")
-                        HairLine(inset: 16)
-                        infoRow("地区", (user.region?.isEmpty == false) ? user.region! : "未设置")
-                        if let phone = user.phone, !phone.isEmpty {
-                            HairLine(inset: 16)
-                            infoRow("电话", phone)
-                        }
-                        if !thumbs.isEmpty {
-                            HairLine(inset: 16)
-                            Button {
-                                onOpenMoments(user.id)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Text("朋友圈").font(pf(16)).foregroundColor(C.label)
-                                    Spacer()
-                                    HStack(spacing: 4) {
-                                        ForEach(thumbs.prefix(4), id: \.self) { p in
-                                            RemoteImage(path: p)
-                                                .frame(width: 44, height: 44)
-                                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                        }
-                                    }
-                                    Chevron(size: 9, line: 1.6).padding(.trailing, 3)
-                                }
-                                .padding(.horizontal, 16)
-                                .frame(height: 64)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Spacer().frame(height: 8)
-
-                    Button {
-                        openChat()
-                    } label: {
-                        Text(busy ? "打开中…" : "发消息")
-                            .font(pf(17))
-                            .foregroundColor(C.green)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(C.cardBg)
-                    }
-                    .disabled(busy)
-
-                    Spacer().frame(height: 30)
                 }
+                .background(scrollBg)
             }
-            .background(C.pageBg)
+            .background(sheetBg.ignoresSafeArea())
+
+            if let idx = viewer, !thumbs.isEmpty {
+                PhotoPager(paths: thumbs, startIndex: idx) { viewer = nil }
+                    .transition(.opacity)
+                    .zIndex(20)
+            }
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
-        .task {
-            if let list = try? await API.shared.moments(userId: user.id) {
-                thumbs = list.flatMap { $0.images ?? [] }
+        .confirmationDialog("", isPresented: $showMore, titleVisibility: .hidden) {
+            Button("设置备注和标签") { app.show("备注和标签还没开，先看下面的资料") }
+            Button("朋友圈权限") { app.show("默认：能看他的朋友圈") }
+            Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
+            Button("昵称：\(u.name)") { }
+            Button("微信号：\(u.username ?? "—")") { }
+            Button("地区：\((u.region?.isEmpty == false) ? u.region! : "未知")") { }
+            Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("", isPresented: $showPhone, titleVisibility: .hidden) {
+            Button("拨打 \(phone)") { dial() }
+            Button("取消", role: .cancel) { }
+        }
+        .task { await load() }
+    }
+
+    /* ---------------------------------------------------------- 导航 */
+
+    private var nav: some View {
+        NavBar(title: "", back: { dismiss() }) {
+            Button { showMore = true } label: {
+                FlexIcon(custom: IconOverrides.custom("nav.more"), size: 22,
+                         color: ink, symbol: "ellipsis")
+                    .frame(width: 44, height: L.navH)
+            }
+            .buttonStyle(.plain)
+        }
+        .background(sheetBg)
+    }
+
+    /* ---------------------------------------------------------- 头部资料 */
+
+    private var hero: some View {
+        HStack(alignment: .top, spacing: L.cdHeroGap) {
+            Avatar(path: u.avatarPath, size: L.cdAvatar, radius: L.cdAvatarRadius)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 10) {
+                    Text(u.name)
+                        .font(pf(L.cdNameSize))
+                        .foregroundColor(ink)
+                        .lineLimit(1)
+                    GenderMark(gender: u.gender, size: L.cdGender)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: L.cdNameRowH)
+
+                cardLine("昵称：" + u.name)
+                    .padding(.top, L.cdLineGap)
+                cardLine("微信号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
+                cardLine("地区：" + ((u.region?.isEmpty == false) ? u.region! : "未知"))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.top, L.cdHeroPadTop)
+        .padding(.horizontal, L.cdHeroPadH)
+        .padding(.bottom, L.cdHeroPadBottom)
+        .background(sheetBg)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(lineColor).frame(height: 0.5)
+        }
+    }
+
+    private func cardLine(_ text: String) -> some View {
+        Text(text)
+            .font(pf(L.cdLineSize))
+            .foregroundColor(gray)
+            .lineLimit(1)
+            .frame(height: L.cdLineH, alignment: .leading)
+    }
+
+    /* ---------------------------------------------------------- 朋友资料 / 电话 */
+
+    private var infoCard: some View {
+        VStack(spacing: 0) {
+            Button { showInfo = true } label: {
+                HStack(spacing: 0) {
+                    Text("朋友资料")
+                        .font(pf(L.cdLineSize))
+                        .foregroundColor(ink)
+                        .frame(width: L.cdLabelW, alignment: .leading)
+                    Spacer(minLength: 0)
+                    cardArrow
+                }
+                .padding(.horizontal, L.cdPadH)
+                .frame(height: L.cdRowH)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if !phone.isEmpty {
+                Spacer().frame(height: L.cdRowGap)
+                Button { showPhone = true } label: {
+                    HStack(spacing: 0) {
+                        Text("电话")
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(ink)
+                            .frame(width: L.cdLabelW, alignment: .leading)
+                        Text(phone)
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(link)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, L.cdPadH)
+                    .frame(height: L.cdRowH)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-    }
-
-    private func infoRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title).font(pf(16)).foregroundColor(C.label)
-            Spacer()
-            Text(value).font(pf(16)).foregroundColor(C.subLabel)
+        .padding(.vertical, L.cdRowsPadV)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(sheetBg)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(lineColor).frame(height: 0.5)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
     }
 
-    private func openChat() {
+    /* ---------------------------------------------------------- 朋友圈那一行 */
+
+    private var momentsCard: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Text("朋友圈")
+                .font(pf(L.cdLineSize))
+                .foregroundColor(ink)
+                .frame(width: L.cdLabelW, height: L.cdLineH, alignment: .leading)
+
+            HStack(spacing: L.cdThumbGap) {
+                ForEach(thumbs.prefix(5).indices, id: \.self) { i in
+                    Button { viewer = i } label: {
+                        RemoteImage(path: thumbs[i])
+                            .frame(width: L.cdThumb, height: L.cdThumb)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            cardArrow
+                .padding(.top, max(0, (L.cdThumb - 18) / 2))
+        }
+        .padding(.top, L.cdThumbRowTop)
+        .padding(.horizontal, L.cdPadH)
+        .padding(.bottom, L.cdThumbRowBottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { onOpenMoments(u.id) }
+        .background(sheetBg)
+        .overlay(alignment: .top) { Rectangle().fill(lineColor).frame(height: 0.5) }
+        .overlay(alignment: .bottom) { Rectangle().fill(lineColor).frame(height: 0.5) }
+    }
+
+    private var cardArrow: some View {
+        Path { p in
+            p.move(to: CGPoint(x: 1.2, y: 1.2))
+            p.addLine(to: CGPoint(x: 7, y: 9))
+            p.addLine(to: CGPoint(x: 1.2, y: 16.8))
+        }
+        .stroke(Color(hex: 0xB2B2B2),
+                style: StrokeStyle(lineWidth: 1.7, lineCap: .round, lineJoin: .round))
+        .frame(width: 9, height: 18)
+        .padding(.trailing, 3)
+    }
+
+    /* ---------------------------------------------------------- 底部按钮 */
+
+    private struct CardAct {
+        var title: String
+        var key: String
+    }
+
+    private var actList: [CardAct] {
+        switch relation {
+        case "friend", "self":
+            return [CardAct(title: "发消息", key: "msg"),
+                    CardAct(title: "音视频通话", key: "call")]
+        case "incoming":
+            return [CardAct(title: "同意好友申请", key: "agree"),
+                    CardAct(title: "发消息", key: "msg")]
+        case "requested":
+            return [CardAct(title: "已发送好友申请", key: "pending")]
+        default:
+            return [CardAct(title: "添加到通讯录", key: "add")]
+        }
+    }
+
+    private var acts: some View {
+        VStack(spacing: 0) {
+            ForEach(actList.indices, id: \.self) { i in
+                if i > 0 {
+                    Rectangle().fill(lineColor).frame(height: 0.5)
+                }
+                Button { run(actList[i]) } label: {
+                    HStack(spacing: L.cdActGap) {
+                        if actList[i].key == "msg" {
+                            SVGIcon(markup: I.cardChat, size: L.cdIcChatH, color: link)
+                                .frame(width: L.cdIcChatW, height: L.cdIcChatH)
+                        } else if actList[i].key == "call" {
+                            SVGIcon(markup: I.cardVideo, size: L.cdIcVideoH, color: link)
+                                .frame(width: L.cdIcVideoW, height: L.cdIcVideoH)
+                        }
+                        Text(actList[i].title)
+                            .font(pf(L.cdActSize))
+                            .foregroundColor(link)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: L.cdActH)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .background(sheetBg)
+        .overlay(alignment: .top) { Rectangle().fill(lineColor).frame(height: 0.5) }
+        .overlay(alignment: .bottom) { Rectangle().fill(lineColor).frame(height: 0.5) }
+    }
+
+    /* ---------------------------------------------------------- 干活 */
+
+    private func run(_ act: CardAct) {
+        switch act.key {
+        case "msg":
+            openChat()
+        case "call":
+            openChat { app.show("和真人的实时语音/视频要装 WebRTC 组件（下一版），先用文字或图片聊") }
+        case "add":
+            busy = true
+            Task {
+                do {
+                    try await API.shared.addFriend(username: u.username ?? "")
+                    app.show("好友申请已发出")
+                    await app.loadContacts()
+                    await load()
+                } catch {
+                    app.show((error as? APIError)?.errorDescription ?? "加好友失败")
+                }
+                busy = false
+            }
+        case "agree":
+            busy = true
+            Task {
+                if let all = try? await API.shared.contactsFull(),
+                   let req = all.incoming.first(where: { $0.id == u.id }),
+                   let rid = req.requestId {
+                    await API.shared.respondFriend(rid, accept: true)
+                    app.show("已同意，现在可以聊天了")
+                    await app.loadContacts()
+                    await load()
+                } else {
+                    app.show("到「通讯录 → 新的朋友」里同意")
+                }
+                busy = false
+            }
+        default:
+            app.show("已经发过申请了，等对方通过")
+        }
+    }
+
+    private func openChat(then after: (() -> Void)? = nil) {
         busy = true
         Task {
-            if let chat = try? await API.shared.openDirect(userId: user.id) {
+            if let chat = try? await API.shared.openDirect(userId: u.id) {
                 onOpenChat(chat)
+                after?()
             } else {
                 app.show("打不开聊天")
             }
             busy = false
         }
+    }
+
+    private func dial() {
+        let digits = phone.filter { $0.isNumber || $0 == "+" }
+        guard !digits.isEmpty, let url = URL(string: "tel://\(digits)") else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func load() async {
+        if let fresh = try? await API.shared.user(id: user.id) { full = fresh }
+        if let list = try? await API.shared.moments(limit: 6, userId: user.id) {
+            var images: [String] = []
+            for m in list {
+                for src in (m.images ?? []) where images.count < 5 {
+                    images.append(src)
+                }
+            }
+            thumbs = images
+            hasMoments = !list.isEmpty
+        }
+    }
+}
+
+/* 性别图标：微信那对蓝色小图标（男 ♂ / 女 ♀），照网页版的 SVG 画 */
+struct GenderMark: View {
+    let gender: String?
+    var size: CGFloat = 14
+
+    var body: some View {
+        Group {
+            if gender == "male" {
+                male
+            } else if gender == "female" {
+                female
+            } else {
+                Color.clear.frame(width: 0, height: 0)
+            }
+        }
+    }
+
+    private var blue: Color { Color(hex: 0x10AEFF) }
+
+    private var male: some View {
+        ZStack {
+            Path { p in
+                p.addEllipse(in: CGRect(x: 4, y: 8.8, width: 11.2, height: 11.2))
+            }
+            .stroke(blue, lineWidth: 1.5)
+            Path { p in
+                p.move(to: CGPoint(x: 13.6, y: 10.4))
+                p.addLine(to: CGPoint(x: 20, y: 4))
+                p.move(to: CGPoint(x: 15, y: 4))
+                p.addLine(to: CGPoint(x: 20, y: 4))
+                p.addLine(to: CGPoint(x: 20, y: 9))
+            }
+            .stroke(blue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var female: some View {
+        ZStack {
+            Path { p in
+                p.addEllipse(in: CGRect(x: 6.4, y: 3.2, width: 11.2, height: 11.2))
+            }
+            .stroke(blue, lineWidth: 1.5)
+            Path { p in
+                p.move(to: CGPoint(x: 12, y: 14.4))
+                p.addLine(to: CGPoint(x: 12, y: 21))
+                p.move(to: CGPoint(x: 9, y: 18.4))
+                p.addLine(to: CGPoint(x: 15, y: 18.4))
+            }
+            .stroke(blue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/* 点小图看大图：黑底、左右翻、点一下返回（和微信一样，不带那个 × ） */
+struct PhotoPager: View {
+    let paths: [String]
+    let startIndex: Int
+    var onClose: () -> Void
+
+    @State private var index = 0
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            TabView(selection: $index) {
+                ForEach(paths.indices, id: \.self) { i in
+                    RemoteImage(path: paths[i], mode: .fit)
+                        .tag(i)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            VStack {
+                Spacer()
+                Text("\(index + 1) / \(paths.count)")
+                    .font(pfExact(14))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.bottom, 26)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { onClose() }
+        .onAppear { index = min(max(0, startIndex), max(0, paths.count - 1)) }
     }
 }

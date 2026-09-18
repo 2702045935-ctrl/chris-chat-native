@@ -126,6 +126,16 @@ enum I {
     <svg data-key="i.coke" viewBox="0 0 40 60"><path d="M14 6h12v6H14z" fill="#8e1c1c"/><path d="M11 12h18c2.2 0 4 1.8 4 4v34c0 2.2-1.8 4-4 4H11c-2.2 0-4-1.8-4-4V16c0-2.2 1.8-4 4-4z" fill="#e02020"/><path d="M7 30c6 3 20 3 26 0v10c-6 3-20 3-26 0z" fill="#fff"/><path d="M12 33c5 2 11 2 16 0v5c-5 2-11 2-16 0z" fill="#e02020"/></svg>
     """
 
+    // ---------------- 名片底部两个按钮的图标（照着参考图上的样式画） ----------------
+    /// 「发消息」：圆角气泡 + 左下小尾巴
+    static let cardChat = """
+    <svg data-key="card.chat" viewBox="0 0 24 25" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M7.1 20.6v-4H6.6A3.6 3.6 0 0 1 3 13V6.6A3.6 3.6 0 0 1 6.6 3h10.8A3.6 3.6 0 0 1 21 6.6V13a3.6 3.6 0 0 1-3.6 3.6h-6z"/></svg>
+    """
+    /// 「音视频通话」：摄像机机身 + 右侧镜头三角
+    static let cardVideo = """
+    <svg data-key="card.video" viewBox="0 0 24 25" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="6.4" width="13.2" height="12.2" rx="3"/><path d="M16.2 12.6l5.2-3.3v6.6l-5.2-3.3z"/></svg>
+    """
+
     // ---------------- 「＋」面板 / 礼物面板 ----------------
     static let plusIcons: [String: String] = [
         "photo": #"<svg data-key="plus.photo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.8" width="17.6" height="14.4" rx="2.4"/><circle cx="8.6" cy="9.8" r="1.7"/><path d="M3.6 16.6l4.6-4.2 3.5 3.1 3-2.7 5.7 5"/></svg>"#,

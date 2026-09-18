@@ -251,6 +251,8 @@ enum C {
     static var red         : Color { UIConfig.color("redColor", 0xFA5151, 0xFA5151) }
     static var orange      : Color { UIConfig.color("orangeColor", 0xFF9500, 0xFF9500) }
     static var tabInk      : Color { UIConfig.color("tabInkColor", 0x191919, 0xB5B5B5) }
+    /// 会话列表页顶部（导航栏 + 搜索框那一块）的底色：按你给的 #F7F7F7
+    static var chatsTopBg  : Color { UIConfig.color("chatsTopBg", 0xF7F7F7, 0x18181A) }
     static let bubbleMine  = Color.dyn(0x95EC69, 0x3EB575)
     static let bubbleOther = Color.dyn(0xFFFFFF, 0x2D2D30)
     static let bubbleText  = Color.dyn(0x191919, 0xEDEDED)

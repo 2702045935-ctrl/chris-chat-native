@@ -217,7 +217,7 @@ struct ChatsView: View {
 
                 SearchBoxCenter(text: $keyword)
                     .padding(L.searchPad)
-                    .background(C.pageBg)
+                    .background(C.chatsTopBg)      // 顶部（导航栏+搜索框）底色 #F7F7F7
 
                 if app.chats.isEmpty {
                     emptyView
@@ -239,8 +239,8 @@ struct ChatsView: View {
                     .refreshable { await app.loadChats() }
                 }
             }
-            .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-            .background(C.navBg.ignoresSafeArea(edges: .top))
+            .background(C.chatsTopBg.ignoresSafeArea(edges: .bottom))
+            .background(C.chatsTopBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)

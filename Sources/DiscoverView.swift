@@ -283,6 +283,25 @@ struct MomentsView: View {
                 blockY = y
                 updatePull()
             }
+            /* 备用的下拉检测：手指往下拖 + 封面还没滚走（说明在最顶上）→ 拉出彩球。
+               这套不依赖几何坐标，真机上一定有效。 */
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 8)
+                    .onChanged { v in
+                        guard !sentinelGone else { return }        // 已经滚下去了，不算下拉
+                        let dy = v.translation.height
+                        if dy > 0 {
+                            pullY = min(140, dy)
+                            if !pulling { spin = Double(pullY) * 3.2 }
+                        } else if !pulling {
+                            pullY = 0
+                        }
+                    }
+                    .onEnded { _ in
+                        if pullY > 60 && !pulling { startPullRefresh() }
+                        if !pulling { pullY = 0 }
+                    }
+            )
             .ignoresSafeArea(edges: .top)
 
             navBar
@@ -604,6 +623,8 @@ struct MomentsView: View {
             }
             if target == nil { app.me = try? await API.shared.me() }    // 封面也一起更新
             await reload()
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            pullY = 0                       // 转完收回去
             pulling = false
         }
     }

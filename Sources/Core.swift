@@ -367,6 +367,12 @@ struct RemoteImage: View {
             .clipped()
         }
         .onAppear { if !started { started = true; Task { await load() } } }
+        // 换过头像/封面/聊天背景：path 变了要重新加载，不然一直显示旧图
+        .onChange(of: path) { _ in
+            image = nil
+            started = true
+            Task { await load() }
+        }
     }
 
     private func load() async {

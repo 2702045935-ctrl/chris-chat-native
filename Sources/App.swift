@@ -640,8 +640,8 @@ struct LoginView: View {
                     VStack(spacing: 0) {
                         logoBlock
                         Text("欢迎回来，请选择登录方式")
-                            .font(pf(14)).foregroundColor(C.loginGray)
-                            .padding(.top, 26)
+                            .font(.system(size: 14)).foregroundColor(C.loginGray)
+                            .padding(.top, 20)
                         wechatButton
                         otherWays
                         if way != .none { formArea; submitButton }
@@ -707,56 +707,56 @@ struct LoginView: View {
             Group {
                 if let p = logoPath {
                     RemoteImage(path: p, icon: "message.fill", mode: .fill)
-                        .frame(width: 84, height: 84)
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 } else if let img = AppIconImage.image {
                     Image(uiImage: img).resizable()
-                        .frame(width: 84, height: 84)
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 } else {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(C.loginGreen).frame(width: 84, height: 84)
-                        .overlay(Image(systemName: "message.fill").font(pf(36)).foregroundColor(.white))
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(C.loginGreen).frame(width: 80, height: 80)
+                        .overlay(Image(systemName: "message.fill").font(.system(size: 36)).foregroundColor(.white))
                 }
             }
-            Text(appName).font(pf(20, .semibold)).foregroundColor(C.loginText)
+            Text(appName).font(.system(size: 22, weight: .semibold)).foregroundColor(C.loginText)
         }
-        .padding(.top, 28)
+        .padding(.top, 40)
     }
 
     /* ---------- 微信登录（核心大按钮）---------- */
     private var wechatButton: some View {
         Button {
             focus = nil; error = nil
-            if !agreed { error = "请先阅读并同意《用户协议》和《隐私政策》"; return }
             showPair = true
         } label: {
             HStack(spacing: 9) {
-                Image(systemName: "message.fill").font(pf(17, .semibold))
-                Text("微信登录").font(pf(17, .semibold))
+                Image(systemName: "message.fill").font(.system(size: 22))
+                Text("微信登录").font(.system(size: 16, weight: .medium))
             }
             .foregroundColor(.white)
             .frame(maxWidth: .infinity).frame(height: 52)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(C.loginGreen))
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(agreed ? Color(hexString: "#07C160") : Color(hexString: "#B2E4C8")))
         }
-        .padding(.top, 30)
+        .disabled(!agreed)
+        .padding(.top, 48)
     }
 
     /* ---------- 其他登录选项 ---------- */
     private var otherWays: some View {
         HStack(spacing: 14) {
-            Text("其他登录选项").font(pf(13)).foregroundColor(C.loginGray)
             Button("手机号登录") {
                 way = (way == .phone ? .none : .phone); error = nil; focus = nil
             }
-            .font(pf(13, .medium)).foregroundColor(C.loginGreen)
-            Text("|").font(pf(12)).foregroundColor(C.loginGray.opacity(0.5))
+            .font(.system(size: 14)).foregroundColor(Color(hexString: "#636366"))
+            Text("｜").font(.system(size: 14)).foregroundColor(Color(hexString: "#C7C7CC"))
             Button("账号密码登录") {
                 way = (way == .password ? .none : .password); error = nil; focus = nil
             }
-            .font(pf(13, .medium)).foregroundColor(C.loginGreen)
+            .font(.system(size: 14)).foregroundColor(Color(hexString: "#636366"))
         }
-        .padding(.top, 22)
+        .padding(.top, 24)
     }
 
     /* ---------- 展开的表单 ---------- */
@@ -809,34 +809,35 @@ struct LoginView: View {
         HStack(alignment: .top, spacing: 8) {
             Button { agreed.toggle() } label: {
                 Image(systemName: agreed ? "checkmark.circle.fill" : "circle")
-                    .font(pf(16)).foregroundColor(agreed ? C.loginGreen : C.loginGray)
+                    .font(.system(size: 18)).foregroundColor(agreed ? Color(hexString: "#07C160") : Color(hexString: "#C7C7CC"))
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text("我已阅读并同意")
-                    .font(pf(12.5)).foregroundColor(C.loginGray)
-                HStack(spacing: 4) {
+                HStack(spacing: 0) {
+                    Text("我已阅读并同意 ").font(.system(size: 12)).foregroundColor(C.loginGray)
                     Button("《用户协议》") { termsKind = 0; showTerms = true }
-                        .font(pf(12.5)).foregroundColor(C.loginGreen)
+                        .font(.system(size: 12)).foregroundColor(Color(hexString: "#007AFF"))
+                    Text(" 和 ").font(.system(size: 12)).foregroundColor(C.loginGray)
                     Button("《隐私政策》") { termsKind = 1; showTerms = true }
-                        .font(pf(12.5)).foregroundColor(C.loginGreen)
+                        .font(.system(size: 12)).foregroundColor(Color(hexString: "#007AFF"))
                 }
             }
             Spacer()
         }
-        .padding(.top, 30)
+        .padding(.top, 32)
     }
 
     /* ---------- 版本号 ---------- */
     private var versionText: some View {
-        VStack(spacing: 6) {
-            Text("版本 \(AppInfo.version)（build \(AppInfo.build)）")
-                .font(pf(11)).foregroundColor(C.loginGray.opacity(0.7))
+        VStack(spacing: 8) {
+            Text("V\(AppInfo.version)")
+                .font(.system(size: 11)).foregroundColor(Color(hexString: "#AEAEB2"))
             Button { showServer = true } label: {
                 Text("服务器 \(server)")
-                    .font(pf(11)).foregroundColor(C.loginGray.opacity(0.55))
+                    .font(.system(size: 11)).foregroundColor(Color(hexString: "#AEAEB2").opacity(0.75))
             }
         }
-        .padding(.top, 34)
+        .padding(.top, 60)
+        .padding(.bottom, 20)
     }
 
     /* ---------- 动作 ---------- */

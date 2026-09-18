@@ -96,6 +96,9 @@ struct ChatDetailView: View {
                         }
                     }
                     .ignoresSafeArea()
+                    /* 背景图是异步加载的：不加这一句，图片一到就会跟着「推进来」那段
+                       导航动画一起缩一下（打开聊天页那种缩放感就是这么来的）。 */
+                    .transaction { $0.animation = nil }
                 }
 
             if uploading {

@@ -247,10 +247,49 @@ struct ServiceGroup: Decodable, Identifiable, Hashable {
     var items: [DiscoverItem]?
 }
 
+/// 服务页的样式：绿卡背景图 / 图标大小 / 各处字体的大小和颜色（后台「服务页 → 样式」里配）
+struct ServiceStyle: Decodable, Hashable {
+    var cardImage: String?
+    var cardTextColor: String?
+    var cardTextSize: Double?
+    var cardSubSize: Double?
+    var cardSubOpacity: Double?
+    var iconSize: Double?
+    var gridTitleSize: Double?
+    var gridTitleColor: String?
+    var gridTextSize: Double?
+    var gridTextColor: String?
+
+    /// 默认值 = 照参考图量出来的那套
+    var icon: CGFloat { CGFloat(iconSize ?? 28) }
+    var cardNameSize: CGFloat { CGFloat(cardTextSize ?? 18) }
+    var cardSubSizeV: CGFloat { CGFloat(cardSubSize ?? 12) }
+    var cardSubOpacityV: Double { cardSubOpacity ?? 0.5 }
+    var titleSize: CGFloat { CGFloat(gridTitleSize ?? 14) }
+    var textSize: CGFloat { CGFloat(gridTextSize ?? 13) }
+    var cardText: Color { Color(hexString: cardTextColor ?? "#FFFFFF", fallback: 0xFFFFFF) }
+    /// 标题颜色：还是默认值就跟主题走（浅色 #7A7A7A / 深色 #8A8A8A）
+    var titleColor: Color {
+        let v = (gridTitleColor ?? "#7A7A7A").uppercased()
+        if v == "#7A7A7A" { return Color.dyn(0x7A7A7A, 0x8A8A8A) }
+        return Color(hexString: v, fallback: 0x7A7A7A)
+    }
+    /// 格子文字颜色：留空就跟主题
+    var gridText: Color {
+        if let c = gridTextColor, !c.isEmpty { return Color(hexString: c, fallback: 0x191919) }
+        return C.label
+    }
+    /// 尺寸变了，卡片和格子跟着长，不把字挤出去
+    var cardHeight: CGFloat { 144 + (icon - 28) + (cardNameSize - 18) + (cardSubSizeV - 12) }
+    var cellHeight: CGFloat { 92 + (icon - 28) + (textSize - 13) }
+    var titleHeight: CGFloat { 48 + (titleSize - 14) }
+}
+
 /// 整页服务页的配置
 struct ServiceConfig: Decodable, Hashable {
     var title: String?
     var card: ServiceCard?
+    var style: ServiceStyle?
     var groups: [ServiceGroup]?
 }
 

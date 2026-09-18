@@ -460,6 +460,9 @@ struct ServiceView: View {
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 4)
 
+    /// 样式（绿卡背景 / 图标大小 / 字体）：后台「服务页 → 样式」里配，取不到就用参考图那套默认值
+    private var st: ServiceStyle { cfg?.style ?? ServiceStyle() }
+
     /// 分类：后台配的优先，没有就用内置那套（内容和参考图一致）
     private var groups: [Group] {
         if let list = cfg?.groups, !list.isEmpty {
@@ -547,8 +550,16 @@ struct ServiceView: View {
     private var greenCard: some View {
         let c = cfg?.card
         let bg = Color(hexString: c?.bg ?? "#2AAE67", fallback: 0x2AAE67)
+        let s = st
         return ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: 7, style: .continuous).fill(bg)
+            /* 后台填了背景图就用图，没填就只用底色 */
+            if let img = s.cardImage, !img.isEmpty {
+                RemoteImage(path: img)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: s.cardHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
             HStack(alignment: .top, spacing: 0) {
                 halfView(c?.left, label: "收付款", icon: "svc.pay", action: "pay", sub: "")
                 halfView(c?.right, label: "钱包", icon: "svc.wallet", action: "wallet", sub: balanceText)
@@ -556,7 +567,7 @@ struct ServiceView: View {
             .padding(.horizontal, 25)
             .padding(.top, 33)
         }
-        .frame(height: 144)
+        .frame(height: s.cardHeight)
         .padding(.horizontal, 8)
     }
 
@@ -566,20 +577,21 @@ struct ServiceView: View {
         let label = rawLabel.isEmpty ? fallbackLabel : rawLabel
         let rawSub = h?.sub ?? ""
         let sub = rawSub.isEmpty ? fallbackSub : rawSub
+        let s = st
         return Button {
             run(h?.action ?? fallbackAction, label)
         } label: {
             VStack(spacing: 0) {
-                SVGIcon(markup: SvcIcon.markup(h?.icon ?? fallbackIcon, h?.svg), size: 28, color: .white)
-                    .frame(width: 28, height: 28)
+                SVGIcon(markup: SvcIcon.markup(h?.icon ?? fallbackIcon, h?.svg), size: s.icon, color: s.cardText)
+                    .frame(width: s.icon, height: s.icon)
                 Text(label)
-                    .font(pf(18))
-                    .foregroundColor(.white)
+                    .font(pf(s.cardNameSize))
+                    .foregroundColor(s.cardText)
                     .padding(.top, 17)
                 if !sub.isEmpty {
                     Text(sub)
-                        .font(pf(12))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(pf(s.cardSubSizeV))
+                        .foregroundColor(s.cardText.opacity(s.cardSubOpacityV))
                         .padding(.top, 10)
                 }
             }
@@ -591,13 +603,14 @@ struct ServiceView: View {
     /* ---------------------------------------------------------- 白卡：分类标题 + 四列格子 */
 
     private func groupCard(_ g: Group) -> some View {
-        VStack(spacing: 0) {
+        let s = st
+        return VStack(spacing: 0) {
             Text(g.title)
-                .font(pf(14))
-                .foregroundColor(Color.dyn(0x7A7A7A, 0x8A8A8A))
+                .font(pf(s.titleSize))
+                .foregroundColor(s.titleColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 16.7)
-                .frame(height: 48)
+                .frame(height: s.titleHeight)
 
             LazyVGrid(columns: cols, spacing: 0) {
                 ForEach(g.cells) { c in
@@ -605,17 +618,17 @@ struct ServiceView: View {
                         run(c.action, c.label)
                     } label: {
                         VStack(spacing: 0) {
-                            SVGIcon(markup: c.svg, size: 28, color: c.color)
-                                .frame(width: 28, height: 28)
+                            SVGIcon(markup: c.svg, size: s.icon, color: c.color)
+                                .frame(width: s.icon, height: s.icon)
                             Text(c.label)
-                                .font(pf(13))
-                                .foregroundColor(C.label)
+                                .font(pf(s.textSize))
+                                .foregroundColor(s.gridText)
                                 .lineLimit(1)
                                 .padding(.top, 18.5)
                         }
                         .padding(.top, 14)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 92, alignment: .top)
+                        .frame(height: s.cellHeight, alignment: .top)
                     }
                     .buttonStyle(.plain)
                 }

@@ -125,6 +125,8 @@ private struct LoginPayload: Decodable { var user: User? }
 private struct SessionPayload: Decodable { var authenticated: Bool?; var user: User? }
 private struct PhoneCodePayload: Decodable { var sent: Bool?; var devCode: String?; var nickname: String? }
 private struct CaptchaPayload: Decodable { var id: String?; var svg: String? }
+private struct PairStartPayload: Decodable { var code: String?; var expiresIn: Int? }
+private struct PairStatusPayload: Decodable { var status: String?; var user: User?; var token: String? }
 private struct MomentsPayload: Decodable {
     var moments: [Moment]
     var hasMore: Bool?
@@ -435,6 +437,19 @@ final class API {
         ], as: LoginPayload.self)
         guard let user = payload.user else { throw APIError.message("注册失败") }
         return user
+    }
+
+    /* ---------------- 设备确认登录（就是「微信登录」那个核心按钮）----------------
+       这台设备出一个 6 位数字，在已经登录的设备上确认，这台就登上了。 */
+    func pairStart() async throws -> (code: String, expiresIn: Int) {
+        let p: PairStartPayload = try await post("/api/pair/start", [:], as: PairStartPayload.self)
+        return (p.code ?? "", p.expiresIn ?? 180)
+    }
+
+    /// 轮询：pending（还没确认）/ approved（确认了，带回登录令牌）/ expired
+    func pairStatus(code: String) async throws -> (status: String, user: User?, token: String?) {
+        let p: PairStatusPayload = try await get("/api/pair/status?code=\(code)", as: PairStatusPayload.self)
+        return (p.status ?? "pending", p.user, p.token)
     }
 
     func loginPhone(phone: String, code: String) async throws -> User {

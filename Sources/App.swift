@@ -604,27 +604,28 @@ struct CaptchaView: View {
     }
 }
 
+/* ============================================================ 登录页（按设计稿）
+   ← 返回 + 标题「账号登录」
+   图标 + App 名 → 欢迎语 →【微信登录】大按钮 → 其他登录选项 → 协议 → 版本号 */
+
 struct LoginView: View {
     @EnvironmentObject var app: AppState
     @FocusState private var focus: Field?
 
-    private enum Field: Hashable { case user, pass, phone, code, regUser, regNick, regPass, regCap }
-    private enum Tab { case login, register }
+    private enum Field: Hashable { case phone, code, user, pass }
+    private enum Way { case none, phone, password }
 
-    @State private var tab: Tab = .login
-    @State private var useCode = false
-    @State private var username = ""
-    @State private var password = ""
+    @State private var way: Way = .none
     @State private var phone = ""
     @State private var code = ""
-    @State private var regUser = ""
-    @State private var regNick = ""
-    @State private var regPass = ""
-    @State private var regCap = ""
-    @State private var capId = ""
-    @State private var capSvg = ""
+    @State private var username = ""
+    @State private var password = ""
+    @State private var agreed = false
     @State private var busy = false
     @State private var error: String?
+    @State private var showPair = false
+    @State private var showTerms = false
+    @State private var termsKind = 0            // 0=用户协议 1=隐私政策
     @State private var showServer = false
     @State private var server = API.shared.server
     @State private var appName = "CHRIS Chat"
@@ -633,25 +634,32 @@ struct LoginView: View {
     var body: some View {
         ZStack {
             C.loginBg.ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    header
-                    tabs
-                    card
-                    if let e = error {
-                        Text(e).font(pf(13)).foregroundColor(C.red)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 12)
+            VStack(spacing: 0) {
+                navBar
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        logoBlock
+                        Text("欢迎回来，请选择登录方式")
+                            .font(pf(14)).foregroundColor(C.loginGray)
+                            .padding(.top, 26)
+                        wechatButton
+                        otherWays
+                        if way != .none { formArea; submitButton }
+                        if let e = error {
+                            Text(e).font(pf(13)).foregroundColor(C.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 12)
+                        }
+                        agreeRow
+                        versionText
                     }
-                    mainButton
-                    linkRow
-                    serverRow
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, max(20, L.safeBottom))
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, max(30, L.safeTop + 22))
-                .padding(.bottom, max(22, L.safeBottom))
             }
         }
+        .sheet(isPresented: $showPair) { PairSheet() }
+        .sheet(isPresented: $showTerms) { TermsSheet(kind: termsKind) }
         .sheet(isPresented: $showServer) {
             ServerSheet(server: $server) {
                 API.shared.setServer(server)
@@ -671,191 +679,189 @@ struct LoginView: View {
         }
     }
 
-    /* ---------- 顶部：图标 + 名字 ---------- */
-    private var header: some View {
+    /* ---------- 顶部导航栏 ---------- */
+    private var navBar: some View {
+        ZStack {
+            Text("账号登录").font(pf(17, .semibold)).foregroundColor(C.loginText)
+            HStack {
+                Button {
+                    if way != .none { way = .none }        // 从「其他方式」退回选择页
+                    focus = nil
+                    error = nil
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(pf(20, .medium))
+                        .foregroundColor(C.loginText)
+                        .frame(width: 44, height: 52)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+        }
+        .frame(height: 52)
+    }
+
+    /* ---------- 图标 + 名字 ---------- */
+    private var logoBlock: some View {
         VStack(spacing: 12) {
             Group {
                 if let p = logoPath {
                     RemoteImage(path: p, icon: "message.fill", mode: .fill)
-                        .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+                        .frame(width: 84, height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 } else if let img = AppIconImage.image {
                     Image(uiImage: img).resizable()
-                        .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+                        .frame(width: 84, height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 } else {
-                    RoundedRectangle(cornerRadius: 19, style: .continuous)
-                        .fill(C.loginGreen)
-                        .frame(width: 72, height: 72)
-                        .overlay(Image(systemName: "message.fill").font(pf(32)).foregroundColor(.white))
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(C.loginGreen).frame(width: 84, height: 84)
+                        .overlay(Image(systemName: "message.fill").font(pf(36)).foregroundColor(.white))
                 }
             }
             Text(appName).font(pf(20, .semibold)).foregroundColor(C.loginText)
-            Text(tab == .login ? "登录后同步你的聊天记录" : "注册一个属于你的微信号")
-                .font(pf(13)).foregroundColor(C.loginGray)
         }
-        .padding(.bottom, 22)
+        .padding(.top, 28)
     }
 
-    /* ---------- 登录 / 注册 ---------- */
-    private var tabs: some View {
-        HStack(spacing: 28) {
-            tabButton("登录", .login)
-            tabButton("注册", .register)
-        }
-        .padding(.bottom, 14)
-    }
-    private func tabButton(_ title: String, _ t: Tab) -> some View {
+    /* ---------- 微信登录（核心大按钮）---------- */
+    private var wechatButton: some View {
         Button {
-            tab = t; error = nil; focus = nil
-            if t == .register && capSvg.isEmpty { loadCaptcha() }
+            focus = nil; error = nil
+            if !agreed { error = "请先阅读并同意《用户协议》和《隐私政策》"; return }
+            showPair = true
         } label: {
-            VStack(spacing: 4) {
-                Text(title)
-                    .font(pf(15, tab == t ? .semibold : .regular))
-                    .foregroundColor(tab == t ? C.loginText : C.loginGray)
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(tab == t ? C.loginGreen : Color.clear)
-                    .frame(width: 20, height: 2.5)
-            }
-        }
-    }
-
-    /* ---------- 卡片 ---------- */
-    private var card: some View {
-        VStack(spacing: 0) {
-            if tab == .login {
-                if useCode {
-                    field("", .phone, $phone, "手机号", .numberPad)
-                    HairLine(color: C.navLine)
-                    HStack(spacing: 8) {
-                        TextField("验证码", text: $code)
-                            .font(pf(15)).focused($focus, equals: .code).keyboardType(.numberPad)
-                        Button("获取验证码") { sendCode() }
-                            .font(pf(13.5)).foregroundColor(C.loginGreen)
-                    }
-                    .frame(height: 54).padding(.horizontal, 14)
-                } else {
-                    field("", .user, $username, "微信号 / 用户名", .default)
-                    HairLine(color: C.navLine)
-                    secureField("", .pass, $password, "密码")
-                }
-            } else {
-                field("", .regUser, $regUser, "用户名（3-24 位字母/数字/下划线）", .default)
-                HairLine(color: C.navLine)
-                field("", .regNick, $regNick, "昵称", .default)
-                HairLine(color: C.navLine)
-                secureField("", .regPass, $regPass, "密码（至少 6 位）")
-                HairLine(color: C.navLine)
-                HStack(spacing: 10) {
-                    TextField("图形验证码", text: $regCap)
-                        .font(pf(15)).focused($focus, equals: .regCap)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled(true)
-                    CaptchaView(svg: capSvg)
-                        .frame(width: 96, height: 36)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.navLine, lineWidth: 0.5))
-                        .onTapGesture { loadCaptcha() }
-                }
-                .frame(height: 54).padding(.horizontal, 14)
-            }
-        }
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x1C1C1E)))
-    }
-
-    private func field(_ label: String, _ f: Field, _ text: Binding<String>, _ ph: String, _ kb: UIKeyboardType) -> some View {
-        TextField(ph, text: text)
-            .font(pf(15))
-            .focused($focus, equals: f)
-            .keyboardType(kb)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled(true)
-            .frame(height: 54)
-            .padding(.horizontal, 14)
-    }
-    private func secureField(_ label: String, _ f: Field, _ text: Binding<String>, _ ph: String) -> some View {
-        SecureField(ph, text: text)
-            .font(pf(15))
-            .focused($focus, equals: f)
-            .frame(height: 54)
-            .padding(.horizontal, 14)
-    }
-
-    /* ---------- 主按钮 ---------- */
-    private var mainButton: some View {
-        Button { submit() } label: {
-            HStack(spacing: 8) {
-                if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
-                Text(busy ? "请稍候…" : (tab == .login ? "登 录" : "注 册"))
-                    .font(pf(16, .semibold))
+            HStack(spacing: 9) {
+                Image(systemName: "message.fill").font(pf(17, .semibold))
+                Text("微信登录").font(pf(17, .semibold))
             }
             .foregroundColor(.white)
-            .frame(maxWidth: .infinity).frame(height: 50)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(busy ? C.loginGreen.opacity(0.6) : C.loginGreen))
+            .frame(maxWidth: .infinity).frame(height: 52)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(C.loginGreen))
         }
-        .disabled(busy)
-        .padding(.top, 20)
+        .padding(.top, 30)
     }
 
-    private var linkRow: some View {
-        Button {
-            if tab == .login { useCode.toggle() } else { tab = .login }
-            error = nil; focus = nil
-        } label: {
-            Text(tab == .login ? (useCode ? "用账号密码登录" : "用手机验证码登录") : "已有账号，去登录")
-                .font(pf(13)).foregroundColor(C.loginGreen)
-        }
-        .padding(.top, 16)
-    }
-
-    private var serverRow: some View {
-        Button { showServer = true } label: {
-            Text("服务器 \(server)（点这里可改）")
-                .font(pf(11)).foregroundColor(C.loginGray.opacity(0.75))
+    /* ---------- 其他登录选项 ---------- */
+    private var otherWays: some View {
+        HStack(spacing: 14) {
+            Text("其他登录选项").font(pf(13)).foregroundColor(C.loginGray)
+            Button("手机号登录") {
+                way = (way == .phone ? .none : .phone); error = nil; focus = nil
+            }
+            .font(pf(13, .medium)).foregroundColor(C.loginGreen)
+            Text("|").font(pf(12)).foregroundColor(C.loginGray.opacity(0.5))
+            Button("账号密码登录") {
+                way = (way == .password ? .none : .password); error = nil; focus = nil
+            }
+            .font(pf(13, .medium)).foregroundColor(C.loginGreen)
         }
         .padding(.top, 22)
     }
 
-    /* ---------- 动作 ---------- */
-    private func loadCaptcha() {
-        Task {
-            do {
-                let c = try await API.shared.captcha()
-                capId = c.id; capSvg = c.svg
-            } catch { }
+    /* ---------- 展开的表单 ---------- */
+    private var formArea: some View {
+        VStack(spacing: 0) {
+            if way == .phone {
+                TextField("手机号", text: $phone)
+                    .font(pf(15)).keyboardType(.numberPad).focused($focus, equals: .phone)
+                    .frame(height: 54).padding(.horizontal, 14)
+                HairLine(color: C.navLine)
+                HStack(spacing: 8) {
+                    TextField("验证码", text: $code)
+                        .font(pf(15)).keyboardType(.numberPad).focused($focus, equals: .code)
+                    Button("获取验证码") { sendCode() }
+                        .font(pf(13.5)).foregroundColor(C.loginGreen)
+                }
+                .frame(height: 54).padding(.horizontal, 14)
+            } else {
+                TextField("微信号 / 用户名", text: $username)
+                    .font(pf(15)).focused($focus, equals: .user)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                    .frame(height: 54).padding(.horizontal, 14)
+                HairLine(color: C.navLine)
+                SecureField("密码", text: $password)
+                    .font(pf(15)).focused($focus, equals: .pass)
+                    .frame(height: 54).padding(.horizontal, 14)
+            }
         }
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x1C1C1E)))
+        .padding(.top, 18)
     }
 
+    private var submitButton: some View {
+        Button { submit() } label: {
+            HStack(spacing: 8) {
+                if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
+                Text(busy ? "请稍候…" : "登 录").font(pf(16, .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity).frame(height: 48)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(busy ? C.loginGreen.opacity(0.6) : C.loginGreen))
+        }
+        .disabled(busy)
+        .padding(.top, 14)
+    }
+
+    /* ---------- 协议 ---------- */
+    private var agreeRow: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Button { agreed.toggle() } label: {
+                Image(systemName: agreed ? "checkmark.circle.fill" : "circle")
+                    .font(pf(16)).foregroundColor(agreed ? C.loginGreen : C.loginGray)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("我已阅读并同意")
+                    .font(pf(12.5)).foregroundColor(C.loginGray)
+                HStack(spacing: 4) {
+                    Button("《用户协议》") { termsKind = 0; showTerms = true }
+                        .font(pf(12.5)).foregroundColor(C.loginGreen)
+                    Button("《隐私政策》") { termsKind = 1; showTerms = true }
+                        .font(pf(12.5)).foregroundColor(C.loginGreen)
+                }
+            }
+            Spacer()
+        }
+        .padding(.top, 30)
+    }
+
+    /* ---------- 版本号 ---------- */
+    private var versionText: some View {
+        VStack(spacing: 6) {
+            Text("版本 \(AppInfo.version)（build \(AppInfo.build)）")
+                .font(pf(11)).foregroundColor(C.loginGray.opacity(0.7))
+            Button { showServer = true } label: {
+                Text("服务器 \(server)")
+                    .font(pf(11)).foregroundColor(C.loginGray.opacity(0.55))
+            }
+        }
+        .padding(.top, 34)
+    }
+
+    /* ---------- 动作 ---------- */
     private func sendCode() {
         let p = phone.trimmingCharacters(in: .whitespaces)
         if p.count < 5 { error = "请填写手机号"; return }
         error = nil
         Task {
             do {
-                let dev = try await API.shared.phoneCode(phone: p)
-                if let c = dev { code = c; app.show("验证码：\(c)") } else { app.show("验证码已发送") }
-            } catch {
-                self.error = (error as? APIError)?.errorDescription ?? "发送失败"
-            }
+                if let dev = try await API.shared.phoneCode(phone: p) {
+                    code = dev
+                    app.show("验证码：\(dev)")
+                } else {
+                    app.show("验证码已发送")
+                }
+            } catch { self.error = (error as? APIError)?.errorDescription ?? "发送失败" }
         }
     }
 
     private func submit() {
+        guard agreed else { error = "请先阅读并同意《用户协议》和《隐私政策》"; return }
         busy = true; error = nil
         Task {
             do {
-                if tab == .register {
-                    let u = regUser.trimmingCharacters(in: .whitespaces)
-                    if u.count < 3 { throw APIError.message("用户名至少 3 位") }
-                    if regPass.count < 6 { throw APIError.message("密码至少 6 位") }
-                    if regCap.isEmpty { throw APIError.message("请填写图形验证码") }
-                    _ = try await API.shared.register(username: u, nickname: regNick.isEmpty ? u : regNick,
-                                                     password: regPass, captchaId: capId, captcha: regCap)
-                    try await app.login(username: u, password: regPass)
-                    app.show("注册成功，欢迎加入")
-                } else if useCode {
+                if way == .phone {
                     let p = phone.trimmingCharacters(in: .whitespaces)
                     if p.isEmpty || code.isEmpty { throw APIError.message("请填写手机号和验证码") }
                     try await app.login(phone: p, code: code)
@@ -865,10 +871,127 @@ struct LoginView: View {
                     try await app.login(username: u, password: password)
                 }
             } catch {
-                self.error = (error as? APIError)?.errorDescription ?? "操作失败"
-                if tab == .register { loadCaptcha() }
+                self.error = (error as? APIError)?.errorDescription ?? "登录失败"
             }
             busy = false
+        }
+    }
+}
+
+/* ---------- 「微信登录」→ 设备确认登录 ---------- */
+struct PairSheet: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var code = ""
+    @State private var status = "正在生成…"
+    @State private var fail = false
+    @State private var timer: Timer?
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 18) {
+                Text("在已登录的设备上确认，这台设备就能进入")
+                    .font(pf(14)).foregroundColor(C.loginGray)
+                    .multilineTextAlignment(.center).padding(.top, 20)
+
+                Text(code.isEmpty ? "······" : code)
+                    .font(.system(size: 40, weight: .bold, design: .monospaced))
+                    .foregroundColor(C.loginText)
+                    .tracking(6)
+
+                Text(fail ? "这个码过期了，点下面重新生成" : "打开另一台设备（网页版/App）→ 我 → 设置 → 设备确认登录，输入上面的数字")
+                    .font(pf(12.5)).foregroundColor(C.loginGray)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+
+                if fail {
+                    Button("重新生成") { start() }
+                        .font(pf(15, .semibold)).foregroundColor(C.loginGreen)
+                } else {
+                    ProgressView().padding(.top, 4)
+                    Text(status).font(pf(12)).foregroundColor(C.loginGray)
+                }
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .background(C.loginBg.ignoresSafeArea())
+            .navigationTitle("微信登录")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) { Button("取消") { stop(); dismiss() } }
+            }
+        }
+        .onAppear { start() }
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        fail = false
+        status = "正在生成…"
+        Task {
+            do {
+                let r = try await API.shared.pairStart()
+                code = r.code
+                status = "等待确认…"
+                timer?.invalidate()
+                timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in poll() }
+            } catch {
+                fail = true
+                status = (error as? APIError)?.errorDescription ?? "生成失败"
+            }
+        }
+    }
+    private func poll() {
+        guard !code.isEmpty else { return }
+        Task {
+            guard let r = try? await API.shared.pairStatus(code: code) else { return }
+            switch r.status {
+            case "approved":
+                stop()
+                if let t = r.token, !t.isEmpty { API.shared.setToken(t) }
+                await app.refreshAll()
+                Realtime.shared.start()
+                dismiss()
+            case "expired":
+                stop(); fail = true
+            default:
+                status = "等待确认…"
+            }
+        }
+    }
+    private func stop() { timer?.invalidate(); timer = nil }
+}
+
+/* ---------- 用户协议 / 隐私政策 ---------- */
+struct TermsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    var kind: Int
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(kind == 0 ? "用户协议" : "隐私政策").font(pf(19, .semibold))
+                    Text("""
+                    1. 本应用是自建的即时通讯软件，账号与数据都保存在你自己的服务器上。
+                    2. 请勿使用本应用传播违法违规内容；一经发现，管理员有权封禁账号。
+                    3. 你的昵称、头像、朋友圈等资料仅用于本应用内的展示，不会提供给第三方。
+                    4. 聊天内容保存在你自己的服务器数据库中，用于在登录设备之间同步。
+                    5. 修改密码后，之前的登录令牌会立即失效，需要重新登录。
+                    6. 如不同意以上条款，请不要使用本应用。
+                    """)
+                    .font(pf(14)).foregroundColor(C.loginText)
+                    .lineSpacing(6)
+                }
+                .padding(20)
+            }
+            .background(C.loginBg.ignoresSafeArea())
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) { Button("好") { dismiss() } }
+            }
         }
     }
 }

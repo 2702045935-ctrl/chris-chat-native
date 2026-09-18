@@ -3,6 +3,7 @@ import SwiftUI
 struct DiscoverView: View {
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
+    @ObservedObject private var realtime = Realtime.shared
 
     private var latestThumb: String {
         for m in app.moments {
@@ -82,6 +83,10 @@ struct DiscoverView: View {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
             }
+        }
+        // 别人发了新朋友圈 → 发现页那个小图也跟着换
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "moment" || ev.user != nil { Task { await app.loadMoments() } }
         }
     }
 

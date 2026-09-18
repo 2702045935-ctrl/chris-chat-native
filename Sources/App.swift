@@ -31,6 +31,15 @@ final class AppState: ObservableObject {
 
     /// 长连接推过来的事情，安排界面去刷新
     func handle(_ ev: PushEvent) {
+        // 自己的资料变了（换封面 / 换头像 / 改昵称 / 改状态 / 换聊天背景）
+        if let u = ev.user, u.id == me?.id || me == nil {
+            me = u
+            coalesce { [weak self] in
+                await self?.loadChats()
+                await self?.loadContacts()
+            }
+            return
+        }
         if let b = ev.balance, var me = me {
             me.balance = b
             self.me = me
@@ -45,7 +54,7 @@ final class AppState: ObservableObject {
             coalesce { [weak self] in await self?.loadChats() }
         case "moment":
             coalesce { [weak self] in await self?.loadMoments() }
-        case "friend":
+        case "friend", "presence", "profile":
             coalesce { [weak self] in await self?.loadContacts() }
         default:
             break

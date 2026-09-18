@@ -3,6 +3,7 @@ import SwiftUI
 struct MeView: View {
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
+    @ObservedObject private var realtime = Realtime.shared
 
     private var friendCount: Int { app.contacts.count }
 
@@ -76,6 +77,12 @@ struct MeView: View {
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
+            }
+        }
+        // 自己的资料变了（头像 / 昵称 / 封面 / 状态）→ 我页立刻变
+        .onChange(of: realtime.event) { ev in
+            if ev.user != nil || ev.type == "profile" {
+                Task { app.me = try? await API.shared.me() }
             }
         }
     }

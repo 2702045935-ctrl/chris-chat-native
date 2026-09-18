@@ -14,6 +14,7 @@ struct ContactsView: View {
     @State private var bubble: String?
     @State private var bubbleTask: Task<Void, Never>?
     @FocusState private var searchFocused: Bool
+    @ObservedObject private var realtime = Realtime.shared
 
     private let funcs: [(String, String, Color, String)] = [
         ("新的朋友", I.newFriends, Color(hex: 0xF0A75C), "newFriends"),
@@ -162,6 +163,12 @@ struct ContactsView: View {
             }
         }
         .task { await app.loadContacts() }
+        // 有人加你 / 改资料 / 上下线 → 通讯录立刻刷新
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "friend" || ev.type == "presence" || ev.type == "profile" || ev.user != nil {
+                Task { await app.loadContacts() }
+            }
+        }
     }
 
     private func showBubble(_ letter: String) {

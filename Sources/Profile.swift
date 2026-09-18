@@ -410,6 +410,7 @@ struct GroupCreateView: View {
 struct ServiceView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var realtime = Realtime.shared
 
     @State private var bills: [BillItem] = []
     @State private var loading = true
@@ -532,6 +533,10 @@ struct ServiceView: View {
             Button("取消", role: .cancel) { }
         }
         .task { await loadBills() }
+        // 有转账 / 余额变动 → 账单立刻刷新
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "transfer" || ev.type == "balance" { Task { await loadBills() } }
+        }
     }
 
     private func doRecharge() {

@@ -8,6 +8,7 @@ struct PushEvent: Equatable {
     var fromId = ""
     var balance: Double? = nil
     var announce = ""
+    var user: User? = nil
     var tick = 0
 }
 
@@ -74,6 +75,12 @@ final class Realtime: ObservableObject {
         if let m = obj["message"] as? [String: Any] { ev.fromId = (m["senderId"] as? String) ?? "" }
         if let b = obj["balance"] as? Double { ev.balance = b }
         else if let b = obj["balance"] as? Int { ev.balance = Double(b) }
+        // 资料变动（换封面 / 换头像 / 改昵称 / 改状态）：服务器推的是 profile
+        if let u = obj["user"] as? [String: Any],
+           let d = try? JSONSerialization.data(withJSONObject: u),
+           let decoded = try? JSONDecoder().decode(User.self, from: d) {
+            ev.user = decoded
+        }
         ev.announce = (obj["text"] as? String) ?? ""
         tick += 1
         ev.tick = tick

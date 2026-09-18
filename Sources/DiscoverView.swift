@@ -310,7 +310,8 @@ struct MomentsView: View {
     /* ---------------------------------------------------------- 列表 */
 
     private var momentList: some View {
-        VStack(spacing: 0) {
+        // 必须用 LazyVStack：1500 条动态如果一次性全建出来（每行还有图），手机会直接崩
+        LazyVStack(spacing: 0) {
             if moments.isEmpty {
                 Text("正在加载朋友圈…")
                     .font(pf(14))

@@ -168,15 +168,25 @@ private struct OffsetKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
+/// 第二路测量（整个内容块的屏幕坐标），和 OffsetKey 互为备份
+private struct OffsetKey2: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 struct MomentsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 
     var target: User? = nil
 
-    @State private var offset: CGFloat = 0
-    /// 静止时「内容顶端」在屏幕上的位置，用来算往下滚了多少
-    @State private var baseY: CGFloat?
+    /// 滚动量：两路测量各存一份（1pt 条的屏幕 y、整个内容块的屏幕 y），取滚得更多的那个
+    @State private var topY: CGFloat = 0
+    @State private var blockY: CGFloat = 0
+    @State private var baseTop: CGFloat?
+    @State private var baseBlock: CGFloat?
+    /// 兜底：列表顶上那个哨兵被 LazyVStack 回收了（说明封面已经滚过去）
+    @State private var sentinelGone = false
     @State private var moments: [Moment] = []
     @State private var cameraMenu = false
     @State private var showPhoto = false
@@ -200,9 +210,13 @@ struct MomentsView: View {
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
-    /// （用屏幕坐标量「内容最顶端被推上去多少」，比命名坐标空间稳，任何机型都一样）
-    private var scrolled: CGFloat { max(0, (baseY ?? offset) - offset) }
-    private var solid: Bool { scrolled > (L.coverH - 52) }
+    /// 两路测量 + LazyVStack 哨兵兜底，哪个先到算哪个
+    private var scrolled: CGFloat {
+        let a = baseTop.map { $0 - topY } ?? 0
+        let b = baseBlock.map { $0 - blockY } ?? 0
+        return max(0, max(a, b))
+    }
+    private var solid: Bool { scrolled > (L.coverH - 52) || sentinelGone }
     private var owner: User? { target ?? app.me }
     private var cover: String { owner?.momentCover ?? "" }
 
@@ -212,19 +226,34 @@ struct MomentsView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    /* 内容最顶端：把它的屏幕坐标报上来，用来看往下滚了多少 */
-                    GeometryReader { g in
-                        Color.clear.preference(key: OffsetKey.self,
-                                               value: g.frame(in: .global).minY)
-                    }
-                    .frame(height: 0)
+                    /* 量往下滚了多少：① 内容最顶端那根 1pt 条的屏幕坐标
+                       ② 整个内容块的屏幕坐标 —— 两个一起量，取滚动更多的那份，
+                       任何一个在真机上抽风都不会影响「滚过封面出朋友圈三个字」 */
+                    Color.clear
+                        .frame(height: 1)
+                        .background(
+                            GeometryReader { g in
+                                Color.clear.preference(key: OffsetKey.self,
+                                                       value: g.frame(in: .global).minY)
+                            }
+                        )
                     coverView
                     momentList
                 }
+                .background(
+                    GeometryReader { g in
+                        Color.clear.preference(key: OffsetKey2.self,
+                                               value: g.frame(in: .global).minY)
+                    }
+                )
             }
             .onPreferenceChange(OffsetKey.self) { y in
-                if baseY == nil { baseY = y }
-                offset = y
+                if baseTop == nil { baseTop = y }
+                topY = y
+            }
+            .onPreferenceChange(OffsetKey2.self) { y in
+                if baseBlock == nil { baseBlock = y }
+                blockY = y
             }
             .ignoresSafeArea(edges: .top)
 
@@ -238,7 +267,11 @@ struct MomentsView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
-        .onAppear { baseY = nil }
+        .onAppear {
+            baseTop = nil
+            baseBlock = nil
+            sentinelGone = false
+        }
         .task { await reload() }
         // 别人发朋友圈 / 换了封面，这边立刻跟着变
         .onChange(of: realtime.event) { _ in
@@ -347,6 +380,11 @@ struct MomentsView: View {
     private var momentList: some View {
         // 必须用 LazyVStack：1500 条动态如果一次性全建出来（每行还有图），手机会直接崩
         LazyVStack(spacing: 0) {
+            /* 哨兵：它被 LazyVStack 回收时说明封面已经滚过去了（滚动量测不准时的兜底） */
+            Color.clear
+                .frame(height: 1)
+                .onAppear { sentinelGone = false }
+                .onDisappear { sentinelGone = true }
             if moments.isEmpty {
                 Text("正在加载朋友圈…")
                     .font(pf(14))

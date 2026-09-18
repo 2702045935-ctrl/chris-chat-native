@@ -223,6 +223,20 @@ extension Color {
     static func dyn(_ light: UInt32, _ dark: UInt32) -> Color { Color(UIColor.dyn(light, dark)) }
 }
 
+/// 后台某个模块配的颜色（比如零钱页的底色）：当作**浅色**值用，深色模式给一个对应的深色。
+/// 想在后台自己把深浅色都定死，就写 "#FFFFFF|#0B0B0D"。
+func colorDyn(_ raw: String?, light: UInt32, dark: UInt32) -> Color {
+    let s = (raw ?? "").trimmingCharacters(in: .whitespaces)
+    if s.isEmpty { return Color.dyn(light, dark) }
+    let parts = s.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+    func hex(_ t: String) -> UInt32? {
+        UInt32(t.replacingOccurrences(of: "#", with: "").trimmingCharacters(in: .whitespaces), radix: 16)
+    }
+    let l = hex(parts[0]) ?? light
+    if parts.count > 1, let d = hex(parts[1]) { return Color.dyn(l, d) }
+    return Color.dyn(l, dark)
+}
+
 /// 逐个色号对着网页版量出来的（浅色 / 深色）
 enum C {
     // 颜色也能在 data/ui.json 里改（写成 "#浅色|#深色"）

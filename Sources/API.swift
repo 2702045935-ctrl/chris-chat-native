@@ -556,16 +556,18 @@ struct BalanceStyle: Decodable, Hashable {
     var btnR: CGFloat { CGFloat(btnRadius ?? 8) }
     var linkFont: CGFloat { CGFloat(linkSize ?? 13) }
     var footFont: CGFloat { CGFloat(footerSize ?? 12) }
-    var pageBg: Color { Color(hexString: bg ?? "#FFFFFF", fallback: 0xFFFFFF) }
-    var circleColorV: Color { Color(hexString: circleColor ?? "#FFD100", fallback: 0xFFD100) }
-    var yenColorV: Color { Color(hexString: yenColor ?? "#FFFFFF", fallback: 0xFFFFFF) }
-    var noteColorV: Color { Color(hexString: noteColor ?? "#EB9400", fallback: 0xEB9400) }
-    var rechargeBgV: Color { Color(hexString: rechargeBg ?? "#07C160", fallback: 0x07C160) }
-    var rechargeInkV: Color { Color(hexString: rechargeInk ?? "#FFFFFF", fallback: 0xFFFFFF) }
-    var withdrawBgV: Color { Color(hexString: withdrawBg ?? "#F2F2F2", fallback: 0xF2F2F2) }
-    var withdrawInkV: Color { Color(hexString: withdrawInk ?? "#313131", fallback: 0x313131) }
-    var linkColorV: Color { Color(hexString: linkColor ?? "#576B95", fallback: 0x576B95) }
-    var footerColorV: Color { Color(hexString: footerColor ?? "#B3B3B3", fallback: 0xB3B3B3) }
+    /* 后台配的颜色当浅色用，深色模式自动给对应的深色（后台也能写 "#浅色|#深色" 自己定两套）。
+       以前这些是写死的单色 —— 深色模式下整页还是白的，就是这儿。 */
+    var pageBg: Color { colorDyn(bg, light: 0xFFFFFF, dark: 0x0B0B0D) }
+    var circleColorV: Color { colorDyn(circleColor, light: 0xFFD100, dark: 0xFFD100) }
+    var yenColorV: Color { colorDyn(yenColor, light: 0xFFFFFF, dark: 0xFFFFFF) }
+    var noteColorV: Color { colorDyn(noteColor, light: 0xEB9400, dark: 0xEB9400) }
+    var rechargeBgV: Color { colorDyn(rechargeBg, light: 0x07C160, dark: 0x3EB575) }
+    var rechargeInkV: Color { colorDyn(rechargeInk, light: 0xFFFFFF, dark: 0xFFFFFF) }
+    var withdrawBgV: Color { colorDyn(withdrawBg, light: 0xF2F2F2, dark: 0x2C2C2E) }
+    var withdrawInkV: Color { colorDyn(withdrawInk, light: 0x313131, dark: 0xEDEDED) }
+    var linkColorV: Color { colorDyn(linkColor, light: 0x576B95, dark: 0x7D90A9) }
+    var footerColorV: Color { colorDyn(footerColor, light: 0xB3B3B3, dark: 0x8E8E93) }
 }
 
 struct BalancePageConfig: Decodable, Hashable {

@@ -392,6 +392,62 @@ struct WalletConfig: Decodable, Hashable {
     var balance: Double?
 }
 
+/* ---------------- 账单（钱包页右上角「账单」进来，数据来自 /api/bills） ---------------- */
+
+/// 一条账单（就是一笔转账，带对方是谁）
+struct BillRecord: Decodable, Identifiable, Hashable {
+    var id: String
+    var chatId: String?
+    var amount: Double
+    var note: String?
+    var method: String?
+    var status: String?
+    var createdAt: String?
+    var expiresAt: Double?
+    var receivedAt: String?
+    var refundedAt: String?
+    var direction: String?          // out = 我转出去 / in = 别人转给我
+    var peerId: String?
+    var peerName: String?
+    var peerAvatar: String?
+
+    var mine: Bool { direction != "in" }
+    var peer: String { (peerName?.isEmpty == false) ? peerName! : "好友" }
+    var stateText: String {
+        let st = status ?? "pending"
+        if mine {
+            if st == "received" { return "对方已收款" }
+            if st == "refunded" { return "已退回" }
+            return "待对方收款"
+        }
+        if st == "received" { return "已收款" }
+        if st == "refunded" { return "已退回" }
+        return "待收款"
+    }
+}
+
+/// 账单汇总（in 是关键字，映射成 inSum）
+struct BillSummary: Decodable, Hashable {
+    var out: Double
+    var inSum: Double
+    var pendingOut: Int
+    var pendingIn: Int
+    var count: Int
+
+    enum CodingKeys: String, CodingKey {
+        case out
+        case inSum = "in"
+        case pendingOut, pendingIn, count
+    }
+}
+
+struct BillsPayload: Decodable, Hashable {
+    var bills: [BillRecord]
+    var months: [String]?
+    var summary: BillSummary?
+    var month: String?
+}
+
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
 private struct GiftsPayload: Decodable { var gifts: [Gift]? }
 private struct UploadPayload: Decodable {
@@ -873,6 +929,15 @@ final class API {
     /// 钱包页整页配置（后台「钱包页」模块配的；零钱那一行的数值是现算的余额）
     func walletConfig() async throws -> WalletConfig {
         try await get("/api/wallet", as: WalletConfig.self)
+    }
+
+    /// 账单：这个人所有的转账（wallet 页右上角「账单」用），可按月筛
+    func bills(month: String? = nil) async throws -> BillsPayload {
+        var path = "/api/bills"
+        if let m = month, !m.isEmpty {
+            path += "?month=" + m.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!
+        }
+        return try await get(path, as: BillsPayload.self)
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）

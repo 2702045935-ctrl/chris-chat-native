@@ -16,6 +16,7 @@ struct WalletView: View {
     @ObservedObject private var realtime = Realtime.shared
 
     @State private var cfg: WalletConfig?
+    @State private var showBills = false
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
     @State private var revealed: Set<String> = []
 
@@ -63,6 +64,7 @@ struct WalletView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
+        .navigationDestination(isPresented: $showBills) { BillsView() }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" || ev.type == "ui" { Task { await load() } }
@@ -165,7 +167,7 @@ struct WalletView: View {
         case "balance":
             app.show("零钱 ¥\(String(format: "%.2f", app.me?.balance ?? 0))")
         case "bills":
-            app.show("账单：进任意聊天看「转账」记录")
+            showBills = true            // 进「账单」页（真实转账记录）
         case "settings":
             app.show("支付设置：还没接后端，先把页面做出来")
         case "service":

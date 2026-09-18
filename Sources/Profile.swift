@@ -430,6 +430,7 @@ struct ServiceView: View {
     @State private var showRecharge = false
     @State private var showMore = false
     @State private var showWallet = false
+    @State private var showBillsPage = false
     @State private var detailChat: Chat?
     @State private var detailInfo: TransferInfo?
 
@@ -520,6 +521,7 @@ struct ServiceView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .navigationDestination(isPresented: $showWallet) { WalletView() }
+        .navigationDestination(isPresented: $showBillsPage) { BillsView() }
         .confirmationDialog("服务", isPresented: $showMore, titleVisibility: .hidden) {
             Button("刷新账单") { Task { await loadBills() } }
             Button("充值") { rechargeAmount = ""; showRecharge = true }
@@ -655,6 +657,15 @@ struct ServiceView: View {
                 Text(balanceText)
                     .font(pf(13))
                     .foregroundColor(C.subLabel)
+                Button {
+                    showBillsPage = true
+                } label: {
+                    Text("全部账单")
+                        .font(pf(13))
+                        .foregroundColor(C.green)
+                        .padding(.leading, 14)
+                }
+                .buttonStyle(.plain)
                 Button {
                     rechargeAmount = ""
                     showRecharge = true

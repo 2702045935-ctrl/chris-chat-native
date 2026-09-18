@@ -104,6 +104,7 @@ final class AppState: ObservableObject {
             let s = try await API.shared.session()
             if s.ok, let user = s.user {
                 me = user
+                rememberLastUser()      // 登录页那个圆圈用「最后登录的人」的头像
                 await refreshAll()
                 Realtime.shared.start()
             } else {

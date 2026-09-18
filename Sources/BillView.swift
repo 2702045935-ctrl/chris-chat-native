@@ -125,26 +125,27 @@ struct BillDetailView: View {
 
                     /* 标题：参考图墨迹 14.3pt 高 → 16.5pt */
                     Text(titleText)
-                        .font(pf(16.5))
+                        .font(pfExact(16.5))
                         .foregroundColor(C.label)
                         .padding(.top, 36)
 
-                    /* 金额：参考图数字墨迹 35.7pt 高 → 50pt；¥ 墨迹 24.3 → 34pt；方点 */
+                    /* 金额：参考图数字墨迹 35.7pt 高 → 50pt；¥ 墨迹 24.3 → 34pt；方点。
+                       这一页不吃全站缩放（不然 50 会算成 47，跟参考图对不上）。 */
                     MoneyLabel(text: "¥" + money(t.amount), size: 50, curSize: 34,
-                               topAlign: true, color: C.label)
+                               topAlign: true, color: C.label, exact: true)
                         .padding(.top, 16)
 
                     /* 提示 + 操作链接：参考图 15pt，灰字 + 链接蓝 */
                     HStack(spacing: 2) {
                         Text(hintText)
-                            .font(pf(14.5))
+                            .font(pfExact(14.5))
                             .foregroundColor(faint)
                         if t.status == "pending" {
                             Button {
                                 billAction()
                             } label: {
                                 Text(mine ? "提醒对方收款" : "立即收款")
-                                    .font(pf(14.5))
+                                    .font(pfExact(14.5))
                                     .foregroundColor(C.link)
                             }
                             .buttonStyle(.plain)
@@ -178,7 +179,7 @@ struct BillDetailView: View {
                 showMore = true
             } label: {
                 Text("账单详情")
-                    .font(pf(14.5))
+                    .font(pfExact(14.5))
                     .foregroundColor(C.link)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
@@ -216,11 +217,11 @@ struct BillDetailView: View {
     private func detailRow(_ k: String, _ v: String) -> some View {
         HStack(spacing: 12) {
             Text(k)
-                .font(pf(14.5))
+                .font(pfExact(14.5))
                 .foregroundColor(faint)
             Spacer(minLength: 0)
             Text(v)
-                .font(pf(14.5))
+                .font(pfExact(14.5))
                 .foregroundColor(C.label)
                 .multilineTextAlignment(.trailing)
         }

@@ -337,22 +337,34 @@ func pfMoney(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
 
 /// 金额拼成一段 Text：**¥ 可以单独用自己的字号**（微信那样比数字小）。
 /// curSize <= 0 就整段一个字号。
+/// exact = true 时不吃全站 fontScale（要严格对齐参考图数值的页面用）。
 func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0, topAlign: Bool = false,
-               weight: Font.Weight = .medium) -> Text {
+               weight: Font.Weight = .medium, exact: Bool = false) -> Text {
+    let f: (CGFloat) -> Font = { s in exact ? pfMoneyExact(s, weight) : pfMoney(s, weight) }
     guard let r = text.range(of: "¥") else {
-        return Text(text).font(pfMoney(size, weight))
+        return Text(text).font(f(size))
     }
     let prefix = String(text[text.startIndex..<r.lowerBound])
     let rest = String(text[r.upperBound...])
-    let curFont = curSize > 0 ? pfMoney(curSize, weight) : pfMoney(size, weight)
-    var out = Text(prefix).font(pfMoney(size, weight))
+    let curFont = curSize > 0 ? f(curSize) : f(size)
+    var out = Text(prefix).font(f(size))
     var cur = Text("¥").font(curFont)
     /* 左上角对齐（和微信一样）：把钱号往上抬，抬多少 ≈ 两者字高差的 0.72 */
     if topAlign, curSize > 0, curSize < size {
         cur = cur.baselineOffset((size - curSize) * 0.72)
     }
     out = out + cur
-    return out + Text(rest).font(pfMoney(size, weight))
+    return out + Text(rest).font(f(size))
+}
+
+/// 和 pfMoney 一样（SF Pro Display Medium），但**不缩放、不取整**
+func pfMoneyExact(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font {
+    if weight == .medium {
+        for name in ["SFProDisplay-Medium", "SF Pro Display", ".SFUI-Display-Medium"] {
+            if let f = UIFont(name: name, size: size) { return Font(f) }
+        }
+    }
+    return .system(size: size, weight: weight, design: .default)
 }
 
 /// 金额显示：**方形小数点** + 可单独设大小的「¥」（微信那种金融样式）。
@@ -364,13 +376,15 @@ struct MoneyLabel: View {
     var topAlign: Bool = false
     var color: Color = C.label
     var weight: Font.Weight = .medium
+    /// 不吃全站 fontScale（严格对齐参考图时用）
+    var exact: Bool = false
 
     var body: some View {
         let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
         let head = String(parts.first ?? "")
         let tail = parts.count > 1 ? String(parts[1]) : ""
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
-            moneyText(head, size: size, curSize: curSize, topAlign: topAlign, weight: weight)
+            moneyText(head, size: size, curSize: curSize, topAlign: topAlign, weight: weight, exact: exact)
                 .foregroundColor(color)
             if !tail.isEmpty || text.contains(".") {
                 Rectangle()
@@ -379,7 +393,8 @@ struct MoneyLabel: View {
                     .padding(.horizontal, size * 0.04)
             }
             if !tail.isEmpty {
-                Text(tail).font(pfMoney(size, weight)).foregroundColor(color)
+                Text(tail).font(exact ? pfMoneyExact(size, weight) : pfMoney(size, weight))
+                    .foregroundColor(color)
             }
         }
         .monospacedDigit()

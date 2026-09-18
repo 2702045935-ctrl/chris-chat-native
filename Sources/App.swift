@@ -115,9 +115,18 @@ final class AppState: ObservableObject {
                 API.shared.clearToken()
             }
         } catch {
-            // 连不上（不在家 / 电脑没开）时先留着登录状态
+            /* 连不上服务器（电脑没开 / 不在同一个 Wi-Fi）：不要把人踢回登录页，
+               先用本地缓存的资料进 App，等服务器回来了再自动同步。 */
+            if let cached = AppState.cachedUser() { me = cached }
         }
         booting = false
+    }
+
+    /// 本地缓存的当前用户（离线进 App 用）
+    static func cachedUser() -> User? {
+        guard let s = UserDefaults.standard.string(forKey: "chris.lastUserJSON"),
+              let d = s.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(User.self, from: d)
     }
 
     /// 拉服务器上的 data/ui.json：改了数字/颜色，App 重开或回到前台就生效
@@ -158,6 +167,10 @@ final class AppState: ObservableObject {
         lastName = me.nickname ?? me.username ?? ""
         UserDefaults.standard.set(lastAvatar, forKey: "chris.lastAvatar")
         UserDefaults.standard.set(lastName, forKey: "chris.lastName")
+        /* 缓存一份完整资料：连不上服务器时用它先进 App，不把人踢回登录页 */
+        if let d = try? JSONEncoder().encode(me), let s = String(data: d, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: "chris.lastUserJSON")
+        }
         /* 记进「登录过的账号」列表：最多 3 个，登录页可以左右滑 */
         if let u = me.username, !u.isEmpty, !API.shared.token.isEmpty {
             accounts = AccountStore.upsert(username: u,

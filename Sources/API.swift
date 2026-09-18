@@ -3,7 +3,7 @@ import UIKit
 
 /* ============================================================ 数据模型 */
 
-struct User: Decodable, Identifiable, Hashable {
+struct User: Codable, Identifiable, Hashable {
     var id: String
     var requestId: String?
     var moodText: String?

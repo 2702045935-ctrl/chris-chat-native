@@ -25,6 +25,22 @@ struct SVGIcon: View {
     var iconFill: Color? = nil
 
     var body: some View {
+        // 后台换过的图标优先
+        let raw = IconOverrides.markup(markup)
+        if raw.hasPrefix("<svg") {
+            vector(raw)
+        } else if raw.hasPrefix("http") || raw.hasPrefix("/uploads") || raw.hasPrefix("data:") {
+            RemoteImage(path: raw).frame(width: size, height: size)
+        } else {
+            Text(raw)
+                .font(.system(size: size * 0.86))
+                .foregroundColor(color)
+                .frame(width: size, height: size)
+        }
+    }
+
+    @ViewBuilder
+    private func vector(_ markup: String) -> some View {
         let spec = SVG.spec(markup)
         let s = size / spec.box
         let t = CGAffineTransform(translationX: -spec.minX, y: -spec.minY)

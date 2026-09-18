@@ -341,12 +341,18 @@ final class API {
         return payload.branding
     }
 
-    /// 服务器上的界面配置（data/ui.json）
-    func uiConfig() async -> [String: Any] {
+    /// 服务器上的界面配置（data/ui.json）+ 换过的 UI 图标（data/icons.json）
+    func uiConfig() async -> (ui: [String: Any], icons: [String: String]) {
         guard let any = try? await request("GET", "/api/ui"),
-              let dict = any as? [String: Any],
-              let ui = dict["ui"] as? [String: Any] else { return [:] }
-        return ui
+              let dict = any as? [String: Any] else { return ([:], [:]) }
+        let ui = dict["ui"] as? [String: Any] ?? [:]
+        var icons: [String: String] = [:]
+        if let raw = dict["icons"] as? [String: Any] {
+            for (k, v) in raw where !k.hasPrefix("_") {
+                if let s = v as? String, !s.isEmpty { icons[k] = s }
+            }
+        }
+        return (ui, icons)
     }
 
     /// 把真实量到的尺寸报回服务器（只用来对着参考图校准，不影响使用）

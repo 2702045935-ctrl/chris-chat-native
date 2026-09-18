@@ -492,3 +492,64 @@ struct UnreadBadge: View {
         }
     }
 }
+
+/* ============================================================
+   UI 图标：管理后台「UI 图标」页换过的图标，App 打开时拉一份下来，
+   这里存着「标识 → 新的图标」。新图标可以是：
+     ① 一段 <svg> 代码   ② 一张图片地址（/uploads/xxx.png）   ③ 一个 emoji
+   标识写在每个内置 SVG 的 data-key 里（比如 i.moments、plus.photo），
+   系统图标用 sf:xxx（比如 sf:message）。
+   ============================================================ */
+
+enum IconOverrides {
+    static var map: [String: String] = [:]
+
+    static func custom(_ key: String) -> String? {
+        if let v = map[key], !v.isEmpty { return v }
+        return nil
+    }
+
+    /// 从内置 SVG 里读 data-key
+    private static func keyOf(_ markup: String) -> String? {
+        guard let r = markup.range(of: "data-key=\"") else { return nil }
+        let rest = markup[r.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return nil }
+        let k = String(rest[rest.startIndex..<end])
+        return k.isEmpty ? nil : k
+    }
+
+    /// 有自定义就用自定义的，没有就用内置那一段
+    static func markup(_ builtin: String) -> String {
+        if let k = keyOf(builtin), let v = custom(k) { return v }
+        return builtin
+    }
+}
+
+/// 能画四种东西：SVG / 图片 / 文字（emoji）/ 系统图标兜底
+struct FlexIcon: View {
+    var custom: String?
+    var size: CGFloat
+    var color: Color
+    var symbol: String
+    var weight: Font.Weight = .regular
+
+    var body: some View {
+        if let v = custom, !v.isEmpty {
+            if v.hasPrefix("<svg") {
+                SVGIcon(markup: v, size: size, color: color)
+            } else if v.hasPrefix("http") || v.hasPrefix("/uploads") || v.hasPrefix("data:") {
+                RemoteImage(path: v).frame(width: size, height: size)
+            } else {
+                Text(v)
+                    .font(.system(size: size * 0.86))
+                    .foregroundColor(color)
+                    .frame(width: size, height: size)
+            }
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: size, weight: weight))
+                .foregroundColor(color)
+                .frame(width: size, height: size)
+        }
+    }
+}

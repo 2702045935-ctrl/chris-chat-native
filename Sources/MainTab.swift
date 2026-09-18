@@ -51,6 +51,9 @@ struct TabBar: View {
         return pf(UIConfig.num("tabIcon\(i)", def))
     }
 
+    /// 底栏四个图标也允许在后台换掉
+    private let customKeys = ["tab.chat", "tab.contacts", "tab.discover", "tab.me"]
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
@@ -59,9 +62,15 @@ struct TabBar: View {
                 } label: {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
-                            Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                .font(iconFont(i))
-                                .frame(width: L.tabIconBox, height: L.tabIconBox)
+                            if let custom = IconOverrides.custom(customKeys[i]) {
+                                FlexIcon(custom: custom, size: L.tabIconBox,
+                                         color: selection == i ? C.green : C.tabInk,
+                                         symbol: items[i].0)
+                            } else {
+                                Image(systemName: selection == i ? items[i].1 : items[i].0)
+                                    .font(iconFont(i))
+                                    .frame(width: L.tabIconBox, height: L.tabIconBox)
+                            }
                             if i == 0 && badge > 0 {
                                 Text(badge > 99 ? "99+" : "\(badge)")
                                     .font(pf(11, .semibold))
@@ -125,9 +134,8 @@ struct NavBar<Right: View>: View {
             HStack(spacing: 0) {
                 if let back = back {
                     Button(action: back) {
-                        Image(systemName: "chevron.left")
-                            .font(pf(20, .medium))
-                            .foregroundColor(C.label)
+                        FlexIcon(custom: IconOverrides.custom("nav.back"), size: 20,
+                                 color: C.label, symbol: "chevron.left", weight: .medium)
                             .frame(width: 44, height: L.navH)
                     }
                     .buttonStyle(.plain)

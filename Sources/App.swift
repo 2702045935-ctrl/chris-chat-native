@@ -50,11 +50,13 @@ final class AppState: ObservableObject {
 
     /// 拉服务器上的 data/ui.json：改了数字/颜色，App 重开或回到前台就生效
     func refreshUI(force: Bool = false) async {
-        let ui = await API.shared.uiConfig()
-        let stamp = String(describing: ui.sorted { $0.key < $1.key })
+        let cfg = await API.shared.uiConfig()
+        let stamp = String(describing: cfg.ui.sorted { $0.key < $1.key })
+            + "|icons:" + String(describing: cfg.icons.sorted { $0.key < $1.key })
         if force || stamp != lastUIConfig {
             lastUIConfig = stamp
-            UIConfig.apply(ui)
+            UIConfig.apply(cfg.ui)
+            IconOverrides.map = cfg.icons
             uiVersion += 1
         }
     }

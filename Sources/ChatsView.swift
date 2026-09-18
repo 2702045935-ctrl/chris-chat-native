@@ -187,9 +187,9 @@ struct ChatsView: View {
                     Button {
                         plusMenu = true
                     } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: UIConfig.num("navPlusSize", 20), weight: .regular))
-                            .foregroundColor(C.label)
+                        FlexIcon(custom: IconOverrides.custom("nav.plus"),
+                                 size: UIConfig.num("navPlusSize", 20),
+                                 color: C.label, symbol: "plus")
                             .frame(width: 44, height: L.navH)
                     }
                     .buttonStyle(.plain)

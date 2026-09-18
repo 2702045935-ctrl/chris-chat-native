@@ -467,7 +467,6 @@ struct BillsPageStyle: Decodable, Hashable {
     var timeSize: Double?
     var amountSize: Double?
     var curSize: Double?
-    var curSize: Double?
     var monthSize: Double?
     var sumSize: Double?
     var rowHeight: Double?

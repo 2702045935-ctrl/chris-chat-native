@@ -60,8 +60,11 @@ struct SwipeChatRow: View {
     @State private var mode: Mode = .none
     @State private var dragging = false
 
-    private let btnW: CGFloat = 83
-    private var fullW: CGFloat { btnW * 3 }        // 249
+    /// 三个按钮的尺寸：和原版微信一致（每个 80 宽、整行高 72、17 号白字）
+    /// 想微调就改 ui.json 里的 swipeBtnW / swipeFont
+    private var btnW: CGFloat { UIConfig.num("swipeBtnW", 80) }
+    private var btnFont: CGFloat { UIConfig.num("swipeFont", 17) }
+    private var fullW: CGFloat { btnW * 3 }
 
     private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.chatRowBg }
 
@@ -117,12 +120,14 @@ struct SwipeChatRow: View {
                               action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(pf(17))
+                .font(pfExact(btnFont))
                 .foregroundColor(.white)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(width: max(0, width), height: L.rowH)
                 .background(bg)
                 .clipped()
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -139,9 +144,9 @@ struct SwipeChatRow: View {
                 x = min(0, max(-fullW - 140, x))
                 offset = x
                 // 拖过 289 预览第二层（那一条撑满 249，变成「不显示该聊天」）
-                if -x > 289 && mode == .none {
+                if -x > fullW + 40 && mode == .none {
                     mode = .hideConfirm
-                } else if -x < 240 && mode == .hideConfirm {
+                } else if -x < fullW - 9 && mode == .hideConfirm {
                     mode = .none
                 }
             }

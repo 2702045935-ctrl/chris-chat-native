@@ -223,8 +223,8 @@ enum C {
 /// 全站字号统一小一号（用户要求）：17→16、15→14、14→13、12→11
 var fontScale: CGFloat { UIConfig.scale }
 
-func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    let scaled = max(9, (size * fontScale).rounded())
+/// 苹方字体名（按字重挑）
+func pfName(_ weight: Font.Weight) -> String? {
     var want = "PingFangSC-Regular"
     if weight == .medium {
         want = "PingFangSC-Medium"
@@ -233,16 +233,26 @@ func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     } else if weight == .light || weight == .thin || weight == .ultraLight {
         want = "PingFangSC-Light"
     }
-    if UIFont(name: want, size: scaled) != nil {
-        return .custom(want, size: scaled)
-    }
-    // 兜底：把系统里所有苹方字体列出来，按想要的字重挑一个
+    if UIFont(name: want, size: 12) != nil { return want }
     for family in UIFont.familyNames where family.lowercased().contains("pingfang") {
         let names = UIFont.fontNames(forFamilyName: family)
-        if names.contains(want) { return .custom(want, size: scaled) }
-        if let fallback = names.first { return .custom(fallback, size: scaled) }
+        if names.contains(want) { return want }
+        if let fallback = names.first { return fallback }
     }
-    return .system(size: scaled, weight: weight)
+    return nil
+}
+
+/// 带全站缩放的字号（界面文字都用这个）
+func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    pfExact(max(9, (size * fontScale).rounded()), weight)
+}
+
+/// 不给缩放的字号（少数要严格对齐网页版数值的地方）
+func pfExact(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    if let name = pfName(weight), UIFont(name: name, size: size) != nil {
+        return .custom(name, size: size)
+    }
+    return .system(size: size, weight: weight)
 }
 
 enum AppIconImage {

@@ -205,11 +205,11 @@ struct ChatsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                /* 下拉时：顶栏那几个字（微信(N) + 右边那个＋号）跟着手往下滑走，一路滑过搜索框，
-                   搜索框自己原地不动（和朋友圈下拉那个跟手感一样）。
-                   外面这层正好是「导航栏 + 搜索框」两块，clipped() 裁到搜索框下沿，
-                   滑过下沿才消失，不会糊到列表上。 */
+                /* 微信的逻辑（对着桌面 s 文件夹的参考图）：顶栏固定不动，
+                   搜索框和列表一起跟着手指滚 —— 上滑搜索框会滚走，下拉它会跟着下来。 */
                 VStack(spacing: 0) {
+                    /* 顶栏固定不动 —— 对着桌面 s 文件夹那两张参考图量的：
+                       微信在两张图里都在同一行（y 224~252），动的是搜索框和列表。 */
                     NavBar(title: navTitle) {
                         Button {
                             plusMenu = true
@@ -221,12 +221,6 @@ struct ChatsView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .offset(y: pullY)          // 1:1 跟手，拉多少滑多少
-
-                    SearchBoxCenter(text: $keyword)
-                        .padding(L.searchPad)
-                        .background(C.navBg)      // 和「通讯录」顶部用同一个颜色（ui.json 的 navBg）
-                        .zIndex(1)                     // 压在上面：顶栏滑过来是钻到它后面，不会糊住搜索框
                 }
 
                 if app.chats.isEmpty {
@@ -234,14 +228,11 @@ struct ChatsView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            /* 顶部哨兵：记录往下拉了多远（负数=往上滚，正数=下拉） */
-                            GeometryReader { g in
-                                Color.clear
-                                    .onChange(of: g.frame(in: .named("chatsScroll")).minY) { y in
-                                        pullY = max(0, y)
-                                    }
-                            }
-                            .frame(height: 0)
+                            /* 搜索框放进滚动区里：上滑会跟着列表一起滚走，
+                               下拉会跟着列表一起下来 —— 微信就是这样（参考图里第二张搜索框已经滚没了）。 */
+                            SearchBoxCenter(text: $keyword)
+                                .padding(L.searchPad)
+                                .background(C.navBg)      // 和顶栏同色，滚起来是一条连续的
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,

@@ -25,18 +25,8 @@ struct BalancePageView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "") {
-                Button {
-                    run("bills", "零钱明细")
-                } label: {
-                    Text(cfg?.detailLabel ?? "零钱明细")
-                        .font(pf(15))
-                        .foregroundColor(C.label)
-                        .frame(height: L.navH)
-                        .padding(.trailing, 16)
-                }
-                .buttonStyle(.plain)
-            }
+            // 顶部导航：左边返回箭头 + 中间「零钱明细」（和参考代码一致）
+            NavBar(title: cfg?.navTitle ?? "零钱明细", back: { dismiss() })
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -68,36 +58,34 @@ struct BalancePageView: View {
 
     private var top: some View {
         VStack(spacing: 0) {
+            // 黄色圆形 ¥ 图标
             ZStack {
-                SVGIcon(markup: cfg?.svg ?? "", size: st.icon, color: Color(hex: 0xFFC300))
-                    .frame(width: st.icon, height: st.icon)
-                /* 默认那枚金币是「实心金圆 + 白 ¥」，原生这层解析器给不出双色，这里补一个白 ¥ */
-                if (cfg?.icon ?? "svc.coin") == "svc.coin" {
-                    Text("¥")
-                        .font(pf(st.icon * 0.46, .semibold))
-                        .foregroundColor(.white)
-                }
+                Circle().fill(st.circleColorV)
+                Text("¥")
+                    .font(pf(st.yenFont, .medium))
+                    .foregroundColor(st.yenColorV)
             }
-            .padding(.top, 59)
+            .frame(width: st.circle, height: st.circle)
+            .padding(.top, st.topPad)
 
             Text(cfg?.title ?? "我的零钱")
                 .font(pf(st.titleFont))
-                .foregroundColor(Color.dyn(0x363636, 0xEDEDED))
-                .padding(.top, 36)
+                .foregroundColor(Color.dyn(0x000000, 0xEDEDED))
+                .padding(.top, st.gapTitleV)
 
             Text(money(cfg?.balance ?? app.me?.balance ?? 0))
-                .font(pf(st.amountFont, .semibold))
+                .font(pf(st.amountFont, .medium))
                 .monospacedDigit()          // 钱用等宽数字
-                .kerning(-0.8)
-                .foregroundColor(Color.dyn(0x272727, 0xEDEDED))
-                .padding(.top, 12)
+                .kerning(-1)
+                .foregroundColor(Color.dyn(0x000000, 0xEDEDED))
+                .padding(.top, st.gapAmountV)
 
             if let note = cfg?.note, !note.isEmpty {
                 HStack(spacing: 4) {
                     Text(note).font(pf(st.noteFont)).foregroundColor(st.noteColorV)
                     Chevron(size: 6, line: 1.4, color: st.noteColorV)
                 }
-                .padding(.top, 24)
+                .padding(.top, st.gapNoteV)
             }
         }
         .frame(maxWidth: .infinity)

@@ -471,11 +471,18 @@ struct BalanceLink: Decodable, Identifiable, Hashable {
 
 struct BalanceStyle: Decodable, Hashable {
     var bg: String?
-    var iconSize: Double?
+    var circleSize: Double?
+    var circleColor: String?
+    var yenSize: Double?
+    var yenColor: String?
     var titleSize: Double?
-    var balanceSize: Double?
+    var amountSize: Double?
     var noteSize: Double?
     var noteColor: String?
+    var padTop: Double?
+    var gapTitle: Double?
+    var gapAmount: Double?
+    var gapNote: Double?
     var btnWidth: Double?
     var btnHeight: Double?
     var btnRadius: Double?
@@ -488,17 +495,24 @@ struct BalanceStyle: Decodable, Hashable {
     var footerSize: Double?
     var footerColor: String?
 
-    var icon: CGFloat { CGFloat(iconSize ?? 48) }
-    var titleFont: CGFloat { CGFloat(titleSize ?? 17) }
-    var amountFont: CGFloat { CGFloat(balanceSize ?? 44) }
-    var noteFont: CGFloat { CGFloat(noteSize ?? 13) }
+    var circle: CGFloat { CGFloat(circleSize ?? 88) }
+    var yenFont: CGFloat { CGFloat(yenSize ?? 32) }
+    var titleFont: CGFloat { CGFloat(titleSize ?? 18) }
+    var amountFont: CGFloat { CGFloat(amountSize ?? 64) }
+    var noteFont: CGFloat { CGFloat(noteSize ?? 16) }
+    var topPad: CGFloat { CGFloat(padTop ?? 60) }
+    var gapTitleV: CGFloat { CGFloat(gapTitle ?? 24) }
+    var gapAmountV: CGFloat { CGFloat(gapAmount ?? 16) }
+    var gapNoteV: CGFloat { CGFloat(gapNote ?? 20) }
     var btnW: CGFloat { CGFloat(btnWidth ?? 183.7) }
     var btnH: CGFloat { CGFloat(btnHeight ?? 47.7) }
     var btnR: CGFloat { CGFloat(btnRadius ?? 8) }
     var linkFont: CGFloat { CGFloat(linkSize ?? 13) }
     var footFont: CGFloat { CGFloat(footerSize ?? 12) }
     var pageBg: Color { Color(hexString: bg ?? "#FFFFFF", fallback: 0xFFFFFF) }
-    var noteColorV: Color { Color(hexString: noteColor ?? "#FA9D3B", fallback: 0xFA9D3B) }
+    var circleColorV: Color { Color(hexString: circleColor ?? "#FFD100", fallback: 0xFFD100) }
+    var yenColorV: Color { Color(hexString: yenColor ?? "#FFFFFF", fallback: 0xFFFFFF) }
+    var noteColorV: Color { Color(hexString: noteColor ?? "#EB9400", fallback: 0xEB9400) }
     var rechargeBgV: Color { Color(hexString: rechargeBg ?? "#07C160", fallback: 0x07C160) }
     var rechargeInkV: Color { Color(hexString: rechargeInk ?? "#FFFFFF", fallback: 0xFFFFFF) }
     var withdrawBgV: Color { Color(hexString: withdrawBg ?? "#F2F2F2", fallback: 0xF2F2F2) }
@@ -508,10 +522,8 @@ struct BalanceStyle: Decodable, Hashable {
 }
 
 struct BalancePageConfig: Decodable, Hashable {
-    var icon: String?
-    var svg: String?
+    var navTitle: String?
     var title: String?
-    var detailLabel: String?
     var note: String?
     var recharge: BalanceButton?
     var withdraw: BalanceButton?

@@ -498,7 +498,19 @@ enum TimeFmt {
 
 /* ============================================================ 小零件 */
 
+/// 名字 → 拼音首字母。算一次就记住：通讯录一千个人时，每次重绘都重新转拼音会卡
+/// （搜索框每敲一个字都会重绘一遍）。
+private var pinyinMemo: [String: String] = [:]
+
 func pinyinInitial(_ text: String) -> String {
+    if let hit = pinyinMemo[text] { return hit }
+    let value = pinyinInitialRaw(text)
+    if pinyinMemo.count > 4000 { pinyinMemo.removeAll(keepingCapacity: true) }
+    pinyinMemo[text] = value
+    return value
+}
+
+private func pinyinInitialRaw(_ text: String) -> String {
     guard !text.isEmpty else { return "#" }
     let first = String(text[text.startIndex])
     if first.range(of: "^[A-Za-z]$", options: .regularExpression) != nil {

@@ -6,7 +6,9 @@ import UIKit
 @MainActor
 final class AppState: ObservableObject {
     @Published var booting = true
-    @Published var me: User?
+    @Published var me: User? {
+        didSet { rememberLastUser() }        // 谁登录（或改了头像）就记住谁，登录页圆圈用它
+    }
     /// 这台设备上最后登录的人（登录页圆圈显示他的头像 / 名字）
     @Published var lastAvatar: String = UserDefaults.standard.string(forKey: "chris.lastAvatar") ?? ""
     @Published var lastName: String = UserDefaults.standard.string(forKey: "chris.lastName") ?? ""

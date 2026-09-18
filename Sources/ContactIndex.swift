@@ -15,8 +15,8 @@ struct ContactIndexBar: View {
 
     /* 字号 / 行距 / 颜色都从后台「界面文字」读（ctIdxSize / ctIdxItemH / ctIdxColor），
        以前这里写死 12.5 和 #B2B2B2，所以后台改了手机上没反应 */
-    private var fontSize: CGFloat { max(6, C.ctIdxSize) }
-    private var rowH: CGFloat { max(fontSize, C.ctIdxItemH) }
+    private var fontSize: CGFloat { max(6, L.ctIdxSize) }
+    private var rowH: CGFloat { max(fontSize, L.ctIdxItemH) }
     private var pitch: CGFloat { rowH }
     private var listTop: CGFloat { padV + searchBox + searchGap }
 

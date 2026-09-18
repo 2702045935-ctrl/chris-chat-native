@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-18 23:20 ¥左上角对齐"
+    static let build = "2026-09-18 23:35 方形小数点+¥左上角"
 }
 
 /* ============================================================
@@ -347,6 +347,36 @@ func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0, topAlign: Bo
     }
     out = out + cur
     return out + Text(rest).font(pfMoney(size))
+}
+
+/// 金额显示：**方形小数点** + 可单独设大小的「¥」（微信那种金融样式）。
+/// 用法和 Text 差不多，外面照样能叠 .foregroundColor / .monospacedDigit。
+struct MoneyLabel: View {
+    let text: String
+    let size: CGFloat
+    var curSize: CGFloat = 0
+    var topAlign: Bool = false
+    var color: Color = C.label
+
+    var body: some View {
+        let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        let head = String(parts.first ?? "")
+        let tail = parts.count > 1 ? String(parts[1]) : ""
+        return HStack(alignment: .firstTextBaseline, spacing: 0) {
+            moneyText(head, size: size, curSize: curSize, topAlign: topAlign)
+                .foregroundColor(color)
+            if !tail.isEmpty || text.contains(".") {
+                Rectangle()
+                    .fill(color)
+                    .frame(width: size * 0.16, height: size * 0.16)
+                    .padding(.horizontal, size * 0.04)
+            }
+            if !tail.isEmpty {
+                Text(tail).font(pfMoney(size)).foregroundColor(color)
+            }
+        }
+        .monospacedDigit()
+    }
 }
 
 enum AppIconImage {

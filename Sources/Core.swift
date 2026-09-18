@@ -802,6 +802,8 @@ enum LoginTheme {
     static var text: Color? = nil
     static var sub: Color? = nil
     static var pageBg: Color? = nil
+    /// 登录页背景图（后台「🎨 登录页 → 背景图」）
+    static var bgImage = ""
     /// 用户协议 / 隐私政策全文（后台可改）
     static var terms = ""
     static var privacy = ""
@@ -823,6 +825,7 @@ enum LoginTheme {
         if let v = l.text, !v.isEmpty { text = Color(hexString: v) }
         if let v = l.sub, !v.isEmpty { sub = Color(hexString: v) }
         if let v = l.bg, !v.isEmpty { pageBg = Color(hexString: v) }
+        bgImage = l.bgImage ?? ""
         terms = l.terms ?? ""
         privacy = l.privacy ?? ""
     }

@@ -752,7 +752,7 @@ struct LoginView: View {
                 .padding(.horizontal, 20)
                 .frame(minHeight: UIScreen.main.bounds.height - 120, alignment: .top)
             }
-            .background(Color(.systemBackground).ignoresSafeArea())
+            .background(Color.clear)
             .navigationTitle("账号登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -768,6 +768,18 @@ struct LoginView: View {
         .sheet(item: $sheet) { w in
             if w == .phone { PhoneLoginView() } else { AccountLoginSheet(mode: w) }
         }
+        /* 登录页背景：后台配了背景图就用它（压一层薄薄的底色保证文字看得清），否则用系统背景 */
+        .background(
+            ZStack {
+                if !LoginTheme.bgImage.isEmpty {
+                    RemoteImage(path: LoginTheme.bgImage, icon: "photo", mode: .fill)
+                        .ignoresSafeArea()
+                    Color(.systemBackground).opacity(0.30).ignoresSafeArea()
+                } else {
+                    Color(.systemBackground).ignoresSafeArea()
+                }
+            }
+        )
         .onAppear {
             Task {
                 if let b = await API.shared.branding() {

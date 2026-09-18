@@ -479,21 +479,25 @@ struct MomentsView: View {
             HStack(spacing: 0) {
                 Button { dismiss() } label: {
                     SVGIcon(markup: I.backCover, size: 20, color: solid ? C.label : .white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)          // 点击区按微信标准 44×44
                         .shadow(color: solid ? .clear : Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 4)
+                .padding(.leading, 2)
+                .contentShape(Rectangle())
 
                 Spacer(minLength: 0)
 
                 Button { cameraMenu = true } label: {
                     SVGIcon(markup: I.camera, size: 26, color: solid ? C.label : .white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .shadow(color: solid ? .clear : Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 10)
+                .padding(.trailing, 6)
+                .contentShape(Rectangle())
             }
         }
         .frame(height: L.navH)
@@ -507,6 +511,7 @@ struct MomentsView: View {
             }
             .ignoresSafeArea(edges: .top)
         )
+        .zIndex(10)          // 永远在最上层：不能被下面的滚动层吃掉点击
     }
 
     /* ---------------------------------------------------------- 发表 / 评论 / 点赞 */

@@ -124,6 +124,7 @@ private struct UserPayload: Decodable { var user: User? }
 private struct LoginPayload: Decodable { var user: User? }
 private struct SessionPayload: Decodable { var authenticated: Bool?; var user: User? }
 private struct PhoneCodePayload: Decodable { var sent: Bool?; var devCode: String?; var nickname: String? }
+private struct CaptchaPayload: Decodable { var id: String?; var svg: String? }
 private struct MomentsPayload: Decodable {
     var moments: [Moment]
     var hasMore: Bool?
@@ -415,6 +416,25 @@ final class API {
                                                        ["phone": phone],
                                                        as: PhoneCodePayload.self)
         return payload.devCode
+    }
+
+    /// 注册用的图形验证码（服务器给的是 SVG，App 里用 CaptchaView 画出来）
+    func captcha() async throws -> (id: String, svg: String) {
+        let payload: CaptchaPayload = try await get("/api/captcha", as: CaptchaPayload.self)
+        return (payload.id ?? "", payload.svg ?? "")
+    }
+
+    /// 注册新账号（注册完成后由调用方再去登录一次）
+    func register(username: String, nickname: String, password: String, captchaId: String, captcha: String) async throws -> User {
+        let payload: LoginPayload = try await post("/api/register", [
+            "username": username,
+            "nickname": nickname,
+            "password": password,
+            "captchaId": captchaId,
+            "captcha": captcha
+        ], as: LoginPayload.self)
+        guard let user = payload.user else { throw APIError.message("注册失败") }
+        return user
     }
 
     func loginPhone(phone: String, code: String) async throws -> User {

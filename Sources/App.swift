@@ -270,7 +270,8 @@ struct LaunchView: View {
 
 /* ============================================================ 登录页 */
 
-struct LoginView: View {
+/* 旧的微信风登录页（保留但不再使用；新的是下面那个简洁版 LoginView） */
+struct LoginViewOld: View {
     @EnvironmentObject var app: AppState
     @FocusState private var focus: Field?
 
@@ -536,6 +537,338 @@ struct ServerSheet: View {
                 ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .navigationBarTrailing) { Button("保存") { onSave() } }
             }
+        }
+    }
+}
+
+/* ============================================================ 简洁版登录 / 注册页
+   和网页版一致的极简风格：图标 + 名称 → 登录/注册两个 Tab → 一张卡片 → 一个绿色按钮。
+   注册带图形验证码（服务器给的是 SVG，用 CaptchaView 把点阵字画出来）。 */
+
+struct CaptchaView: View {
+    let svg: String
+    var body: some View {
+        Canvas { ctx, size in
+            let sx = size.width / 160.0, sy = size.height / 64.0
+            let groups = CaptchaView.parseGroups(svg)
+            for g in groups {
+                let color = Color(hexString: g.fill)
+                for r in g.rects {
+                    var p = Path(roundedRect: CGRect(x: r.x * sx, y: r.y * sy,
+                                                     width: r.w * sx, height: r.h * sy),
+                                 cornerRadius: r.rx * min(sx, sy))
+                    if g.angle != 0 {
+                        var t = CGAffineTransform(translationX: g.cx * sx, y: g.cy * sy)
+                        t = t.rotated(by: g.angle * .pi / 180)
+                        t = t.translatedBy(x: -g.cx * sx, y: -g.cy * sy)
+                        p = p.applying(t)
+                    }
+                    ctx.fill(p, with: .color(color))
+                }
+            }
+        }
+        .background(Color.white)
+    }
+
+    struct Rect { var x, y, w, h, rx: CGFloat }
+    struct Group { var fill: String; var angle: CGFloat; var cx, cy: CGFloat; var rects: [Rect] }
+
+    static func parseGroups(_ svg: String) -> [Group] {
+        var out: [Group] = []
+        let ns = svg as NSString
+        guard let gRe = try? NSRegularExpression(pattern: "<g\\s+fill=\"([^\"]+)\"([^>]*)>([\\s\\S]*?)</g>") else { return out }
+        let rRe = try? NSRegularExpression(pattern: "<rect\\s+x=\"([-\\d.]+)\"\\s+y=\"([-\\d.]+)\"\\s+width=\"([-\\d.]+)\"\\s+height=\"([-\\d.]+)\"(?:\\s+rx=\"([-\\d.]+)\")?")
+        let tRe = try? NSRegularExpression(pattern: "rotate\\(\\s*([-\\d.]+)\\s+([-\\d.]+)\\s+([-\\d.]+)\\s*\\)")
+        gRe.enumerateMatches(in: svg, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+            guard let m = m else { return }
+            let fill = ns.substring(with: m.range(at: 1))
+            let attrs = ns.substring(with: m.range(at: 2))
+            let body = ns.substring(with: m.range(at: 3))
+            var angle: CGFloat = 0, cx: CGFloat = 0, cy: CGFloat = 0
+            if let tRe = tRe, let tm = tRe.firstMatch(in: attrs, range: NSRange(location: 0, length: (attrs as NSString).length)) {
+                let a = attrs as NSString
+                angle = CGFloat(Double(a.substring(with: tm.range(at: 1))) ?? 0)
+                cx = CGFloat(Double(a.substring(with: tm.range(at: 2))) ?? 0)
+                cy = CGFloat(Double(a.substring(with: tm.range(at: 3))) ?? 0)
+            }
+            var rects: [Rect] = []
+            let bs = body as NSString
+            rRe?.enumerateMatches(in: body, range: NSRange(location: 0, length: bs.length)) { rm, _, _ in
+                guard let rm = rm else { return }
+                func num(_ i: Int, _ d: Double) -> CGFloat { CGFloat(Double(bs.substring(with: rm.range(at: i))) ?? d) }
+                rects.append(Rect(x: num(1, 0), y: num(2, 0), w: num(3, 0), h: num(4, 0), rx: num(5, 0)))
+            }
+            if !rects.isEmpty { out.append(Group(fill: fill, angle: angle, cx: cx, cy: cy, rects: rects)) }
+        }
+        return out
+    }
+}
+
+struct LoginView: View {
+    @EnvironmentObject var app: AppState
+    @FocusState private var focus: Field?
+
+    private enum Field: Hashable { case user, pass, phone, code, regUser, regNick, regPass, regCap }
+    private enum Tab { case login, register }
+
+    @State private var tab: Tab = .login
+    @State private var useCode = false
+    @State private var username = ""
+    @State private var password = ""
+    @State private var phone = ""
+    @State private var code = ""
+    @State private var regUser = ""
+    @State private var regNick = ""
+    @State private var regPass = ""
+    @State private var regCap = ""
+    @State private var capId = ""
+    @State private var capSvg = ""
+    @State private var busy = false
+    @State private var error: String?
+    @State private var showServer = false
+    @State private var server = API.shared.server
+    @State private var appName = "CHRIS Chat"
+    @State private var logoPath: String?
+
+    var body: some View {
+        ZStack {
+            C.loginBg.ignoresSafeArea()
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    header
+                    tabs
+                    card
+                    if let e = error {
+                        Text(e).font(pf(13)).foregroundColor(C.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 12)
+                    }
+                    mainButton
+                    linkRow
+                    serverRow
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, max(30, L.safeTop + 22))
+                .padding(.bottom, max(22, L.safeBottom))
+            }
+        }
+        .sheet(isPresented: $showServer) {
+            ServerSheet(server: $server) {
+                API.shared.setServer(server)
+                server = API.shared.server
+                showServer = false
+                app.show("服务器已改成 \(server)")
+            }
+        }
+        .onAppear {
+            server = API.shared.server
+            Task {
+                if let b = await API.shared.branding() {
+                    if let n = b.appName, !n.isEmpty { appName = n }
+                    if let lg = b.logo, !lg.isEmpty { logoPath = lg }
+                }
+            }
+        }
+    }
+
+    /* ---------- 顶部：图标 + 名字 ---------- */
+    private var header: some View {
+        VStack(spacing: 12) {
+            Group {
+                if let p = logoPath {
+                    RemoteImage(path: p, icon: "message.fill", mode: .fill)
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+                } else if let img = AppIconImage.image {
+                    Image(uiImage: img).resizable()
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+                } else {
+                    RoundedRectangle(cornerRadius: 19, style: .continuous)
+                        .fill(C.loginGreen)
+                        .frame(width: 72, height: 72)
+                        .overlay(Image(systemName: "message.fill").font(pf(32)).foregroundColor(.white))
+                }
+            }
+            Text(appName).font(pf(20, .semibold)).foregroundColor(C.loginText)
+            Text(tab == .login ? "登录后同步你的聊天记录" : "注册一个属于你的微信号")
+                .font(pf(13)).foregroundColor(C.loginGray)
+        }
+        .padding(.bottom, 22)
+    }
+
+    /* ---------- 登录 / 注册 ---------- */
+    private var tabs: some View {
+        HStack(spacing: 28) {
+            tabButton("登录", .login)
+            tabButton("注册", .register)
+        }
+        .padding(.bottom, 14)
+    }
+    private func tabButton(_ title: String, _ t: Tab) -> some View {
+        Button {
+            tab = t; error = nil; focus = nil
+            if t == .register && capSvg.isEmpty { loadCaptcha() }
+        } label: {
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(pf(15, tab == t ? .semibold : .regular))
+                    .foregroundColor(tab == t ? C.loginText : C.loginGray)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(tab == t ? C.loginGreen : Color.clear)
+                    .frame(width: 20, height: 2.5)
+            }
+        }
+    }
+
+    /* ---------- 卡片 ---------- */
+    private var card: some View {
+        VStack(spacing: 0) {
+            if tab == .login {
+                if useCode {
+                    field("", .phone, $phone, "手机号", .numberPad)
+                    HairLine(color: C.navLine)
+                    HStack(spacing: 8) {
+                        TextField("验证码", text: $code)
+                            .font(pf(15)).focused($focus, equals: .code).keyboardType(.numberPad)
+                        Button("获取验证码") { sendCode() }
+                            .font(pf(13.5)).foregroundColor(C.loginGreen)
+                    }
+                    .frame(height: 54).padding(.horizontal, 14)
+                } else {
+                    field("", .user, $username, "微信号 / 用户名", .default)
+                    HairLine(color: C.navLine)
+                    secureField("", .pass, $password, "密码")
+                }
+            } else {
+                field("", .regUser, $regUser, "用户名（3-24 位字母/数字/下划线）", .default)
+                HairLine(color: C.navLine)
+                field("", .regNick, $regNick, "昵称", .default)
+                HairLine(color: C.navLine)
+                secureField("", .regPass, $regPass, "密码（至少 6 位）")
+                HairLine(color: C.navLine)
+                HStack(spacing: 10) {
+                    TextField("图形验证码", text: $regCap)
+                        .font(pf(15)).focused($focus, equals: .regCap)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled(true)
+                    CaptchaView(svg: capSvg)
+                        .frame(width: 96, height: 36)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.navLine, lineWidth: 0.5))
+                        .onTapGesture { loadCaptcha() }
+                }
+                .frame(height: 54).padding(.horizontal, 14)
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x1C1C1E)))
+    }
+
+    private func field(_ label: String, _ f: Field, _ text: Binding<String>, _ ph: String, _ kb: UIKeyboardType) -> some View {
+        TextField(ph, text: text)
+            .font(pf(15))
+            .focused($focus, equals: f)
+            .keyboardType(kb)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .frame(height: 54)
+            .padding(.horizontal, 14)
+    }
+    private func secureField(_ label: String, _ f: Field, _ text: Binding<String>, _ ph: String) -> some View {
+        SecureField(ph, text: text)
+            .font(pf(15))
+            .focused($focus, equals: f)
+            .frame(height: 54)
+            .padding(.horizontal, 14)
+    }
+
+    /* ---------- 主按钮 ---------- */
+    private var mainButton: some View {
+        Button { submit() } label: {
+            HStack(spacing: 8) {
+                if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
+                Text(busy ? "请稍候…" : (tab == .login ? "登 录" : "注 册"))
+                    .font(pf(16, .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity).frame(height: 50)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(busy ? C.loginGreen.opacity(0.6) : C.loginGreen))
+        }
+        .disabled(busy)
+        .padding(.top, 20)
+    }
+
+    private var linkRow: some View {
+        Button {
+            if tab == .login { useCode.toggle() } else { tab = .login }
+            error = nil; focus = nil
+        } label: {
+            Text(tab == .login ? (useCode ? "用账号密码登录" : "用手机验证码登录") : "已有账号，去登录")
+                .font(pf(13)).foregroundColor(C.loginGreen)
+        }
+        .padding(.top, 16)
+    }
+
+    private var serverRow: some View {
+        Button { showServer = true } label: {
+            Text("服务器 \(server)（点这里可改）")
+                .font(pf(11)).foregroundColor(C.loginGray.opacity(0.75))
+        }
+        .padding(.top, 22)
+    }
+
+    /* ---------- 动作 ---------- */
+    private func loadCaptcha() {
+        Task {
+            do {
+                let c = try await API.shared.captcha()
+                capId = c.id; capSvg = c.svg
+            } catch { }
+        }
+    }
+
+    private func sendCode() {
+        let p = phone.trimmingCharacters(in: .whitespaces)
+        if p.count < 5 { error = "请填写手机号"; return }
+        error = nil
+        Task {
+            do {
+                let dev = try await API.shared.phoneCode(phone: p)
+                if let c = dev { code = c; app.show("验证码：\(c)") } else { app.show("验证码已发送") }
+            } catch {
+                self.error = (error as? APIError)?.errorDescription ?? "发送失败"
+            }
+        }
+    }
+
+    private func submit() {
+        busy = true; error = nil
+        Task {
+            do {
+                if tab == .register {
+                    let u = regUser.trimmingCharacters(in: .whitespaces)
+                    if u.count < 3 { throw APIError.message("用户名至少 3 位") }
+                    if regPass.count < 6 { throw APIError.message("密码至少 6 位") }
+                    if regCap.isEmpty { throw APIError.message("请填写图形验证码") }
+                    _ = try await API.shared.register(username: u, nickname: regNick.isEmpty ? u : regNick,
+                                                     password: regPass, captchaId: capId, captcha: regCap)
+                    try await app.login(username: u, password: regPass)
+                    app.show("注册成功，欢迎加入")
+                } else if useCode {
+                    let p = phone.trimmingCharacters(in: .whitespaces)
+                    if p.isEmpty || code.isEmpty { throw APIError.message("请填写手机号和验证码") }
+                    try await app.login(phone: p, code: code)
+                } else {
+                    let u = username.trimmingCharacters(in: .whitespaces)
+                    if u.isEmpty || password.isEmpty { throw APIError.message("请填写账号和密码") }
+                    try await app.login(username: u, password: password)
+                }
+            } catch {
+                self.error = (error as? APIError)?.errorDescription ?? "操作失败"
+                if tab == .register { loadCaptcha() }
+            }
+            busy = false
         }
     }
 }

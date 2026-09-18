@@ -205,10 +205,11 @@ struct ChatsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                /* 下拉时：顶栏这几个字（微信(N) + 右边那个＋号）跟着手往下滑走，搜索框不动。
-                   外面套一层固定「导航栏高度」并裁掉溢出，所以字滑出导航栏就没了，
-                   不会盖到下面的搜索框上。 */
-                ZStack(alignment: .top) {
+                /* 下拉时：顶栏那几个字（微信(N) + 右边那个＋号）跟着手往下滑走，一路滑过搜索框，
+                   搜索框自己原地不动（和朋友圈下拉那个跟手感一样）。
+                   外面这层正好是「导航栏 + 搜索框」两块，clipped() 裁到搜索框下沿，
+                   滑过下沿才消失，不会糊到列表上。 */
+                VStack(spacing: 0) {
                     NavBar(title: navTitle) {
                         Button {
                             plusMenu = true
@@ -221,13 +222,13 @@ struct ChatsView: View {
                         .buttonStyle(.plain)
                     }
                     .offset(y: pullY)          // 1:1 跟手，拉多少滑多少
-                }
-                .frame(height: L.navH)
-                .clipped()
+                    .zIndex(1)                 // 画在搜索框上面，滑过去的时候看得见
 
-                SearchBoxCenter(text: $keyword)
-                    .padding(L.searchPad)
-                    .background(C.chatsTopBg)      // 顶部（导航栏+搜索框）底色 #F7F7F7
+                    SearchBoxCenter(text: $keyword)
+                        .padding(L.searchPad)
+                        .background(C.chatsTopBg)      // 顶部（导航栏+搜索框）底色 #F7F7F7
+                }
+                .clipped()
 
                 if app.chats.isEmpty {
                     emptyView

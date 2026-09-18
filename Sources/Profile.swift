@@ -508,8 +508,8 @@ struct ServiceView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     if cfg?.card?.enabled != false { greenCard.padding(.top, 13) }
-                    ForEach(groups) { g in
-                        groupCard(g).padding(.top, CGFloat(g.style?.gapTop ?? 8))
+                    ForEach(Array(groups.enumerated()), id: \.element.id) { idx, g in
+                        groupCard(g).padding(.top, topGap(idx))
                     }
                     billsCard.padding(.top, 8)
                     Color.clear.frame(height: 24)
@@ -652,7 +652,15 @@ struct ServiceView: View {
         .padding(.top, padTop)
         .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(C.cardBg))
         .padding(.horizontal, 8)
-        .padding(.bottom, CGFloat(gs?.gapBottom ?? 0))
+    }
+
+    /// 版块之间的空隙 = 上一块的「块下间距」+ 这一块的「块上间距」
+    /// （默认：上一块 8、这一块 0 → 和参考图一样空 8pt；后台怎么调都不会挨在一起）
+    private func topGap(_ idx: Int) -> CGFloat {
+        guard idx > 0 else { return 8 }
+        let prev = groups[idx - 1].style?.gapBottom ?? 8
+        let cur = groups[idx].style?.gapTop ?? 0
+        return CGFloat(max(8, prev + cur))
     }
 
     /* ---------------------------------------------------------- 账单（原来那一套，接在下面） */

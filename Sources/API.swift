@@ -294,6 +294,96 @@ struct ServiceConfig: Decodable, Hashable {
     var groups: [ServiceGroup]?
 }
 
+/* ---------------- 钱包页（我 → 服务 → 钱包，后台「钱包页」模块下发） ---------------- */
+
+/// 钱包页的一行
+struct WalletItem: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var value: String?
+    var valueKind: String?      // "balance" = 这一行的数值现算这个人的零钱
+    var note: String?           // 小字，比如「收益率 1.01%」
+    var icon: String?
+    var svg: String?
+    var color: String?
+    var action: String?
+    var enabled: Bool?
+}
+
+/// 钱包页的一张白卡
+struct WalletGroup: Decodable, Identifiable, Hashable {
+    var id: String
+    var enabled: Bool?
+    var items: [WalletItem]?
+}
+
+/// 右上角那个按钮（默认是「账单」）
+struct WalletRight: Decodable, Hashable {
+    var label: String?
+    var action: String?
+}
+
+/// 底部的蓝色链接（身份信息 / 支付设置）
+struct WalletFoot: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var action: String?
+    var enabled: Bool?
+}
+
+/// 钱包页的样式（行高 / 图标 / 字体 / 颜色）
+struct WalletStyle: Decodable, Hashable {
+    var rowHeight: Double?
+    var iconSize: Double?
+    var iconLeft: Double?
+    var textLeft: Double?
+    var rightInset: Double?
+    var labelSize: Double?
+    var valueSize: Double?
+    var noteSize: Double?
+    var footerSize: Double?
+    var groupGap: Double?
+    var dividerInset: Double?
+    var labelColor: String?
+    var valueColor: String?
+    var noteColor: String?
+    var footerColor: String?
+
+    var row: CGFloat { CGFloat(rowHeight ?? 56.3) }
+    var icon: CGFloat { CGFloat(iconSize ?? 20) }
+    var iconX: CGFloat { CGFloat(iconLeft ?? 18) }
+    var textX: CGFloat { CGFloat(textLeft ?? 56.7) }
+    var rightPad: CGFloat { CGFloat(rightInset ?? 18) }
+    var labelFont: CGFloat { CGFloat(labelSize ?? 17) }
+    var valueFont: CGFloat { CGFloat(valueSize ?? 16) }
+    var noteFont: CGFloat { CGFloat(noteSize ?? 13) }
+    var footFont: CGFloat { CGFloat(footerSize ?? 13) }
+    var gap: CGFloat { CGFloat(groupGap ?? 12) }
+    var divider: CGFloat { CGFloat(dividerInset ?? 56) }
+    /// 行标题：留空就跟主题
+    var labelColorV: Color {
+        if let c = labelColor, !c.isEmpty { return Color(hexString: c, fallback: 0x191919) }
+        return C.label
+    }
+    var valueColorV: Color {
+        let v = (valueColor ?? "#1A1A1A").uppercased()
+        if v == "#1A1A1A" { return C.label }
+        return Color(hexString: v, fallback: 0x1A1A1A)
+    }
+    var noteColorV: Color { Color(hexString: noteColor ?? "#FA9D3B", fallback: 0xFA9D3B) }
+    var footerColorV: Color { Color(hexString: footerColor ?? "#576B95", fallback: 0x576B95) }
+}
+
+/// 整页钱包页的配置
+struct WalletConfig: Decodable, Hashable {
+    var title: String?
+    var right: WalletRight?
+    var groups: [WalletGroup]?
+    var footer: [WalletFoot]?
+    var style: WalletStyle?
+    var balance: Double?
+}
+
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
 private struct GiftsPayload: Decodable { var gifts: [Gift]? }
 private struct UploadPayload: Decodable {
@@ -770,6 +860,11 @@ final class API {
     /// 服务页整页配置（后台「服务页」模块配的，网页版和 App 共用一份）
     func serviceConfig() async throws -> ServiceConfig {
         try await get("/api/service", as: ServiceConfig.self)
+    }
+
+    /// 钱包页整页配置（后台「钱包页」模块配的；零钱那一行的数值是现算的余额）
+    func walletConfig() async throws -> WalletConfig {
+        try await get("/api/wallet", as: WalletConfig.self)
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）

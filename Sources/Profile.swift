@@ -429,6 +429,7 @@ struct ServiceView: View {
     @State private var rechargeAmount = ""
     @State private var showRecharge = false
     @State private var showMore = false
+    @State private var showWallet = false
     @State private var detailChat: Chat?
     @State private var detailInfo: TransferInfo?
 
@@ -516,6 +517,7 @@ struct ServiceView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
+        .navigationDestination(isPresented: $showWallet) { WalletView() }
         .confirmationDialog("服务", isPresented: $showMore, titleVisibility: .hidden) {
             Button("刷新账单") { Task { await loadBills() } }
             Button("充值") { rechargeAmount = ""; showRecharge = true }
@@ -715,7 +717,7 @@ struct ServiceView: View {
     private func run(_ action: String, _ label: String) {
         switch action {
         case "wallet":
-            app.show("零钱 \(balanceText)")
+            showWallet = true          // 进「钱包」页（照参考图做的那一页）
         case "pay":
             app.show("收付款：还没接后端，先把页面做出来")
         default:

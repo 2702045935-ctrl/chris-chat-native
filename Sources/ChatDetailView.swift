@@ -719,10 +719,18 @@ struct MessageRow: View {
         let note = (o["note"] as? String) ?? ""
         let status = (o["status"] as? String) ?? "pending"
         let state = status == "received" ? "已收款" : (status == "refunded" ? "已退回" : "待对方确认收款")
-        /* 转账卡片的橙按微信参考图实测的 #FA9D3D。
-           注意：已收款不褪色 —— 参考图里「已收款」那张和「待对方确认收款」那张是同一个橙；
-           只有 24 小时退回才变灰。 */
-        let card: Color = status == "refunded" ? Color(hex: 0xC2C2C2) : Color(hex: 0xFA9D3C)
+        /* 转账卡片的颜色：
+           还没人收 = 微信橙 #FA9D3D（参考图实测的橙）；
+           收了之后（不管是发钱那侧还是收钱那侧）都变淡橙 #F0C69A —— 这就是「已收款要变色」；
+           24 小时没人收退回是灰的。 */
+        let card: Color
+        if status == "refunded" {
+            card = Color(hex: 0xC2C2C2)
+        } else if status == "received" {
+            card = Color(hex: 0xF0C69A)
+        } else {
+            card = Color(hex: 0xFA9D3C)
+        }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "yensign.circle.fill")

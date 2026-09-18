@@ -488,6 +488,8 @@ struct ServiceView: View {
     }
 
     private var balanceText: String { "¥" + String(format: "%.2f", app.me?.balance ?? 0) }
+    /// 绿卡右边的零钱：后台开了「金额打星号」就显示 ¥****
+    private var walletSubText: String { (st.maskAmount ?? false) ? "¥****" : balanceText }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -564,7 +566,7 @@ struct ServiceView: View {
             }
             HStack(alignment: .top, spacing: 0) {
                 halfView(c?.left, label: "收付款", icon: "svc.pay", action: "pay", sub: "")
-                halfView(c?.right, label: "钱包", icon: "svc.wallet", action: "wallet", sub: balanceText)
+                halfView(c?.right, label: "钱包", icon: "svc.wallet", action: "wallet", sub: walletSubText)
             }
             .padding(.horizontal, 25)
             .padding(.top, 33)

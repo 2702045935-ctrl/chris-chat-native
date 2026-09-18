@@ -16,6 +16,8 @@ struct WalletView: View {
     @ObservedObject private var realtime = Realtime.shared
 
     @State private var cfg: WalletConfig?
+    /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
+    @State private var revealed: Set<String> = []
 
     private var st: WalletStyle { cfg?.style ?? WalletStyle() }
 
@@ -88,7 +90,9 @@ struct WalletView: View {
 
     private func row(_ it: WalletItem) -> some View {
         let s = st
-        let value = it.value ?? ""
+        let rawValue = it.value ?? ""
+        let masked = !rawValue.isEmpty && s.mask && (it.mask ?? true)
+        let value = (masked && !revealed.contains(it.id)) ? WalletView.maskMoney(rawValue) : rawValue
         let note = it.note ?? ""
         return Button {
             run(it.action ?? "soon", it.label)
@@ -118,6 +122,10 @@ struct WalletView: View {
                         .font(pf(s.valueFont))
                         .foregroundColor(s.valueColorV)
                         .padding(.trailing, 11)
+                        .onTapGesture {
+                            guard masked, s.canReveal else { return }
+                            if revealed.contains(it.id) { revealed.remove(it.id) } else { revealed.insert(it.id) }
+                        }
                 }
 
                 Chevron(size: 9, line: 1.6)
@@ -168,11 +176,18 @@ struct WalletView: View {
     }
 
     private func load() async {
+        revealed = []          // 进来先全部打星号
         if let got = try? await API.shared.walletConfig() {
             cfg = got
         } else if cfg == nil {
             // 服务器连不上 / 还没升级：用内置那份兜底，别开天窗
             cfg = WalletFallback.config(balance: app.me?.balance ?? 0)
         }
+    }
+
+    /// ¥122.00 → ¥****
+    static func maskMoney(_ text: String) -> String {
+        if text.contains("¥") { return "¥****" }
+        return String(text.map { $0.isNumber ? "*" : $0 })
     }
 }

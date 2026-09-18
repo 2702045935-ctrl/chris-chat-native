@@ -260,6 +260,8 @@ struct ServiceStyle: Decodable, Hashable {
     var gridTitleColor: String?
     var gridTextSize: Double?
     var gridTextColor: String?
+    var maskAmount: Bool?       // 绿卡右边的零钱打成 ¥****
+    var maskReveal: Bool?       // 点一下能不能看
 
     /// 默认值 = 照参考图量出来的那套
     var icon: CGFloat { CGFloat(iconSize ?? 28) }
@@ -307,6 +309,7 @@ struct WalletItem: Decodable, Identifiable, Hashable {
     var svg: String?
     var color: String?
     var action: String?
+    var mask: Bool?             // 这一行的金额要不要打星号
     var enabled: Bool?
 }
 
@@ -348,6 +351,8 @@ struct WalletStyle: Decodable, Hashable {
     var valueColor: String?
     var noteColor: String?
     var footerColor: String?
+    var maskAmount: Bool?       // 金额打成 ¥****
+    var maskReveal: Bool?       // 点一下能不能看
 
     var row: CGFloat { CGFloat(rowHeight ?? 56.3) }
     var icon: CGFloat { CGFloat(iconSize ?? 20) }
@@ -372,6 +377,9 @@ struct WalletStyle: Decodable, Hashable {
     }
     var noteColorV: Color { Color(hexString: noteColor ?? "#FA9D3B", fallback: 0xFA9D3B) }
     var footerColorV: Color { Color(hexString: footerColor ?? "#576B95", fallback: 0x576B95) }
+    /// 金额打星号（默认开）
+    var mask: Bool { maskAmount ?? true }
+    var canReveal: Bool { maskReveal ?? true }
 }
 
 /// 整页钱包页的配置

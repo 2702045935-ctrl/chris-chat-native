@@ -424,6 +424,9 @@ struct TransferView: View {
                     .clipShape(RoundedRectangle(cornerRadius: L.v(8, 2.6, 11)))
                     .offset(x: badPwd ? -6 : 0)
                     .animation(.default, value: badPwd)
+                    /* 点这 6 个格子也能把原生键盘唤出来 */
+                    .contentShape(Rectangle())
+                    .onTapGesture { payFocus = true }
 
                     if let hint = payHint {
                         Text(hint)
@@ -458,6 +461,7 @@ struct TransferView: View {
                         payHint = nil
                         if clean.count == 6 && !busy { payFocus = false; submit(face: false) }
                     }
+                    .onAppear { focusPaySoon() }
                     .padding(.top, L.v(12, 5.5, 23))
 
                 Rectangle()
@@ -467,14 +471,20 @@ struct TransferView: View {
             .background(C.cardBg)
             .clipShape(TopRounded(radius: L.paySheetRadius))
         }
-        .onAppear { focusPaySoon() }
     }
 
-    /// 支付面板一出来就弹原生键盘（没设支付密码就不用弹）
+    /// 支付面板一出来就弹原生键盘。
+    /// 以前这里是「设过支付密码才弹」——结果没设密码的号（比如 friend001）进来一个键盘都没有，
+    /// 看着就像面板坏了。现在不管有没有密码都弹，跟网页版一致。
+    /// 半屏面板有进场动画，刚出现时抢焦点偶尔会被系统吞掉，所以隔几拍补两次。
     private func focusPaySoon() {
         Task {
-            try? await Task.sleep(nanoseconds: 320_000_000)
-            if hasPwd { payFocus = true }
+            payFocus = true
+            for delay in [280_000_000, 480_000_000] {
+                try? await Task.sleep(nanoseconds: UInt64(delay))
+                if Task.isCancelled { return }
+                if !payFocus && password.isEmpty { payFocus = true }
+            }
         }
     }
 

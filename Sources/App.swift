@@ -12,6 +12,8 @@ final class AppState: ObservableObject {
     /// 这台设备上最后登录的人（登录页圆圈显示他的头像 / 名字）
     @Published var lastAvatar: String = UserDefaults.standard.string(forKey: "chris.lastAvatar") ?? ""
     @Published var lastName: String = UserDefaults.standard.string(forKey: "chris.lastName") ?? ""
+    /// 登录过、可以一键切换的账号（最多 3 个）
+    @Published var accounts: [SavedAccount] = AccountStore.load()
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
     @Published var moments: [Moment] = []
@@ -156,6 +158,13 @@ final class AppState: ObservableObject {
         lastName = me.nickname ?? me.username ?? ""
         UserDefaults.standard.set(lastAvatar, forKey: "chris.lastAvatar")
         UserDefaults.standard.set(lastName, forKey: "chris.lastName")
+        /* 记进「登录过的账号」列表：最多 3 个，登录页可以左右滑 */
+        if let u = me.username, !u.isEmpty, !API.shared.token.isEmpty {
+            accounts = AccountStore.upsert(username: u,
+                                           nickname: me.nickname ?? u,
+                                           avatar: me.avatar ?? "",
+                                           token: API.shared.token)
+        }
     }
 
     func refreshAll() async {
@@ -196,7 +205,8 @@ final class AppState: ObservableObject {
     }
 
     /// 一键登录：用这台设备上保存的登录令牌直接进去（登录页点头像就用这个）
-    func quickLogin() async -> Bool {
+    func quickLogin(token: String? = nil) async -> Bool {
+        if let t = token, !t.isEmpty { API.shared.setToken(t) }
         guard !API.shared.token.isEmpty else { return false }
         guard let s = try? await API.shared.session(), s.ok, let user = s.user else {
             API.shared.clearToken()      // 令牌过期/失效：清掉，让用户重新输密码
@@ -670,6 +680,8 @@ struct LoginView: View {
     @State private var quickBusy = false
     /// 出错提示（比如一键登录的登录态过期了）
     @State private var error: String?
+    /// 当前滑到第几个账号
+    @State private var avatarIndex = 0
 
     enum Way: String, Identifiable { case phone, password; var id: String { rawValue } }
 
@@ -681,36 +693,8 @@ struct LoginView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 40)
 
-                    // App Logo（你代码里是灰色圆形占位；后台配了 logo 就用 logo，没配就是灰圆）
-                    Group {
-                        /* 优先显示「这台设备上最后登录的人」的头像 —— 谁登录过就显示谁 */
-                        if !app.lastAvatar.isEmpty {
-                            RemoteImage(path: app.lastAvatar, icon: "person.fill", mode: .fill)
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                        } else if let p = logoPath {
-                            RemoteImage(path: p, icon: "message.fill", mode: .fill)
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                        } else if let img = AppIconImage.image {
-                            Image(uiImage: img).resizable()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                        } else {
-                            Circle()
-                                .frame(width: 80, height: 80)
-                                .foregroundColor(.gray.opacity(0.2))
-                        }
-                    }
-                    /* 登录过的人：点头像直接一键登录（用这台设备上保存的登录态） */
-                    .contentShape(Circle())
-                    .onTapGesture { if hasSavedLogin { quickLogin() } }
-                    if hasSavedLogin {
-                        Text(quickBusy ? "正在登录…" : "点一下头像，快捷登录")
-                            .font(.system(size: 12))
-                            .foregroundColor(LoginTheme.accent)
-                            .padding(.top, 8)
-                    }
+                    // 头像区：登录过的账号最多 3 个，可以左右滑；点一下就用那个账号一键登录
+                    avatarPager
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
                         .padding(.top, 16)
@@ -822,6 +806,68 @@ struct LoginView: View {
     }
 
     /// 登录页背景：后台配了背景图就铺满整屏（压一层很淡的底色保证文字看得清），否则用系统背景
+    /// 头像区：最多 3 个登录过的账号，左右滑动切换；点头像 = 用那个账号一键登录
+    private var avatarPager: some View {
+        VStack(spacing: 8) {
+            if app.accounts.isEmpty {
+                // 这台设备还没登录过：显示后台 logo / App 图标 / 灰圆
+                Group {
+                    if let p = logoPath {
+                        RemoteImage(path: p, icon: "message.fill", mode: .fill)
+                    } else if let img = AppIconImage.image {
+                        Image(uiImage: img).resizable()
+                    } else {
+                        Circle().foregroundColor(.gray.opacity(0.2))
+                    }
+                }
+                .frame(width: 80, height: 80)
+                .clipShape(Circle())
+            } else {
+                TabView(selection: $avatarIndex) {
+                    ForEach(Array(app.accounts.enumerated()), id: \.element.id) { idx, acc in
+                        Group {
+                            if !acc.avatar.isEmpty {
+                                RemoteImage(path: acc.avatar, icon: "person.fill", mode: .fill)
+                            } else {
+                                Circle().fill(LoginTheme.accent.opacity(0.25))
+                                    .overlay(Text(String(acc.nickname.prefix(1)))
+                                        .font(.system(size: 30, weight: .semibold))
+                                        .foregroundColor(LoginTheme.accent))
+                            }
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                        .contentShape(Circle())
+                        .onTapGesture { quickLogin(account: acc) }
+                        .tag(idx)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: app.accounts.count > 1 ? .always : .never))
+                .frame(height: 108)
+                .frame(maxWidth: app.accounts.count > 1 ? .infinity : 96)
+
+                if app.accounts.count > 1 {
+                    Text("← 左右滑动切换账号，点头像直接登录 →")
+                        .font(.system(size: 11))
+                        .foregroundColor(LoginTheme.sub ?? .secondary)
+                } else {
+                    Text(quickBusy ? "正在登录…" : "点一下头像，快捷登录")
+                        .font(.system(size: 12))
+                        .foregroundColor(LoginTheme.accent)
+                }
+                Text(app.accounts[min(avatarIndex, app.accounts.count - 1)].nickname)
+                    .font(.system(size: 13))
+                    .foregroundColor(LoginTheme.sub ?? .secondary)
+            }
+        }
+        .onChange(of: app.accounts.count) { _ in clampAvatarIndex() }
+    }
+
+    private func clampAvatarIndex() {
+        let maxIdx = max(0, app.accounts.count - 1)
+        if avatarIndex > maxIdx { avatarIndex = maxIdx }
+    }
+
     private var loginBackground: some View {
         ZStack {
             if !bgImage.isEmpty {
@@ -846,12 +892,12 @@ struct LoginView: View {
     }
 
     /// 点头像一键登录：用保存的令牌直接进去；过期了就提示重新输密码
-    private func quickLogin() {
+    private func quickLogin(account: SavedAccount? = nil) {
         guard !quickBusy else { return }
         quickBusy = true
         error = nil
         Task {
-            let ok = await app.quickLogin()
+            let ok = await app.quickLogin(token: account?.token)
             quickBusy = false
             if !ok { error = "登录状态已过期，请重新输入密码登录" }
         }

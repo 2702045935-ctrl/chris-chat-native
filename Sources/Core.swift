@@ -835,3 +835,38 @@ enum TransferTheme {
     static var accent: Color { LoginTheme.accent2 }
     static var success: Color { Color(hexString: "#34C759") }
 }
+/// 登录过、可以一键切换的账号（最多 3 个，存在钥匙串里）
+struct SavedAccount: Codable, Identifiable, Hashable {
+    var username: String
+    var nickname: String
+    var avatar: String
+    var token: String
+    var id: String { username }
+}
+
+enum AccountStore {
+    private static let key = "accounts"
+    static let maxCount = 3
+
+    static func load() -> [SavedAccount] {
+        guard let raw = Keychain.get(key), let data = raw.data(using: .utf8),
+              let list = try? JSONDecoder().decode([SavedAccount].self, from: data) else { return [] }
+        return Array(list.prefix(maxCount))
+    }
+
+    static func save(_ list: [SavedAccount]) {
+        let trimmed = Array(list.prefix(maxCount))
+        if let data = try? JSONEncoder().encode(trimmed), let s = String(data: data, encoding: .utf8) {
+            Keychain.set(s, for: key)
+        }
+    }
+
+    /// 登录成功后记一条（同一个账号放最前面，最多留 3 个）
+    @discardableResult
+    static func upsert(username: String, nickname: String, avatar: String, token: String) -> [SavedAccount] {
+        var list = load().filter { $0.username != username }
+        list.insert(SavedAccount(username: username, nickname: nickname, avatar: avatar, token: token), at: 0)
+        save(list)
+        return Array(list.prefix(maxCount))
+    }
+}

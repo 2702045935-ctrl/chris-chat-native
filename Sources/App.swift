@@ -14,6 +14,8 @@ final class AppState: ObservableObject {
     @Published var lastName: String = UserDefaults.standard.string(forKey: "chris.lastName") ?? ""
     /// 登录过、可以一键切换的账号（最多 3 个）
     @Published var accounts: [SavedAccount] = AccountStore.load()
+    /// 待处理的好友申请数量（通讯录红点用它）
+    @Published var friendRequests = 0
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
     @Published var moments: [Moment] = []
@@ -198,7 +200,10 @@ final class AppState: ObservableObject {
     }
 
     func loadContacts() async {
-        if let list = try? await API.shared.contacts() { contacts = list }
+        if let r = try? await API.shared.contactsFull() {
+            contacts = r.friends
+            friendRequests = r.incoming.count        // 别人加你好友 → 通讯录亮红点
+        }
     }
 
     func loadMoments() async {

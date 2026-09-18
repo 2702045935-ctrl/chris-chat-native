@@ -27,7 +27,9 @@ struct MainTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if !app.tabBarHidden {
-                TabBar(selection: $tab, badge: unreadTotal, momentsDot: app.momentsUnread > 0)
+                TabBar(selection: $tab, badge: unreadTotal,
+                       contactsDot: app.friendRequests > 0,
+                       momentsDot: app.momentsUnread > 0)
                     .transition(.move(edge: .bottom))
             }
         }
@@ -39,6 +41,8 @@ struct MainTabView: View {
 struct TabBar: View {
     @Binding var selection: Int
     var badge: Int
+    /// 「通讯录」上那个小红点（有人加你为好友就亮，微信也是这样）
+    var contactsDot: Bool = false
     /// 「发现」上那个小红点（有人发朋友圈就亮）
     var momentsDot: Bool = false
 
@@ -88,6 +92,14 @@ struct TabBar: View {
                             }
                             // 发现：有人发朋友圈就一个红点（微信就是这样，不带数字）
                             if i == 2 && momentsDot {
+                                Circle()
+                                    .fill(C.red)
+                                    .frame(width: 9, height: 9)
+                                    .overlay(Circle().stroke(C.tabBg, lineWidth: 1.5))
+                                    .offset(x: 5, y: -3)
+                            }
+                            // 通讯录：有人加你好友就一个红点
+                            if i == 1 && contactsDot {
                                 Circle()
                                     .fill(C.red)
                                     .frame(width: 9, height: 9)

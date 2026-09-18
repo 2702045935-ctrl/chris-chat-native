@@ -1062,7 +1062,7 @@ struct AccountLoginSheet: View {
             }
             .sheet(isPresented: $showReg) { RegisterSheet() }
             .sheet(isPresented: $showUnban) {
-                UnbanSheet(username: username, password: password)
+                UnbanSheet(preUser: username, prePass: password)
             }
         }
     }

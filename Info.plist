@@ -22,6 +22,7 @@
   <key>UISupportedInterfaceOrientations</key>
   <array><string>UIInterfaceOrientationPortrait</string></array>
   <key>UIViewControllerBasedStatusBarAppearance</key><true/>
+  <key>NSFaceIDUsageDescription</key><string>CHRIS聊天 需要面容 ID 让你刷脸登录</string>
   <key>NSMicrophoneUsageDescription</key><string>CHRIS聊天 需要使用麦克风进行语音聊天和语音通话</string>
   <key>NSCameraUsageDescription</key><string>CHRIS聊天 需要使用摄像头拍照和视频通话</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>CHRIS聊天 需要使用语音识别，让你能跟 AI 助手说话</string>
@@ -43,3 +44,4 @@
   </dict>
 </dict>
 </plist>
+

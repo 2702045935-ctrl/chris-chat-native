@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 import UIKit
 
 /* ============================================================ 全局状态 */
@@ -819,6 +820,20 @@ struct LoginView: View {
                     .foregroundColor(LoginTheme.sub ?? Color(hexString: "#636366"))
                     .padding(.top, 24)
 
+                    /* 人脸识别登录：走系统 Face ID（人脸数据只在手机安全芯片里，App 拿不到）。
+                       通过以后直接用这台设备上存着的登录态进去；没登录过就先密码登一次。 */
+                    Button {
+                        faceLogin()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "faceid")
+                            Text("人脸识别登录")
+                        }
+                        .font(.system(size: 14))
+                        .foregroundColor(LoginTheme.accent)
+                    }
+                    .padding(.top, 12)
+
                     if let e = error {
                         Text(e)
                             .font(.system(size: 13))
@@ -998,6 +1013,33 @@ struct LoginView: View {
     }
 
     /// 点头像一键登录：用保存的令牌直接进去；过期了就提示重新输密码
+    /// 人脸识别登录：系统 Face ID 过了以后，用「当前选中的那个账号」的登录态进去
+    private func faceLogin() {
+        guard !quickBusy else { return }
+        let ctx = LAContext()
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
+            error = "这台设备还不能用人脸识别（要先在密码登录里登过一次，且手机支持 Face ID）"
+            return
+        }
+        let list = app.accounts
+        guard !list.isEmpty else {
+            error = "先用密码或手机号登录一次，之后就能刷脸进"
+            return
+        }
+        let acc = list[min(avatarIndex, list.count - 1)]
+        quickBusy = true
+        error = nil
+        ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
+                           localizedReason: "刷脸登录 CHRIS") { ok, _ in
+            DispatchQueue.main.async {
+                quickBusy = false
+                if ok { quickLogin(account: acc) }
+                else { error = "人脸没认出来，或者你取消了" }
+            }
+        }
+    }
+
     private func quickLogin(account: SavedAccount? = nil) {
         guard !quickBusy else { return }
         quickBusy = true
@@ -1598,3 +1640,4 @@ struct PhoneLoginView: View {
         }
     }
 }
+

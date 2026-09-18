@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SwiftUI          // 服务页样式里要算颜色（Color）
 
 /* ============================================================ 数据模型 */
 

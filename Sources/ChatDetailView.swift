@@ -112,7 +112,6 @@ struct ChatDetailView: View {
             }
 
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         .swipeBack { dismiss() }
         .navigationBarBackButtonHidden(true)

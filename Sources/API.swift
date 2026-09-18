@@ -446,14 +446,25 @@ final class API {
         _ = try? await request("POST", "/api/chats/\(chatId)/unread", body: [:])
     }
 
-    func deleteChat(chatId: String) async {
-        // 清空聊天记录 + 从列表里移除（微信的「删除」）
-        _ = try? await request("DELETE", "/api/chats/\(chatId)?clear=1")
+    /// 清空聊天记录 + 从列表里移除（微信的「删除」）。返回错误文案，nil = 成功
+    @discardableResult
+    func deleteChat(chatId: String) async -> String? {
+        await deleteChat(path: "/api/chats/\(chatId)?clear=1")
     }
 
-    func hideChat(chatId: String) async {
-        // 不显示该聊天：只从自己的列表里移除，对方不受影响
-        _ = try? await request("DELETE", "/api/chats/\(chatId)")
+    /// 不显示该聊天：只从自己的列表里移除，对方不受影响。返回错误文案，nil = 成功
+    @discardableResult
+    func hideChat(chatId: String) async -> String? {
+        await deleteChat(path: "/api/chats/\(chatId)")
+    }
+
+    private func deleteChat(path: String) async -> String? {
+        do {
+            _ = try await request("DELETE", path)
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "操作失败"
+        }
     }
 
     func openDirect(userId: String) async throws -> Chat? {

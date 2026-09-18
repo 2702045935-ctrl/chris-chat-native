@@ -140,6 +140,8 @@ struct MomentsView: View {
     var target: User? = nil
 
     @State private var offset: CGFloat = 0
+    /// 静止时「内容顶端」在屏幕上的位置，用来算往下滚了多少
+    @State private var baseY: CGFloat?
     @State private var moments: [Moment] = []
     @State private var cameraMenu = false
     @State private var showPhoto = false
@@ -156,7 +158,9 @@ struct MomentsView: View {
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
-    private var solid: Bool { offset < -(L.coverH - 52) }
+    /// （用屏幕坐标量「内容最顶端被推上去多少」，比命名坐标空间稳，任何机型都一样）
+    private var scrolled: CGFloat { max(0, (baseY ?? offset) - offset) }
+    private var solid: Bool { scrolled > (L.coverH - 52) }
     private var owner: User? { target ?? app.me }
     private var cover: String { owner?.momentCover ?? "" }
 
@@ -166,18 +170,20 @@ struct MomentsView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    /* 内容最顶端：把它的屏幕坐标报上来，用来看往下滚了多少 */
+                    GeometryReader { g in
+                        Color.clear.preference(key: OffsetKey.self,
+                                               value: g.frame(in: .global).minY)
+                    }
+                    .frame(height: 0)
                     coverView
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(key: OffsetKey.self,
-                                                       value: geo.frame(in: .named("moments")).minY)
-                            }
-                        )
                     momentList
                 }
             }
-            .coordinateSpace(name: "moments")
-            .onPreferenceChange(OffsetKey.self) { offset = $0 }
+            .onPreferenceChange(OffsetKey.self) { y in
+                if baseY == nil { baseY = y }
+                offset = y
+            }
             .ignoresSafeArea(edges: .top)
 
             navBar
@@ -185,6 +191,7 @@ struct MomentsView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
+        .onAppear { baseY = nil }
         .task { await reload() }
         // 别人发朋友圈 / 换了封面，这边立刻跟着变
         .onChange(of: realtime.event) { _ in
@@ -326,9 +333,9 @@ struct MomentsView: View {
 
             HStack(spacing: 0) {
                 Button { dismiss() } label: {
-                    SVGIcon(markup: I.backCover, size: 20, color: .white)
+                    SVGIcon(markup: I.backCover, size: 20, color: solid ? C.label : .white)
                         .frame(width: 36, height: 36)
-                        .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                        .shadow(color: solid ? .clear : Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 4)
@@ -336,9 +343,9 @@ struct MomentsView: View {
                 Spacer(minLength: 0)
 
                 Button { cameraMenu = true } label: {
-                    SVGIcon(markup: I.camera, size: 26, color: .white)
+                    SVGIcon(markup: I.camera, size: 26, color: solid ? C.label : .white)
                         .frame(width: 36, height: 36)
-                        .shadow(color: Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
+                        .shadow(color: solid ? .clear : Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 10)

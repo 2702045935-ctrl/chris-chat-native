@@ -85,9 +85,6 @@ struct SwipeChatRow: View {
 
             /* ② 操作按钮：画在最上层，只露出滑开的那一块 —— 这样点一定点得到 */
             actionButtons
-                .frame(width: fullW, height: L.rowH, alignment: .trailing)
-                .frame(width: max(0, -offset), height: L.rowH, alignment: .trailing)
-                .clipped()
                 .allowsHitTesting(offset != 0)
                 .zIndex(2)
         }
@@ -97,49 +94,51 @@ struct SwipeChatRow: View {
 
     private var actionButtons: some View {
         HStack(spacing: 0) {
-            actionButton("标为未读", Color(hex: 0x07C160), mode == .none ? btnW : 0) {
-                onUnread()
-                close()
-            }
-            actionButton(mode == .hideConfirm ? "不显示该聊天" : "不显示",
-                         Color(hex: 0xFA9D3C),
-                         mode == .hideConfirm ? fullW : (mode == .none ? btnW : 0)) {
-                if mode == .hideConfirm {
-                    onHide(false)
+            switch mode {
+            case .none:
+                /* 第一层：标为未读 / 不显示 / 删除，各一个按钮宽 */
+                bar("标为未读", Color(hex: 0x07C160), btnW) {
+                    onUnread()
                     close()
-                } else {
+                }
+                bar("不显示", Color(hex: 0xFA9D3C), btnW) {
                     mode = .hideConfirm
                     withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
                 }
-            }
-            actionButton(mode == .delConfirm ? "清空记录同时不显示聊天" : "删除",
-                         Color(hex: mode == .delConfirm ? 0xE75E58 : 0xFA5151),
-                         mode == .delConfirm ? fullW : (mode == .none ? btnW : 0)) {
-                if mode == .delConfirm {
-                    onDelete()
-                    close()
-                } else {
+                bar("删除", Color(hex: 0xFA5151), btnW) {
                     mode = .delConfirm
                     withAnimation(.easeOut(duration: 0.18)) { offset = -fullW }
                 }
+            case .hideConfirm:
+                /* 第二层：整条撑满，再点一下才真的不显示 */
+                bar("不显示该聊天", Color(hex: 0xFA9D3C), fullW) {
+                    onHide(false)
+                    close()
+                }
+            case .delConfirm:
+                /* 第二层：整条撑满，再点一下才真的删掉 */
+                bar("清空记录同时不显示聊天", Color(hex: 0xE75E58), fullW) {
+                    onDelete()
+                    close()
+                }
             }
         }
+        .frame(width: max(0, -offset), height: L.rowH, alignment: .trailing)
+        .clipped()
     }
 
-    private func actionButton(_ title: String, _ bg: Color, _ width: CGFloat,
-                              action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(pfExact(btnFont))
-                .foregroundColor(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: max(0, width), height: L.rowH)
-                .background(bg)
-                .clipped()
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+    /// 一个可以点的长条（不用 Button：Button 在会滑动的行里容易点不到）
+    private func bar(_ title: String, _ bg: Color, _ width: CGFloat,
+                     action: @escaping () -> Void) -> some View {
+        Text(title)
+            .font(pfExact(btnFont))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(width: max(0, width), height: L.rowH)
+            .background(bg)
+            .contentShape(Rectangle())
+            .onTapGesture { action() }
     }
 
     private var dragGesture: some Gesture {
@@ -299,21 +298,19 @@ struct ChatsView: View {
 
     private func hide(_ chat: Chat, clear: Bool) {
         Task {
-            if clear {
-                await API.shared.deleteChat(chatId: chat.id)
-            } else {
-                await API.shared.hideChat(chatId: chat.id)
-            }
+            let err = clear
+                ? await API.shared.deleteChat(chatId: chat.id)
+                : await API.shared.hideChat(chatId: chat.id)
             await app.loadChats()
-            app.show(clear ? "已清空记录并设为不显示" : "已不显示该聊天")
+            app.show(err ?? (clear ? "已清空记录并设为不显示" : "已不显示该聊天"))
         }
     }
 
     private func remove(_ chat: Chat) {
         Task {
-            await API.shared.deleteChat(chatId: chat.id)
+            let err = await API.shared.deleteChat(chatId: chat.id)
             await app.loadChats()
-            app.show("已删除")
+            app.show(err ?? "已删除")
         }
     }
 }

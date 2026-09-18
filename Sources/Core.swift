@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-19 00:45 转账页改用网页版那套"
+    static let build = "2026-09-19 01:05 聊天时间框"
 }
 
 /* ============================================================
@@ -261,6 +261,9 @@ enum C {
     static let bubbleOther = Color.dyn(0xFFFFFF, 0x2D2D30)
     static let bubbleText  = Color.dyn(0x191919, 0xEDEDED)
     static let msgTime     = Color(hex: 0xAEAEB2)
+    /// 聊天里那行时间的小框（后台「界面文字」里配：底色/文字色）
+    static var chatTimeBg  : Color { UIConfig.color("chatTimeBg", 0xE5E5E5, 0x2C2C2E) }
+    static var chatTimeInk : Color { UIConfig.color("chatTimeColor", 0x8A8A8E, 0x8A8A8E) }
     static let link        = Color.dyn(0x576B95, 0x7D90A9)
     static let arrow       = Color.dyn(0xB2B2B2, 0x8A8A8E)
     static let ringInk     = Color(UIColor { t in

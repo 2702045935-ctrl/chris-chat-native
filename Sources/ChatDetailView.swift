@@ -208,7 +208,12 @@ struct ChatDetailView: View {
                             if showTime(for: message) {
                                 Text(TimeFmt.bubble(message.createdAt))
                                     .font(pf(L.msgTimeSize))
-                                    .foregroundColor(C.msgTime)
+                                    .foregroundColor(C.chatTimeInk)
+                                    /* 时间加一个明显的圆角小框（和微信一样；颜色/圆角后台能调，只作用于聊天页） */
+                                    .padding(.horizontal, L.o("chatTimePadX", 8))
+                                    .padding(.vertical, L.o("chatTimePadY", 3))
+                                    .background(RoundedRectangle(cornerRadius: L.o("chatTimeRadius", 4), style: .continuous)
+                                        .fill(C.chatTimeBg))
                                     .frame(maxWidth: .infinity)
                                     .padding(.top, 12)
                                     .padding(.bottom, 16)

@@ -8,6 +8,8 @@ struct FavoritesView: View {
 
     @State private var items: [[String: Any]] = []
     @State private var loading = true
+    @State private var viewerPaths: [String] = []
+    @State private var viewerIndex: Int?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +35,8 @@ struct FavoritesView: View {
                             RemoteImage(path: content)
                                 .frame(width: 52, height: 52)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .contentShape(Rectangle())
+                                .onTapGesture { openPhoto(content) }
                         } else {
                             Text(content)
                                 .font(pf(15))
@@ -59,6 +63,20 @@ struct FavoritesView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .task { await load() }
+        .overlay {
+            if let i = viewerIndex, !viewerPaths.isEmpty {
+                PhotoPager(paths: viewerPaths, startIndex: i) { viewerIndex = nil }
+            }
+        }
+    }
+
+    /// 收藏里的图片也能点开看大图
+    private func openPhoto(_ path: String) {
+        let all = items.filter { (($0["kind"] as? String) ?? "") == "image" }
+            .compactMap { $0["content"] as? String }
+        guard !all.isEmpty else { return }
+        viewerPaths = all
+        viewerIndex = all.firstIndex(of: path) ?? 0
     }
 
     private func load() async {

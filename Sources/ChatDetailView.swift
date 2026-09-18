@@ -49,6 +49,8 @@ struct ChatDetailView: View {
     @State private var showCall = false
     @State private var billInfo: TransferInfo?
     @State private var uploading = false
+    /// 点开聊天里的图片：paths = 这个会话里所有图片，index = 点的那张
+    @State private var viewer: PhotoPager.Item?
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
@@ -99,6 +101,7 @@ struct ChatDetailView: View {
                         .background(RoundedRectangle(cornerRadius: 10).fill(C.cardBg))
                 }
             }
+
         }
         .background(C.navBg.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
@@ -119,6 +122,9 @@ struct ChatDetailView: View {
         }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)
+        }
+        .fullScreenCover(item: $viewer) { item in
+            PhotoPager(paths: item.paths, startIndex: item.index) { viewer = nil }
         }
         .sheet(isPresented: Binding(
             get: { billInfo != nil },
@@ -174,7 +180,8 @@ struct ChatDetailView: View {
                                        mine: message.senderId == myId,
                                        senderName: (!isGroup || message.senderId == myId)
                                            ? "" : displayName(message),
-                                       onTapTransfer: { info in billInfo = info })
+                                       onTapTransfer: { info in billInfo = info },
+                                       onOpenImage: { path in openImage(path) })
                                 .padding(.bottom, 15)
                                 .contextMenu {
                                     if message.senderId == myId {
@@ -381,6 +388,13 @@ struct ChatDetailView: View {
         send(kind: "text", content: text)
     }
 
+    /// 点聊天里的图片：把那一条所在的整个会话的图片都收进去，可以左右翻
+    private func openImage(_ path: String) {
+        let all = messages.filter { $0.kindName == "image" && !$0.isRecalled }.map { $0.body }
+        guard !all.isEmpty else { return }
+        viewer = PhotoPager.Item(paths: all, index: all.firstIndex(of: path) ?? 0)
+    }
+
     private func send(kind: String, content: String) {
         Task {
             do {
@@ -494,6 +508,8 @@ struct MessageRow: View {
     var senderName: String = ""
     /// 点转账卡片 → 打开账单详情
     var onTapTransfer: ((TransferInfo) -> Void)? = nil
+    /// 点图片 → 打开大图
+    var onOpenImage: ((String) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
 
@@ -551,6 +567,8 @@ struct MessageRow: View {
             RemoteImage(path: message.body, icon: "photo")
                 .frame(width: 140, height: 140)
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .contentShape(Rectangle())
+                .onTapGesture { onOpenImage?(message.body) }
 
         case "location":
             locationBubble

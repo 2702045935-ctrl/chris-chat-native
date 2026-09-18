@@ -668,36 +668,3 @@ struct GenderMark: View {
         .frame(width: size, height: size)
     }
 }
-
-/* 点小图看大图：黑底、左右翻、点一下返回（和微信一样，不带那个 × ） */
-struct PhotoPager: View {
-    let paths: [String]
-    let startIndex: Int
-    var onClose: () -> Void
-
-    @State private var index = 0
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            TabView(selection: $index) {
-                ForEach(paths.indices, id: \.self) { i in
-                    RemoteImage(path: paths[i], mode: .fit)
-                        .tag(i)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-
-            VStack {
-                Spacer()
-                Text("\(index + 1) / \(paths.count)")
-                    .font(pfExact(14))
-                    .foregroundColor(.white.opacity(0.85))
-                    .padding(.bottom, 26)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { onClose() }
-        .onAppear { index = min(max(0, startIndex), max(0, paths.count - 1)) }
-    }
-}

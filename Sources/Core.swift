@@ -617,3 +617,70 @@ struct FlexIcon: View {
         }
     }
 }
+
+/* ============================================================
+   点图看大图：黑底、左右翻、点一下返回（和微信一样，不带那个 × ）
+   聊天里的图、朋友圈的图、名片里的小图都用这一个。
+   ============================================================ */
+struct PhotoPager: View {
+    let paths: [String]
+    let startIndex: Int
+
+    /// 用 fullScreenCover 打开时需要的一个 Identifiable 包装
+    struct Item: Identifiable {
+        let id = UUID()
+        var paths: [String]
+        var index: Int
+    }
+    /// 长按保存到相册时用
+    var onLongPress: (() -> Void)? = nil
+    var onClose: () -> Void
+
+    @State private var index = 0
+    @State private var saved = false
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $index) {
+                ForEach(paths.indices, id: \.self) { i in
+                    RemoteImage(path: paths[i], mode: .fit)
+                        .tag(i)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            VStack {
+                Spacer()
+                Text(saved ? "已保存到相册" : (paths.count > 1 ? "\(index + 1) / \(paths.count)" : ""))
+                    .font(pfExact(14))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.bottom, 26)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { onClose() }
+        .onLongPressGesture {
+            if let cb = onLongPress { cb(); return }
+            save(index)
+        }
+        .onAppear { index = min(max(0, startIndex), max(0, paths.count - 1)) }
+    }
+
+    private func save(_ i: Int) {
+        guard i >= 0, i < paths.count else { return }
+        let path = paths[i]
+        Task {
+            var image: UIImage? = ImageStore.shared.get(path)
+            if image == nil, let url = API.shared.assetURL(path) {
+                if let (data, _) = try? await API.shared.session.data(from: url) {
+                    image = UIImage(data: data)
+                }
+            }
+            guard let img = image else { return }
+            UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+            saved = true
+        }
+    }
+}

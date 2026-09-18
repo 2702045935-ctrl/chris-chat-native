@@ -155,6 +155,9 @@ struct MomentsView: View {
     @State private var commenting: Moment?
     @State private var commentText = ""
     @State private var actionMoment: Moment?
+    /// 点开朋友圈的图片：paths = 这条动态的图片，index = 点的那张
+    @State private var viewerPaths: [String] = []
+    @State private var viewerIndex: Int?
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
@@ -187,6 +190,11 @@ struct MomentsView: View {
             .ignoresSafeArea(edges: .top)
 
             navBar
+
+            if let i = viewerIndex, !viewerPaths.isEmpty {
+                PhotoPager(paths: viewerPaths, startIndex: i) { viewerIndex = nil }
+                    .zIndex(40)
+            }
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -306,9 +314,9 @@ struct MomentsView: View {
                     .padding(.vertical, 40)
             }
             ForEach(moments) { moment in
-                MomentRow(moment: moment) {
-                    actionMoment = moment
-                }
+                MomentRow(moment: moment,
+                          onMore: { actionMoment = moment },
+                          onOpenImage: { path in openPhoto(path, in: moment) })
             }
         }
         .padding(.top, 60)
@@ -365,6 +373,13 @@ struct MomentsView: View {
     }
 
     /* ---------------------------------------------------------- 发表 / 评论 / 点赞 */
+
+    private func openPhoto(_ path: String, in moment: Moment) {
+        let all = moment.images ?? []
+        guard !all.isEmpty else { return }
+        viewerPaths = all
+        viewerIndex = all.firstIndex(of: path) ?? 0
+    }
 
     private var publishSheet: some View {
         NavigationView {
@@ -489,6 +504,8 @@ struct MomentsView: View {
 struct MomentRow: View {
     let moment: Moment
     var onMore: (() -> Void)? = nil
+    /// 点图片 → 看大图
+    var onOpenImage: ((String) -> Void)? = nil
 
     private var images: [String] { moment.images ?? [] }
     private var cols: Int {
@@ -592,6 +609,8 @@ struct MomentRow: View {
                         RemoteImage(path: rows[r][i], icon: "photo")
                             .frame(width: cellW, height: cellH)
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .contentShape(Rectangle())
+                            .onTapGesture { onOpenImage?(rows[r][i]) }
                     }
                     if rows[r].count < cols { Spacer(minLength: 0) }
                 }

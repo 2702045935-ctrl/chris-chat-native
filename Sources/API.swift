@@ -142,6 +142,45 @@ struct BrandInfo: Decodable, Hashable {
     var chatBackground: String?
     var fontScale: Double?
     var accentColor: String?
+    /// 登录页外观（后台「🎨 登录页」里配的）
+    var login: LoginBrand?
+}
+
+struct LoginBrand: Decodable, Hashable {
+    var accent: String?
+    var accent2: String?
+    var disabledAccent: String?
+    var disabledGray: String?
+    var bg: String?
+    var card: String?
+    var text: String?
+    var sub: String?
+    var bgImage: String?
+    var appName: String?
+    var subTitle: String?
+    var logo: String?
+}
+
+/// 登录页用的颜色（后台可改，默认值就是设计稿里的那几个）
+enum LoginTheme {
+    static var accent = Color(hexString: "#07C160")
+    static var accent2 = Color(hexString: "#007AFF")
+    static var disabledAccent = Color(hexString: "#B2E4C8")
+    static var disabledGray = Color(hexString: "#C7C7CC")
+    static var text: Color? = nil
+    static var sub: Color? = nil
+    static var pageBg: Color? = nil
+
+    static func apply(_ b: BrandInfo?) {
+        guard let l = b?.login else { return }
+        if let v = l.accent, !v.isEmpty { accent = Color(hexString: v) }
+        if let v = l.accent2, !v.isEmpty { accent2 = Color(hexString: v) }
+        if let v = l.disabledAccent, !v.isEmpty { disabledAccent = Color(hexString: v) }
+        if let v = l.disabledGray, !v.isEmpty { disabledGray = Color(hexString: v) }
+        if let v = l.text, !v.isEmpty { text = Color(hexString: v) }
+        if let v = l.sub, !v.isEmpty { sub = Color(hexString: v) }
+        if let v = l.bg, !v.isEmpty { pageBg = Color(hexString: v) }
+    }
 }
 
 struct PlusItem: Decodable, Identifiable, Hashable {

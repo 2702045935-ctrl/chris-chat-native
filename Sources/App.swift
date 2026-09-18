@@ -661,7 +661,7 @@ struct LoginView: View {
                         .padding(.top, 16)
                     Text("欢迎回来，请选择登录方式")
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(LoginTheme.sub ?? .secondary)
                         .padding(.top, 20)
 
                     Spacer(minLength: 48)
@@ -679,7 +679,7 @@ struct LoginView: View {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(isAgree ? Color(hexString: "#07C160") : Color(hexString: "#B2E4C8"))
+                        .background(isAgree ? LoginTheme.accent : LoginTheme.disabledAccent)
                         .cornerRadius(16)
                     }
                     .disabled(!isAgree)
@@ -687,11 +687,11 @@ struct LoginView: View {
                     // 手机号登录 ｜ 账号密码登录（保持你代码的样式，做成可点，否则没法登录）
                     HStack(spacing: 6) {
                         Button("手机号登录") { sheet = .phone }
-                        Text("｜").foregroundColor(Color(hexString: "#C7C7CC"))
+                        Text("｜").foregroundColor(LoginTheme.disabledGray)
                         Button("账号密码登录") { sheet = .password }
                     }
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hexString: "#636366"))
+                    .foregroundColor(LoginTheme.sub ?? Color(hexString: "#636366"))
                     .padding(.top, 24)
 
                     Spacer(minLength: 32)
@@ -700,9 +700,9 @@ struct LoginView: View {
                     HStack(alignment: .top, spacing: 8) {
                         Button { isAgree.toggle() } label: {
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(isAgree ? Color(hexString: "#07C160") : Color(hexString: "#C7C7CC"), lineWidth: 1.4)
+                                .stroke(isAgree ? LoginTheme.accent : LoginTheme.disabledGray, lineWidth: 1.4)
                                 .background(RoundedRectangle(cornerRadius: 3)
-                                    .fill(isAgree ? Color(hexString: "#07C160") : Color.clear))
+                                    .fill(isAgree ? LoginTheme.accent : Color.clear))
                                 .frame(width: 16, height: 16)
                                 .overlay(isAgree
                                          ? Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundColor(.white)
@@ -712,7 +712,7 @@ struct LoginView: View {
 
                         Text(.init("我已阅读并同意 [《用户协议》](terms://0) 和 [《隐私政策》](terms://1)"))
                             .font(.system(size: 12))
-                            .tint(Color(hexString: "#007AFF"))
+                            .tint(LoginTheme.accent2)
                             .environment(\.openURL, OpenURLAction { url in
                                 if url.scheme == "terms" {
                                     termsKind = Int(url.host ?? "0") ?? 0
@@ -752,8 +752,9 @@ struct LoginView: View {
         .onAppear {
             Task {
                 if let b = await API.shared.branding() {
-                    if let n = b.appName, !n.isEmpty { appName = n }
-                    if let lg = b.logo, !lg.isEmpty { logoPath = lg }
+                    LoginTheme.apply(b)
+                    if let n = b.login?.appName ?? b.appName, !n.isEmpty { appName = n }
+                    if let lg = b.login?.logo ?? b.logo, !lg.isEmpty { logoPath = lg }
                 }
             }
         }
@@ -813,7 +814,7 @@ struct AccountLoginSheet: View {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(Color(hexString: "#07C160"))
+                        .background(LoginTheme.accent)
                         .cornerRadius(16)
                     }
                     .disabled(busy)
@@ -821,7 +822,7 @@ struct AccountLoginSheet: View {
 
                     if mode == .password {
                         Button("还没有账号？去注册") { showReg = true }
-                            .font(.system(size: 13)).foregroundColor(Color(hexString: "#007AFF"))
+                            .font(.system(size: 13)).foregroundColor(LoginTheme.accent2)
                             .padding(.top, 16)
                     }
                 }
@@ -925,7 +926,7 @@ struct RegisterSheet: View {
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Color(hexString: "#07C160")).cornerRadius(16)
+                    .background(LoginTheme.accent).cornerRadius(16)
                 }
                 .disabled(busy)
                 .padding(.top, 20)
@@ -1128,7 +1129,7 @@ struct PhoneLoginView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white)
                                 .frame(width: 100, height: 52)
-                                .background(countDown > 0 ? Color(.systemGray3) : Color(hexString: "#007AFF"))
+                                .background(countDown > 0 ? LoginTheme.disabledGray : LoginTheme.accent2)
                                 .cornerRadius(12)
                         }
                         .disabled(countDown > 0 || phone.count != 11)
@@ -1145,7 +1146,7 @@ struct PhoneLoginView: View {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(canSubmit ? Color(hexString: "#007AFF") : Color(.systemGray3))
+                        .background(canSubmit ? LoginTheme.accent2 : LoginTheme.disabledGray)
                         .cornerRadius(16)
                     }
                     .disabled(!canSubmit)
@@ -1158,9 +1159,9 @@ struct PhoneLoginView: View {
                     HStack(alignment: .top, spacing: 8) {
                         Button { isAgree.toggle() } label: {
                             RoundedRectangle(cornerRadius: 3)
-                                .stroke(isAgree ? Color(hexString: "#007AFF") : Color(hexString: "#C7C7CC"), lineWidth: 1.4)
+                                .stroke(isAgree ? LoginTheme.accent2 : LoginTheme.disabledGray, lineWidth: 1.4)
                                 .background(RoundedRectangle(cornerRadius: 3)
-                                    .fill(isAgree ? Color(hexString: "#007AFF") : Color.clear))
+                                    .fill(isAgree ? LoginTheme.accent2 : Color.clear))
                                 .frame(width: 16, height: 16)
                                 .overlay(isAgree
                                          ? Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundColor(.white)
@@ -1170,7 +1171,7 @@ struct PhoneLoginView: View {
 
                         Text(.init("我已阅读并同意 [《用户协议》](terms://0) 和 [《隐私政策》](terms://1)"))
                             .font(.system(size: 12))
-                            .tint(Color(hexString: "#007AFF"))
+                            .tint(LoginTheme.accent2)
                             .environment(\.openURL, OpenURLAction { url in
                                 if url.scheme == "terms" {
                                     termsKind = Int(url.host ?? "0") ?? 0

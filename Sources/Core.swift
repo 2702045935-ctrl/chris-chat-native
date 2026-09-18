@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-18 23:00 金融体统一+¥单独字号"
+    static let build = "2026-09-18 23:20 ¥左上角对齐"
 }
 
 /* ============================================================
@@ -332,7 +332,7 @@ func pfMoney(_ size: CGFloat) -> Font {
 
 /// 金额拼成一段 Text：**¥ 可以单独用自己的字号**（微信那样比数字小）。
 /// curSize <= 0 就整段一个字号。
-func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0) -> Text {
+func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0, topAlign: Bool = false) -> Text {
     guard let r = text.range(of: "¥") else {
         return Text(text).font(pfMoney(size))
     }
@@ -340,7 +340,12 @@ func moneyText(_ text: String, size: CGFloat, curSize: CGFloat = 0) -> Text {
     let rest = String(text[r.upperBound...])
     let curFont = curSize > 0 ? pfMoney(curSize) : pfMoney(size)
     var out = Text(prefix).font(pfMoney(size))
-    out = out + Text("¥").font(curFont)
+    var cur = Text("¥").font(curFont)
+    /* 左上角对齐（和微信一样）：把钱号往上抬，抬多少 ≈ 两者字高差的 0.72 */
+    if topAlign, curSize > 0, curSize < size {
+        cur = cur.baselineOffset((size - curSize) * 0.72)
+    }
+    out = out + cur
     return out + Text(rest).font(pfMoney(size))
 }
 

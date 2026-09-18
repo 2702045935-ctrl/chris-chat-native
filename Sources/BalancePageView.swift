@@ -86,7 +86,7 @@ struct BalancePageView: View {
                 .foregroundColor(Color.dyn(0x000000, 0xEDEDED))
                 .padding(.top, st.gapTitleV)
 
-            moneyText(money(cfg?.balance ?? app.me?.balance ?? 0), size: st.amountFont, curSize: st.curFont)
+            moneyText(money(cfg?.balance ?? app.me?.balance ?? 0), size: st.amountFont, curSize: st.curFont, topAlign: true)
                 .monospacedDigit()          // 钱用等宽数字
                 .kerning(-1)
                 .foregroundColor(Color.dyn(0x000000, 0xEDEDED))

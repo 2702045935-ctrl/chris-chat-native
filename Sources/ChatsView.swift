@@ -253,7 +253,11 @@ struct ChatsView: View {
                             }
                         }
                     }
-                    .background(C.chatRowBg)
+                    /* 列表这一块故意不加底色（底色在下面那层 VStack 上）：
+                       下拉时消息整体往下走，顶上会空出一条，正好让顶栏那几个字
+                       从搜索框底下钻出来以后还能在这里继续跟着手指走。
+                       如果这里铺一层实底色，字就会被这块盖住，看起来像「不会跟手」。 */
+                    .background(Color.clear)
                     .refreshable { await app.loadChats() }
                     .coordinateSpace(name: "chatsScroll")
                 }

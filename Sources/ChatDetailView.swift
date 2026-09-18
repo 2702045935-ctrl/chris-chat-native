@@ -140,7 +140,10 @@ struct ChatDetailView: View {
             LocationSheet { payload in send(kind: "location", content: payload) }
         }
         .sheet(isPresented: $showTransfer) {
-            TransferView(chat: chat)
+            TransferPagesFlow(chatId: chat.id,
+                              peerName: chat.title,
+                              peerAccount: peerAccount,
+                              onClose: { showTransfer = false })
         }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)
@@ -540,6 +543,13 @@ struct ChatDetailView: View {
             if initial { app.show("聊天记录加载失败") }
         }
         loading = false
+    }
+    /// 转账页预填的「收款账号」：一对一会话里对方的微信号；找不到就留空让用户自己填
+    private var peerAccount: String {
+        if let t = chat.title, let u = app.contacts.first(where: { ($0.nickname ?? "") == t || ($0.name ?? "") == t }) {
+            return u.username ?? ""
+        }
+        return ""
     }
 }
 

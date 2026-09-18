@@ -108,6 +108,7 @@ struct Moment: Decodable, Identifiable, Hashable {
 
 private struct ChatsPayload: Decodable { var chats: [Chat] }
 private struct ChatPayload: Decodable { var chat: Chat? }
+private struct UsersPayload: Decodable { var users: [User] }
 private struct MessagesPayload: Decodable {
     var chat: Chat?
     var messages: [Message]
@@ -504,6 +505,19 @@ final class API {
     func chats() async throws -> [Chat] {
         let payload: ChatsPayload = try await get("/api/chats", as: ChatsPayload.self)
         return payload.chats
+    }
+
+    /// 按「微信号 / 手机号」精确找人（转账页填收款账号用）
+    func findUserByAccount(_ q: String) async throws -> User? {
+        let payload: UsersPayload = try await get("/api/users?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)", as: UsersPayload.self)
+        return payload.users.first
+    }
+
+    /// 拿一对一会话（转账需要 chatId）；不是好友会报错
+    func directChat(userId: String) async throws -> Chat {
+        let payload: ChatPayload = try await post("/api/chats/direct", ["userId": userId], as: ChatPayload.self)
+        guard let chat = payload.chat else { throw APIError.message("会话创建失败") }
+        return chat
     }
 
     func messages(chatId: String, limit: Int = 40, before: Int? = nil) async throws -> (chat: Chat?, messages: [Message], hasMore: Bool) {

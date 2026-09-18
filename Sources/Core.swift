@@ -814,3 +814,8 @@ enum LoginTheme {
         if let v = l.bg, !v.isEmpty { pageBg = Color(hexString: v) }
     }
 }
+/// 转账页颜色（默认 #007AFF / #34C759，后台「🎨 登录页」里改「手机号登录色」即可一起变）
+enum TransferTheme {
+    static var accent: Color { LoginTheme.accent2 }
+    static var success: Color { Color(hexString: "#34C759") }
+}

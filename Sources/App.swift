@@ -640,16 +640,16 @@ struct LoginView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 40)
 
-                    // App Logo
+                    // App Logo（你代码里是灰色圆形占位；后台配了 logo 就用 logo，没配就是灰圆）
                     Group {
                         if let p = logoPath {
                             RemoteImage(path: p, icon: "message.fill", mode: .fill)
                                 .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .clipShape(Circle())
                         } else if let img = AppIconImage.image {
                             Image(uiImage: img).resizable()
                                 .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .clipShape(Circle())
                         } else {
                             Circle()
                                 .frame(width: 80, height: 80)
@@ -733,7 +733,7 @@ struct LoginView: View {
                 .padding(.horizontal, 20)
                 .frame(minHeight: UIScreen.main.bounds.height - 120, alignment: .top)
             }
-            .background(C.loginBg.ignoresSafeArea())
+            .background(Color(.systemBackground).ignoresSafeArea())
             .navigationTitle("账号登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -178,6 +178,14 @@ final class AppState: ObservableObject {
         Realtime.shared.start()
     }
 
+    /// 身份证自助解封成功后走这里：等同于登录成功（解封接口会把登录态一起发下来）
+    func finishLogin(_ user: User) async {
+        me = user
+        rememberLastUser()
+        await refreshAll()
+        Realtime.shared.start()
+    }
+
     /// 记住这台设备上最后登录的人（登录页的圆圈用它显示头像）
     func rememberLastUser() {
         guard let me = me else { return }
@@ -982,6 +990,7 @@ struct AccountLoginSheet: View {
     @State private var busy = false
     @State private var error: String?
     @State private var showReg = false
+    @State private var showUnban = false
 
     var body: some View {
         NavigationStack {
@@ -1005,6 +1014,23 @@ struct AccountLoginSheet: View {
                         Text(e).font(.system(size: 13)).foregroundColor(C.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 12)
+                    }
+                    // 账号被禁用：直接给一个自助解封入口（填身份证号，服务器校验合法就解开）
+                    if isBanned {
+                        Button {
+                            showUnban = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.text.rectangle")
+                                Text("账号被禁用了？用身份证自助解封")
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(LoginTheme.accent2)
+                            .cornerRadius(14)
+                        }
+                        .padding(.top, 12)
                     }
                     Button { submit() } label: {
                         HStack(spacing: 8) {
@@ -1035,7 +1061,15 @@ struct AccountLoginSheet: View {
                 ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
             }
             .sheet(isPresented: $showReg) { RegisterSheet() }
+            .sheet(isPresented: $showUnban) {
+                UnbanSheet(username: username, password: password)
+            }
         }
+    }
+
+    private var isBanned: Bool {
+        let e = error ?? ""
+        return e.contains("禁用") || e.contains("封禁")
     }
 
     private func row<C: View>(@ViewBuilder _ c: () -> C) -> some View {
@@ -1079,6 +1113,97 @@ struct AccountLoginSheet: View {
 }
 
 /* ---------- 注册（图形验证码用 CaptchaView 画） ---------- */
+/* ---------- 身份证自助解封 ---------- */
+struct UnbanSheet: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    let preUser: String
+    let prePass: String
+
+    @State private var username = ""
+    @State private var password = ""
+    @State private var idCard = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("账号被管理员禁用后，可以在这里用身份证号自己解开。号码要真实合法（18 位，最后一位可能是 X）。同一张身份证只能绑定一个账号，解封动作会写进后台审计日志。")
+                        .font(.system(size: 12.5))
+                        .foregroundColor(.secondary)
+                        .padding(.bottom, 14)
+
+                    field { TextField("被封的账号（用户名 / 手机号）", text: $username)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled(true) }
+                    HairLine(color: C.navLine)
+                    field { SecureField("该账号的密码", text: $password) }
+                    HairLine(color: C.navLine)
+                    field { TextField("身份证号（18 位）", text: $idCard)
+                        .textInputAutocapitalization(.characters).autocorrectionDisabled(true) }
+
+                    if let e = error {
+                        Text(e).font(.system(size: 13)).foregroundColor(C.red)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 12)
+                    }
+
+                    Button { submit() } label: {
+                        HStack(spacing: 8) {
+                            if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
+                            Text(busy ? "正在核验…" : "提交并解封").font(.system(size: 16, weight: .medium))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(LoginTheme.accent)
+                        .cornerRadius(16)
+                    }
+                    .disabled(busy)
+                    .padding(.top, 20)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+            }
+            .background(Color(.systemBackground).ignoresSafeArea())
+            .navigationTitle("身份证自助解封")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
+            }
+        }
+        .onAppear {
+            if username.isEmpty { username = preUser }
+            if password.isEmpty { password = prePass }
+        }
+    }
+
+    private func field<C: View>(@ViewBuilder _ c: () -> C) -> some View {
+        HStack(spacing: 8) { c() }
+            .font(.system(size: 15))
+            .frame(height: 54).padding(.horizontal, 14)
+            .background(Color.dyn(0xFFFFFF, 0x1C1C1E))
+    }
+
+    private func submit() {
+        let u = username.trimmingCharacters(in: .whitespaces)
+        let idc = idCard.trimmingCharacters(in: .whitespaces).uppercased()
+        if u.isEmpty { error = "请填写被封的账号"; return }
+        if password.isEmpty { error = "请填写账号密码"; return }
+        if idc.count != 18 { error = "身份证要 18 位，最后一位可以是 X"; return }
+        busy = true; error = nil
+        Task {
+            do {
+                let user = try await API.shared.unban(username: u, password: password, idCard: idc)
+                await app.finishLogin(user)
+                app.show("解封成功，已登录")
+                dismiss()
+            } catch { self.error = (error as? APIError)?.errorDescription ?? "解封失败" }
+            busy = false
+        }
+    }
+}
+
 struct RegisterSheet: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss

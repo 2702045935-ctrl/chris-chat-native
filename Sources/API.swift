@@ -441,6 +441,17 @@ final class API {
         return user
     }
 
+    /// 账号被禁用后的「身份证自助解封」：服务器校验 18 位身份证（含校验位），
+    /// 通过就解封并把登录态直接发下来，所以调完这个就等于登录成功了。
+    @discardableResult
+    func unban(username: String, password: String, idCard: String) async throws -> User {
+        let payload: LoginPayload = try await post("/api/unban",
+                                                   ["username": username, "password": password, "idCard": idCard],
+                                                   as: LoginPayload.self)
+        guard let user = payload.user else { throw APIError.message("解封失败") }
+        return user
+    }
+
     /// 本地没接短信通道，服务器会直接把验证码给回来
     func phoneCode(phone: String) async throws -> String? {
         let payload: PhoneCodePayload = try await post("/api/login/phone-code",

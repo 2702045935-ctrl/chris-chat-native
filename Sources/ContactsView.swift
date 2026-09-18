@@ -234,7 +234,8 @@ struct ContactsView: View {
                 } label: {
                     Text(section.letter)
                         .font(pf(L.ctIdxSize))
-                        .foregroundColor(Color(hex: 0x555555))
+                        // 字号 / 颜色 / 行距都能在后台「界面文字」里调
+                        .foregroundColor(UIConfig.color("ctIdxColor", 0x555555, 0x8E8E93))
                         .frame(width: 22, height: L.ctIdxItemH)
                 }
                 .buttonStyle(.plain)

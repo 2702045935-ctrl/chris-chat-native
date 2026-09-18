@@ -52,6 +52,7 @@ struct ChatDetailView: View {
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
+    @State private var pushTask: Task<Void, Never>?
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -143,7 +144,13 @@ struct ChatDetailView: View {
         }
         // 服务器一推消息，立刻拉一次（不用等轮询）
         .onChange(of: realtime.event) { _ in
-            Task { await load(initial: false) }
+            // 一下子来很多条时合并成一次刷新，别把手机刷爆
+            pushTask?.cancel()
+            pushTask = Task {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                if Task.isCancelled { return }
+                await load(initial: false)
+            }
         }
     }
 

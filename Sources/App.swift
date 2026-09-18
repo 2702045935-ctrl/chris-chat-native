@@ -16,6 +16,18 @@ final class AppState: ObservableObject {
     /// 服务器上的界面配置变了就 +1，整个界面重建一次（不用重装 App）
     @Published var uiVersion = 0
     private var lastUIConfig = ""
+    private var refreshTask: Task<Void, Never>?
+
+    /// 把短时间内的很多次推送合并成一次刷新（比如一下子涌进来几百条消息）
+    private func coalesce(_ work: @escaping () async -> Void) {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            if Task.isCancelled { return }
+            await work()
+            self?.refreshTask = nil
+        }
+    }
 
     /// 长连接推过来的事情，安排界面去刷新
     func handle(_ ev: PushEvent) {
@@ -28,13 +40,13 @@ final class AppState: ObservableObject {
         }
         switch ev.type {
         case "message":
-            Task { await loadChats() }
+            coalesce { [weak self] in await self?.loadChats() }
         case "chat":
-            Task { await loadChats() }
+            coalesce { [weak self] in await self?.loadChats() }
         case "moment":
-            Task { await loadMoments() }
+            coalesce { [weak self] in await self?.loadMoments() }
         case "friend":
-            Task { await loadContacts() }
+            coalesce { [weak self] in await self?.loadContacts() }
         default:
             break
         }

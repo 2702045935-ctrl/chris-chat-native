@@ -78,11 +78,6 @@ struct ChatDetailView: View {
 
     var body: some View {
         ZStack {
-            C.pageBg.ignoresSafeArea()
-            if !backgroundPath.isEmpty {
-                RemoteImage(path: backgroundPath).ignoresSafeArea()
-            }
-
             VStack(spacing: 0) {
                 NavBar(title: chat.name, back: { dismiss() }) {
                     Button {
@@ -102,6 +97,17 @@ struct ChatDetailView: View {
                     .contentShape(Rectangle())
                     .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
                     .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
+            }
+            // 背景整屏铺在最底下：页面底色 +（有的话）聊天背景图。
+            // 这样顶栏那一条也一定是这张背景，不会漏出系统/窗口的白色。
+            .background {
+                ZStack {
+                    C.pageBg
+                    if !backgroundPath.isEmpty {
+                        RemoteImage(path: backgroundPath)
+                    }
+                }
+                .ignoresSafeArea()
             }
 
             if uploading {

@@ -126,7 +126,9 @@ struct ChatDetailView: View {
                    之前太透了，压一层白以后就是 iOS 那种「奶白磨砂」的观感 */
                 ZStack {
                     Rectangle().fill(.ultraThinMaterial)
-                    Color.dyn(0xFFFFFF, 0x1C1C1E).opacity(0.45)
+                    // 压白程度跟着后台「聊天页毛玻璃不透明度」走（0.5 起步，越大小越透）
+                    Color.dyn(0xFFFFFF, 0x1C1C1E)
+                        .opacity(max(0, min(0.5, UIConfig.num("glassAlpha", 0.8) - 0.5)))
                 }
                 .ignoresSafeArea(edges: .top)
             }
@@ -344,7 +346,8 @@ struct ChatDetailView: View {
         .background {
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
-                Color.dyn(0xFFFFFF, 0x1C1C1E).opacity(0.45)
+                Color.dyn(0xFFFFFF, 0x1C1C1E)
+                    .opacity(max(0, min(0.5, UIConfig.num("glassAlpha", 0.8) - 0.5)))
             }
             .ignoresSafeArea(edges: .bottom)
         }

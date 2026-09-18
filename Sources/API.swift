@@ -235,7 +235,7 @@ final class API {
     private let trustDelegate = TrustAllDelegate()
 
     private(set) var token: String = ""
-    private(set) var server: String = "192.168.2.7:5180"
+    private(set) var server: String = "192.168.2.7:5443"
 
     private init() {
         let cfg = URLSessionConfiguration.default
@@ -246,7 +246,7 @@ final class API {
         session = URLSession(configuration: cfg, delegate: trustDelegate, delegateQueue: nil)
 
         if let saved = UserDefaults.standard.string(forKey: "chris.server"), !saved.isEmpty {
-            server = saved
+            server = API.normalizeServer(saved)
         }
         // 令牌优先从钥匙串读（重装 App 也不掉），读不到再看老地方
         if let saved = Keychain.get("token") {
@@ -257,14 +257,24 @@ final class API {
         }
     }
 
-    var base: String { "http://\(server)" }
+    /* 一律走加密通道：http 会被同网段的人抓到账号密码。
+       证书是自签的，但 App 里带了信任代理（TrustAllDelegate），所以不用装证书也能连。 */
+    var base: String { "https://\(server)" }
 
-    func setServer(_ value: String) {
-        var v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// 把用户填的地址规范化：统一成 https + 5443（老地址 :5180 自动换成 :5443）
+    static func normalizeServer(_ raw: String) -> String {
+        var v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         v = v.replacingOccurrences(of: "https://", with: "")
         v = v.replacingOccurrences(of: "http://", with: "")
-        if v.hasSuffix("/") { v.removeLast() }
-        if !v.contains(":") { v += ":5180" }
+        while v.hasSuffix("/") { v.removeLast() }
+        if !v.contains(":") { v += ":5443" }
+        v = v.replacingOccurrences(of: ":5180", with: ":5443")
+        v = v.replacingOccurrences(of: ":80", with: ":5443")
+        return v
+    }
+
+    func setServer(_ value: String) {
+        let v = API.normalizeServer(value)
         guard !v.isEmpty else { return }
         server = v
         UserDefaults.standard.set(v, forKey: "chris.server")

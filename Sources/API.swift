@@ -353,7 +353,7 @@ final class API {
         let data = result.0
         let response = result.1
 
-        if let http = response as? HTTPURLResponse, token.isEmpty,
+        if let http = response as? HTTPURLResponse,
            let raw = http.value(forHTTPHeaderField: "Set-Cookie"),
            let range = raw.range(of: "chris_chat_session=") {
             let rest = raw[range.upperBound...]
@@ -815,3 +815,4 @@ extension UIImage {
         return out.jpegData(compressionQuality: quality)
     }
 }
+

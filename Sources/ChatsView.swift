@@ -205,17 +205,25 @@ struct ChatsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: navTitle) {
-                    Button {
-                        plusMenu = true
-                    } label: {
-                        FlexIcon(custom: IconOverrides.custom("nav.plus"),
-                                 size: UIConfig.num("navPlusSize", 20),
-                                 color: C.label, symbol: "plus")
-                            .frame(width: 44, height: L.navH)
+                /* 下拉时：顶栏这几个字（微信(N) + 右边那个＋号）跟着手往下滑走，搜索框不动。
+                   外面套一层固定「导航栏高度」并裁掉溢出，所以字滑出导航栏就没了，
+                   不会盖到下面的搜索框上。 */
+                ZStack(alignment: .top) {
+                    NavBar(title: navTitle) {
+                        Button {
+                            plusMenu = true
+                        } label: {
+                            FlexIcon(custom: IconOverrides.custom("nav.plus"),
+                                     size: UIConfig.num("navPlusSize", 20),
+                                     color: C.label, symbol: "plus")
+                                .frame(width: 44, height: L.navH)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .offset(y: pullY)          // 1:1 跟手，拉多少滑多少
                 }
+                .frame(height: L.navH)
+                .clipped()
 
                 SearchBoxCenter(text: $keyword)
                     .padding(L.searchPad)
@@ -248,20 +256,6 @@ struct ChatsView: View {
                     .background(C.chatRowBg)
                     .refreshable { await app.loadChats() }
                     .coordinateSpace(name: "chatsScroll")
-                    /* 下拉时「微信(数字)」跟着手往下走（和朋友圈那个不一样，它不是淡入出来的）：
-                       文字就压在列表顶边上面一点，拉多少就往下走多少，再往上拉就自己躲回去。
-                       最外层 .clipped() 负责把藏在上面的部分裁掉，所以不会盖到搜索框。 */
-                    .overlay(alignment: .top) {
-                        if pullY > 0.5 {
-                            Text(navTitle)
-                                .font(pf(UIConfig.num("navTitle", 17), .semibold))
-                                .foregroundColor(C.label)
-                                .frame(maxWidth: .infinity)
-                                .offset(y: pullY - 28)      // 1:1 跟手，没有阻尼也没有淡入
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .clipped()
                 }
             }
             .background(C.chatsTopBg.ignoresSafeArea(edges: .bottom))

@@ -174,8 +174,21 @@ struct StatusCategory: Decodable, Hashable {
     var items: [StatusItem]?
 }
 
+/// 发现页的一行（后台可以自由增删改）
+struct DiscoverItem: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String
+    var icon: String?
+    var svg: String?
+    var color: String?
+    var action: String?
+    var group: Int?
+    var enabled: Bool?
+}
+
 private struct StickersPayload: Decodable { var packs: [StickerPack]? }
 private struct StatusesPayload: Decodable { var categories: [StatusCategory]? }
+private struct DiscoverPayload: Decodable { var items: [DiscoverItem] }
 
 private struct PlusPayload: Decodable { var items: [PlusItem]? }
 private struct GiftsPayload: Decodable { var gifts: [Gift]? }
@@ -557,6 +570,12 @@ final class API {
     func statusCategories() async throws -> [StatusCategory] {
         let payload: StatusesPayload = try await get("/api/statuses", as: StatusesPayload.self)
         return payload.categories ?? []
+    }
+
+    /// 发现页那几行（后台配的，网页版和 App 共用一份）
+    func discover() async throws -> [DiscoverItem] {
+        let payload: DiscoverPayload = try await get("/api/discover", as: DiscoverPayload.self)
+        return payload.items.filter { $0.enabled != false }
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）

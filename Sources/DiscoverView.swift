@@ -3,6 +3,9 @@ import SwiftUI
 struct DiscoverView: View {
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
+    /// 后台配的发现页（加一行、改个名，重开 App 或切回本页就变）
+    @State private var items: [DiscoverItem] = []
+    @State private var loaded = false
     @ObservedObject private var realtime = Realtime.shared
 
     private var latestThumb: String {
@@ -19,54 +22,22 @@ struct DiscoverView: View {
                     .measure("discover.nav")
                 ScrollView {
                     VStack(spacing: 0) {
-                        GroupCard {
-                            MenuRow(icon: I.moments,
-                                    iconColor: Color(hex: 0x4A90D9),
-                                    title: "朋友圈",
-                                    badge: !latestThumb.isEmpty,
-                                    thumb: latestThumb,
-                                    onTap: { path.append("moments") })
+                        // 行数、名字、图标、颜色、分组全部来自后台配置
+                        ForEach(grouped.indices, id: \.self) { gi in
+                            GroupCard {
+                                ForEach(grouped[gi].indices, id: \.self) { ri in
+                                    let item = grouped[gi][ri]
+                                    if ri > 0 { rowLine }
+                                    MenuRow(icon: item.svg ?? I.moments,
+                                            iconColor: Color(hexString: item.color ?? "#4A90D9", fallback: 0x4A90D9),
+                                            title: item.label,
+                                            badge: item.action == "moments" && !latestThumb.isEmpty,
+                                            thumb: item.action == "moments" ? latestThumb : "",
+                                            onTap: { open(item) })
+                                }
+                            }
+                            GroupGap()
                         }
-                        GroupGap()
-
-                        GroupCard {
-                            MenuRow(icon: I.channels, iconColor: Color(hex: 0xF2943B),
-                                    title: "视频号", onTap: { path.append("soon:视频号") })
-                            rowLine
-                            MenuRow(icon: I.live, iconColor: Color(hex: 0xF4525B),
-                                    title: "直播", onTap: { path.append("soon:直播") })
-                        }
-                        GroupGap()
-
-                        GroupCard {
-                            MenuRow(icon: I.scan, iconColor: Color(hex: 0x3D83E7),
-                                    title: "扫一扫", onTap: { path.append("soon:扫一扫") })
-                            rowLine
-                            MenuRow(icon: I.shake, iconColor: Color(hex: 0x4489EA),
-                                    title: "摇一摇", onTap: { path.append("soon:摇一摇") })
-                        }
-                        GroupGap()
-
-                        GroupCard {
-                            MenuRow(icon: I.look, iconColor: Color(hex: 0x7275E9),
-                                    title: "看一看", onTap: { path.append("soon:看一看") })
-                            rowLine
-                            MenuRow(icon: I.searchRow, iconColor: Color(hex: 0x59C47E),
-                                    title: "搜一搜", onTap: { path.append("soon:搜一搜") })
-                        }
-                        GroupGap()
-
-                        GroupCard {
-                            MenuRow(icon: I.nearby, iconColor: Color(hex: 0x3D83E7),
-                                    title: "附近", onTap: { path.append("soon:附近") })
-                        }
-                        GroupGap()
-
-                        GroupCard {
-                            MenuRow(icon: I.game, iconColor: Color(hex: 0x9A6AE8),
-                                    title: "游戏", onTap: { path.append("soon:游戏") })
-                        }
-                        GroupGap()
 
                         Spacer().frame(height: 20)
                     }
@@ -79,14 +50,52 @@ struct DiscoverView: View {
             .navigationDestination(for: String.self) { key in
                 if key == "moments" {
                     MomentsView()
-                } else {
+                } else if key == "news" {
+                    ComingSoonView(title: "腾讯新闻")
+                } else if key.hasPrefix("soon:") {
                     ComingSoonView(title: String(key.dropFirst(5)))
+                } else {
+                    ComingSoonView(title: key)
                 }
             }
         }
         // 别人发了新朋友圈 → 发现页那个小图也跟着换
         .onChange(of: realtime.event) { ev in
             if ev.type == "moment" || ev.user != nil { Task { await app.loadMoments() } }
+            if ev.type == "ui" { Task { await loadItems() } }
+        }
+        .task {
+            if !loaded { await loadItems() }
+        }
+    }
+
+    /// 按 group 分组：同一组排在一张卡片里（和网页版一致）
+    private var grouped: [[DiscoverItem]] {
+        var out: [[DiscoverItem]] = []
+        var last: Int? = nil
+        for it in items {
+            let g = it.group ?? 1
+            if last == nil || g != last! { out.append([]); last = g }
+            out[out.count - 1].append(it)
+        }
+        return out
+    }
+
+    private func loadItems() async {
+        if let list = try? await API.shared.discover(), !list.isEmpty {
+            items = list
+            loaded = true
+        } else if items.isEmpty {
+            // 拉不到就先用内置那套，别让页面空着
+            items = DiscoverItem.builtin
+        }
+    }
+
+    private func open(_ item: DiscoverItem) {
+        switch item.action ?? "soon" {
+        case "moments": path.append("moments")
+        case "news": path.append("news")
+        default: path.append("soon:" + item.label)
         }
     }
 
@@ -96,6 +105,32 @@ struct DiscoverView: View {
 
     private var rowLine: some View {
         HairLine(inset: L.menuLineInset)
+    }
+}
+
+/* App 拉不到后台配置时用的兜底（和微信发现页一样的那几行） */
+extension DiscoverItem {
+    static var builtin: [DiscoverItem] {
+        [
+            DiscoverItem(id: "d01", label: "朋友圈", icon: "i.moments", svg: I.moments,
+                         color: "#4A90D9", action: "moments", group: 1, enabled: true),
+            DiscoverItem(id: "d02", label: "视频号", icon: "i.channels", svg: I.channels,
+                         color: "#F2943B", action: "soon", group: 2, enabled: true),
+            DiscoverItem(id: "d03", label: "直播", icon: "i.live", svg: I.live,
+                         color: "#F4525B", action: "soon", group: 2, enabled: true),
+            DiscoverItem(id: "d04", label: "扫一扫", icon: "i.scan", svg: I.scan,
+                         color: "#3D83E7", action: "soon", group: 3, enabled: true),
+            DiscoverItem(id: "d05", label: "摇一摇", icon: "i.shake", svg: I.shake,
+                         color: "#4489EA", action: "soon", group: 3, enabled: true),
+            DiscoverItem(id: "d06", label: "看一看", icon: "i.look", svg: I.look,
+                         color: "#7275E9", action: "soon", group: 4, enabled: true),
+            DiscoverItem(id: "d07", label: "搜一搜", icon: "i.searchRow", svg: I.searchRow,
+                         color: "#59C47E", action: "soon", group: 4, enabled: true),
+            DiscoverItem(id: "d08", label: "附近", icon: "i.nearby", svg: I.nearby,
+                         color: "#3D83E7", action: "soon", group: 5, enabled: true),
+            DiscoverItem(id: "d10", label: "游戏", icon: "i.game", svg: I.game,
+                         color: "#9A6AE8", action: "soon", group: 7, enabled: true)
+        ]
     }
 }
 

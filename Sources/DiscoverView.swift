@@ -233,6 +233,8 @@ struct MomentsView: View {
     @State private var pulling = false
     @State private var spin: Double = 0
     @State private var spinTask: Task<Void, Never>?
+    /// 最后一次拖动的时间：用来兜底收球（手指松开的手势回调有时候不会被叫到）
+    @State private var lastDragAt = Date(timeIntervalSince1970: 0)
     @ObservedObject private var realtime = Realtime.shared
 
     /// 和网页版一致：往下滚过「封面高度 - 52」时，顶部出现「朋友圈」三个字
@@ -286,6 +288,7 @@ struct MomentsView: View {
             .simultaneousGesture(
                 DragGesture(minimumDistance: 8)
                     .onChanged { v in
+                        lastDragAt = Date()
                         guard !sentinelGone else { return }        // 已经滚下去了，不算下拉
                         let dy = v.translation.height
                         if dy > 0 {
@@ -296,11 +299,28 @@ struct MomentsView: View {
                         }
                     }
                     .onEnded { _ in
+                        lastDragAt = Date()
                         if pullY > 60 && !pulling { startPullRefresh() }
                         if !pulling { pullY = 0 }
                     }
             )
             .ignoresSafeArea(edges: .top)
+
+            /* 看门狗：0.4 秒没有新的拖动就收球。手指松开的手势回调偶尔不会被叫到，
+               没有这个的话球会静止留在屏幕上。 */
+            .task(id: pullY > 0 || pulling) {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    if Task.isCancelled { return }
+                    if pulling { continue }
+                    if pullY > 0 && Date().timeIntervalSince(lastDragAt) > 0.4 {
+                        pullY = 0
+                        spin = 0
+                        return
+                    }
+                    if pullY <= 0 { return }
+                }
+            }
 
             navBar
 

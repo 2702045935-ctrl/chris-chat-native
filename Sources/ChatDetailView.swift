@@ -97,11 +97,11 @@ struct ChatDetailView: View {
                 }
 
                 messageList
-                    // 点一下聊天区域：表情/＋ 面板收回去，打字键盘也一起收起来（微信就是这样）
-                    .simultaneousGesture(TapGesture().onEnded {
-                        if panel != .none { panel = .none }
-                        if focused { focused = false }
-                    })
+                    // 点一下（哪怕是空白处）：表情/＋ 面板收回去，打字键盘也收起来
+                    // 再叠一层：手一滑动也收（微信就是这样）
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(TapGesture().onEnded { dismissTyping() })
+                    .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in dismissTyping() })
             }
 
             if uploading {
@@ -392,6 +392,12 @@ struct ChatDetailView: View {
         default:
             app.show("\(item.label ?? "")排在下一批")
         }
+    }
+
+    /// 收起打字键盘 / 表情面板（点聊天区域、或者滑动聊天区域时调用）
+    private func dismissTyping() {
+        if panel != .none { panel = .none }
+        if focused { focused = false }
     }
 
     private func sendText() {

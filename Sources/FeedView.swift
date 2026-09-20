@@ -126,6 +126,16 @@ struct ChannelsView: View {
             }
         }
         .task { await load() }
+        /* 进视频号就把音频通道设成「播放」：这样手机的静音键拨下去也有声音
+           （抖音就是这个行为），离开时再交还，别影响别人听歌。 */
+        .onAppear {
+            let s = AVAudioSession.sharedInstance()
+            try? s.setCategory(.playback, mode: .moviePlayback, options: [.mixWithOthers])
+            try? s.setActive(true)
+        }
+        .onDisappear {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     /* ---------------------------------------------------------- 顶部 */

@@ -23,14 +23,19 @@ struct CallView: View {
     @EnvironmentObject var app: AppState
 
     private var dark: Color { Color(red: 0.11, green: 0.11, blue: 0.12) }
-    /// 通话页背景：毛玻璃 + 压暗。压暗程度默认 85%，后台 ui.json 里写 callGlassAlpha 可调。
+    /* 通话页背景：毛玻璃。
+       之前写成「85% 黑压上去」，出来就是纯黑；现在是
+         ① 磨砂层（把背后的界面糊掉）—— callGlassAlpha 控制它的不透明度，默认 0.85
+         ② 一层很淡的暗色（保证白字看得清）—— callGlassTint 控制，默认 0.30
+       两个值都能在后台 ui.json 里调：越小越透，越大越暗。 */
     private var glassAlpha: CGFloat { UIConfig.num("callGlassAlpha", 0.85) }
+    private var glassTint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
 
-    /// 毛玻璃底色（来电、通话中都用它）
     private var glassBackground: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial)          // 磨砂
-            Color.black.opacity(glassAlpha)               // 85% 压暗
+            Rectangle().fill(.ultraThinMaterial)
+                .opacity(glassAlpha)
+            Color.black.opacity(glassTint)
         }
         .ignoresSafeArea()
     }
@@ -90,7 +95,6 @@ struct CallView: View {
                 bottomBar
             }
         }
-        .background(glassBackground)
     }
 
     private var statusText: String {

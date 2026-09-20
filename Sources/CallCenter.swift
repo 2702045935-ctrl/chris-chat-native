@@ -51,7 +51,8 @@ final class CallCenter: NSObject, ObservableObject {
     private var factory: RTCPeerConnectionFactory?
     private var pc: RTCPeerConnection?
     private var callId = ""
-    private var peerId = ""
+    /// 当前通话的对方（聊天页靠它判断"这通电话是不是跟这个人打的"）
+    private(set) var peerId = ""
     private var iAmCaller = false
     private var remoteOfferSDP: String?
     private var pendingIce: [RTCIceCandidate] = []

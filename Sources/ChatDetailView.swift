@@ -69,6 +69,24 @@ struct ChatDetailView: View {
         return ids.first(where: { $0 != myId })
     }
 
+    /// 这通电话是不是就跟当前这个会话的人在打（是的话聊天页顶部挂提示条）
+    private var callActiveHere: Bool {
+        let c = CallCenter.shared
+        guard c.phase.isBusy, let peer = peerUserId else { return false }
+        return c.peerId == peer
+    }
+
+    private var callBarText: String {
+        let c = CallCenter.shared
+        switch c.phase {
+        case .incoming:   return c.isVideo ? "邀请你视频通话" : "邀请你语音通话"
+        case .outgoing:   return c.isVideo ? "正在等待对方接受视频通话" : "正在等待对方接受语音通话"
+        case .connecting: return "正在接通…"
+        case .active:     return c.isVideo ? "正在视频通话中" : "正在语音通话中"
+        case .idle:       return ""
+        }
+    }
+
     /// 打给真人（WebRTC）：语音或视频
     private func startRealCall(video: Bool) {
         guard !isGroup else { app.show("群聊通话还没做，先在单聊里打"); return }
@@ -156,6 +174,29 @@ struct ChatDetailView: View {
                         .opacity(max(0, min(0.5, UIConfig.num("glassAlpha", 0.8) - 0.5)))
                 }
                 .ignoresSafeArea(edges: .top)
+            }
+
+            /* 通话中：顶栏下面挂一条绿提示，点一下回到通话界面（微信就是这样） */
+            if callActiveHere {
+                Button {
+                    CallCenter.shared.restore()
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(Color.white.opacity(0.92)).frame(width: 7, height: 7)
+                        Text(callBarText)
+                            .font(pf(13.5))
+                            .foregroundColor(.white)
+                        Spacer(minLength: 0)
+                        Text("回到通话 ›")
+                            .font(pf(13.5))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 34)
+                    .background(C.green)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
@@ -253,6 +294,16 @@ struct ChatDetailView: View {
                                     .padding(.top, 12)
                                     .padding(.bottom, 16)
                             }
+                            /* 系统消息（通话记录、撤回提示这种）：微信是居中一行灰字，没有头像和气泡 */
+                            if message.kindName == "system" {
+                                Text(message.body)
+                                    .font(pf(12.5))
+                                    .foregroundColor(C.msgTime)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 40)
+                                    .padding(.bottom, 15)
+                            } else {
                             MessageRow(message: message,
                                        mine: message.senderId == myId,
                                        senderName: (!isGroup || message.senderId == myId)
@@ -281,6 +332,7 @@ struct ChatDetailView: View {
                                         Label("举报", systemImage: "exclamationmark.bubble")
                                     }
                                 }
+                            }
                         }
                         .id(message.id)
                     }

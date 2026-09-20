@@ -74,6 +74,12 @@ struct TabBar: View {
     /// 底栏四个图标也允许在后台换掉
     private let customKeys = ["tab.chat", "tab.contacts", "tab.discover", "tab.me"]
 
+    /// 自己上传/换过的图标（SVG、图片）用多大：跟内置图标一样吃 tabIcon0…3 的设置，
+    /// 这样后台「界面文字」里调大小，两套图标一起变。
+    private func customSize(_ i: Int) -> CGFloat {
+        UIConfig.num("tabIcon\(i)", L.tabIconBox)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
@@ -87,10 +93,10 @@ struct TabBar: View {
                                    和内置图标一个观感（图片本身是透明底的黑图形）。 */
                                 if custom.hasPrefix("http") || custom.hasPrefix("/uploads") || custom.hasPrefix("data:") {
                                     RemoteImage(path: custom, template: true)
-                                        .frame(width: L.tabIconBox, height: L.tabIconBox)
+                                        .frame(width: customSize(i), height: customSize(i))
                                         .foregroundColor(selection == i ? C.green : C.tabInk)
                                 } else {
-                                    FlexIcon(custom: custom, size: L.tabIconBox,
+                                    FlexIcon(custom: custom, size: customSize(i),
                                              color: selection == i ? C.green : C.tabInk,
                                              symbol: items[i].0)
                                 }

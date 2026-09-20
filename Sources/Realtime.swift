@@ -45,6 +45,9 @@ final class Realtime: ObservableObject {
     private var socket: URLSessionWebSocketTask?
     private var loop: Task<Void, Never>?
     private var tick = 0
+    /// 是否走明文通道、连着失败几次了（见 start() 里的说明）
+    private var plainFallback = false
+    private var failCount = 0
     /// 推送洪水的节流：消息一秒钟来几千条时，不能每条都去通知界面（会把手机刷死）。
     /// 这里最多每 0.25 秒往界面发一次，攒着的那条在稍后合并发出去。
     private var pending: PushEvent?
@@ -52,8 +55,15 @@ final class Realtime: ObservableObject {
 
     func start() {
         stop()
-        guard !API.shared.token.isEmpty,
-              let url = URL(string: "ws://\(API.shared.server)/?token=\(API.shared.token)") else { return }
+        guard !API.shared.token.isEmpty else { return }
+        /* 服务器是加密口（5443，https/wss）。
+           以前这里写死了 ws://host:5443 —— 拿明文去握加密口，服务器直接 socket hang up，
+           于是实时推送一直是断的：聊天页不刷新、通话记录/转账状态也收不到。
+           现在默认 wss（和网页版一样），万一这个部署只开了明文口，再退回 ws://host:5180。 */
+        let host = API.shared.server
+        let plainHost = host.replacingOccurrences(of: ":5443", with: ":5180")
+        let raw = plainFallback ? "ws://\(plainHost)" : "wss://\(host)"
+        guard let url = URL(string: "\(raw)/?token=\(API.shared.token)") else { return }
         let task = API.shared.session.webSocketTask(with: url)
         socket = task
         task.resume()
@@ -69,10 +79,15 @@ final class Realtime: ObservableObject {
                     @unknown default: break
                     }
                     if !text.isEmpty { self.handle(text) }
+                    self.failCount = 0        // 收得到东西就说明这条通道是通的
                 } catch {
                     // 断了：3 秒后重连
                     self.connected = false
                     if Task.isCancelled { break }
+                    /* 连着失败 3 次就换另一种协议再试：加密口握不上就退回明文 5180，
+                       明文也连不上再换回加密，来回自愈，不会卡死在一种上。 */
+                    self.failCount += 1
+                    if self.failCount % 3 == 0 { self.plainFallback.toggle() }
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     if Task.isCancelled { break }
                     self.start()

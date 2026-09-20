@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-21 11:20 后台换图标/界面配置即时生效（服务器推 ui 通知，App 立刻重拉）；网页版底栏图标也接后台"
+    static let build = "2026-09-21 12:10 底栏支持自己上传的图片图标（模板渲染：选中绿/未选中灰）；换图标即时生效"
 }
 
 /* ============================================================
@@ -450,6 +450,9 @@ struct RemoteImage: View {
     let path: String
     var icon: String = "photo"
     var mode: ContentMode = .fill
+    /// 当「模板图」渲染：只取形状，颜色由外面的 foregroundColor 决定
+    /// （底栏那些自己上传的图标就是这么跟着选中状态变色的）
+    var template: Bool = false
 
     @State private var image: UIImage?
     @State private var started = false
@@ -458,7 +461,10 @@ struct RemoteImage: View {
         GeometryReader { geo in
             Group {
                 if let image = image {
-                    Image(uiImage: image).resizable().aspectRatio(contentMode: mode)
+                    Image(uiImage: image)
+                        .renderingMode(template ? .template : .original)
+                        .resizable()
+                        .aspectRatio(contentMode: mode)
                 } else {
                     ZStack {
                         Color.dyn(0xE9E9E9, 0x2C2C2E)

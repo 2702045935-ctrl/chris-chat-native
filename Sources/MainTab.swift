@@ -83,9 +83,17 @@ struct TabBar: View {
                     VStack(spacing: 4) {
                         ZStack(alignment: .topTrailing) {
                             if let custom = IconOverrides.custom(customKeys[i]) {
-                                FlexIcon(custom: custom, size: L.tabIconBox,
-                                         color: selection == i ? C.green : C.tabInk,
-                                         symbol: items[i].0)
+                                /* 自己上传的图片图标：当模板图渲染，这样选中变绿、未选中变灰，
+                                   和内置图标一个观感（图片本身是透明底的黑图形）。 */
+                                if custom.hasPrefix("http") || custom.hasPrefix("/uploads") || custom.hasPrefix("data:") {
+                                    RemoteImage(path: custom, template: true)
+                                        .frame(width: L.tabIconBox, height: L.tabIconBox)
+                                        .foregroundColor(selection == i ? C.green : C.tabInk)
+                                } else {
+                                    FlexIcon(custom: custom, size: L.tabIconBox,
+                                             color: selection == i ? C.green : C.tabInk,
+                                             symbol: items[i].0)
+                                }
                             } else {
                                 Image(systemName: selection == i ? items[i].1 : items[i].0)
                                     .font(iconFont(i))

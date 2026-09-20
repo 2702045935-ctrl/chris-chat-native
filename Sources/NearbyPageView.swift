@@ -4,9 +4,13 @@ import UIKit
 
 /* ============================================================
    附近的人（发现 → 附近）
-   —— 进来先定位、把位置报到服务器，再拉名单：按距离排，能筛性别、能打招呼。
-      微信的逻辑：要自己进过这个页面、并且半小时内报过位置，才会出现在别人名单里。
-   位置只保存在服务器的 data/nearby.json，半小时自动过期清掉；可隐身。
+   页面照桌面 vx 文件夹那张参考图量的（420×912pt 的截图）：
+     · 整页深色：页面 #111111、每一行 #191919、行与行之间没有分割线
+     · 行高 65pt；头像 46×46、左边距 8pt（圆角 5）
+     · 头像右边 13pt 起是两行字：第一行名字（17pt 白）、第二行距离（14pt 灰「500米以内」）
+     · 个性签名灰色，右对齐到右边距 16pt（最多两行）
+     · 顶部：‹ 返回 + 居中「附近的人」+ 右侧 ⋯（筛选/刷新/清除位置都在 ⋯ 里）
+   功能：进来先定位并上报（半小时有效），按距离排；可筛性别、可打招呼。
    ============================================================ */
 
 /// 定位：要一次「使用期间」权限，拿到一次坐标就够（不用一直跟）
@@ -71,75 +75,82 @@ struct NearbyPageView: View {
     @State private var people: [NearbyPerson] = []
     @State private var loading = false
     @State private var tip = ""
-    /// all / female / male —— 和微信那三个选项一样
+    /// all / female / male —— 和微信 ⋯ 里那三个选项一样
     @State private var filter = "all"
+    @State private var showMenu = false
 
     @State private var helloFor: NearbyPerson?
     @State private var helloText = "你好呀，我是在附近的人里看到你的"
     @State private var cardUser: User?
-    @State private var busy = false
 
-    private let filters: [(String, String)] = [("all", "全部"), ("female", "只看女生"), ("male", "只看男生")]
+    /* 参考图里的颜色（深色页面，不走全局主题） */
+    private let pageBg = Color(hex: 0x111111)
+    private let rowBg = Color(hex: 0x191919)
+    private let nameInk = Color.white
+    private let subInk = Color(hex: 0x929292)
+
+    private var filterTitle: String {
+        switch filter {
+        case "female": return "只看女生"
+        case "male": return "只看男生"
+        default: return "全部"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "附近的人", back: { dismiss() }) {
-                Button {
-                    Task { await reload(force: true) }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(C.label)
-                        .frame(width: 44, height: L.navH)
-                }
-                .buttonStyle(.plain)
-            }
-
-            /* 筛选：全部 / 只看女生 / 只看男生 */
-            HStack(spacing: 8) {
-                ForEach(filters, id: \.0) { f in
-                    Button {
-                        filter = f.0
-                        Task { await reload(force: false) }
-                    } label: {
-                        Text(f.1)
-                            .font(pf(14))
-                            .foregroundColor(filter == f.0 ? .white : C.label)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(Capsule().fill(filter == f.0 ? C.green : C.cardBg))
+            /* 顶栏：照参考图，深色 + 居中标题 + 右侧 ⋯ */
+            ZStack {
+                Text("附近的人")
+                    .font(pf(17, .semibold))
+                    .foregroundColor(nameInk)
+                HStack(spacing: 0) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundColor(nameInk)
+                            .frame(width: 44, height: L.navH)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 0)
+                    Button { showMenu = true } label: {
+                        Text("⋯")
+                            .font(pf(22))
+                            .foregroundColor(nameInk)
+                            .frame(width: 44, height: L.navH)
                     }
                     .buttonStyle(.plain)
                 }
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(C.pageBg)
+            .frame(height: L.navH)
+            .background(pageBg)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
                     if loc.denied {
-                        hint("需要定位权限才能看到附近的人\n去「设置 → CHRIS聊天 → 位置」打开")
+                        hint("需要定位权限才能看到附近的人\n去「设置 → CHRIS聊天 → 位置」打开", showSetting: true)
                     } else if loading && people.isEmpty {
-                        ProgressView().padding(.top, 60)
+                        ProgressView().tint(.white).padding(.top, 70)
                     } else if people.isEmpty {
-                        hint(tip.isEmpty ? "附近还没有人\n（让对方也进一次「附近的人」）" : tip)
+                        hint(tip.isEmpty
+                             ? "5 公里内还没有其他人\n（对方也要在这个页面里，并且就在你附近）"
+                             : tip, showSetting: false)
                     } else {
                         ForEach(people) { p in
                             personRow(p)
-                            HairLine(inset: 76)
                         }
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, 20)
             }
-            .background(C.pageBg)
+            .background(pageBg)
         }
-        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .background(pageBg.ignoresSafeArea(edges: .bottom))
+        .background(pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
+        /* 和微信一样：从左边缘往右一滑就回上一页（别的二级页都挂了这一个） */
+        .swipeBack { dismiss() }
         .navigationDestination(isPresented: Binding(
             get: { cardUser != nil },
             set: { if !$0 { cardUser = nil } }
@@ -147,6 +158,14 @@ struct NearbyPageView: View {
             if let u = cardUser {
                 ContactCardView(user: u, onOpenChat: { _ in cardUser = nil }, onOpenMoments: { _ in cardUser = nil })
             }
+        }
+        .confirmationDialog("", isPresented: $showMenu, titleVisibility: .hidden) {
+            Button("全部") { setFilter("all") }
+            Button("只看女生") { setFilter("female") }
+            Button("只看男生") { setFilter("male") }
+            Button("刷新") { Task { await reload(force: true) } }
+            Button("清除位置信息并退出", role: .destructive) { clearLocation() }
+            Button("取消", role: .cancel) { }
         }
         .alert("打招呼", isPresented: Binding(
             get: { helloFor != nil },
@@ -165,74 +184,68 @@ struct NearbyPageView: View {
         .onChange(of: loc.lat) { _ in Task { await reload(force: true) } }
     }
 
-    /* ---------------------------------------------------------- 一行 */
+    /* ---------------------------------------------------------- 一行（照参考图） */
 
     private func personRow(_ p: NearbyPerson) -> some View {
         Button {
             helloFor = p
         } label: {
-            HStack(spacing: 12) {
-                Avatar(path: p.avatar ?? "", size: 48, radius: 6)
+            HStack(alignment: .top, spacing: 13) {
+                Avatar(path: p.avatar ?? "", size: 46, radius: 5)
+                    .padding(.leading, 8)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 5) {
-                        Text(p.name)
-                            .font(pf(16))
-                            .foregroundColor(C.name)
-                            .lineLimit(1)
-                        Image(systemName: p.isFemale ? "female" : "male")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(p.isFemale ? Color(hex: 0xFA7FA8) : Color(hex: 0x4C9AFF))
-                    }
-                    Text(signature(p))
-                        .font(pf(13))
-                        .foregroundColor(C.preview)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(p.name)
+                        .font(pf(17))
+                        .foregroundColor(nameInk)
+                        .lineLimit(1)
+                    Text(p.distanceText)
+                        .font(pf(14))
+                        .foregroundColor(subInk)
                         .lineLimit(1)
                 }
+                .padding(.top, 1)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 8)
 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(p.distanceText)
-                        .font(pf(13))
-                        .foregroundColor(C.label)
-                    Text(p.timeText)
-                        .font(pf(12))
-                        .foregroundColor(C.time)
+                if !signature(p).isEmpty {
+                    Text(signature(p))
+                        .font(pf(13.5))
+                        .foregroundColor(subInk)
+                        .multilineTextAlignment(.trailing)
+                        .lineLimit(2)
+                        .frame(maxWidth: 150, alignment: .trailing)
+                        .padding(.top, 3)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(C.cardBg)
+            .padding(.trailing, 16)
+            .frame(height: 65, alignment: .top)
+            .background(rowBg)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button {
-                openCard(p)
-            } label: {
+            Button { openCard(p) } label: {
                 Label("查看资料", systemImage: "person.text.rectangle")
-            }
-            if let m = p.moments, m > 0 {
-                Text("朋友圈 \(m) 条")
             }
         }
     }
 
+    /// 右边那列灰字：优先个性签名，其次简介；好友就直接写「已经是好友」
     private func signature(_ p: NearbyPerson) -> String {
         if let m = p.moodText, !m.isEmpty { return m }
         if let b = p.bio, !b.isEmpty { return b }
-        if let r = p.region, !r.isEmpty { return r }
-        return p.friend == true ? "已经是好友" : "打个招呼吧"
+        if p.friend == true { return "已经是好友" }
+        return ""
     }
 
-    private func hint(_ text: String) -> some View {
-        VStack(spacing: 8) {
+    private func hint(_ text: String, showSetting: Bool) -> some View {
+        VStack(spacing: 10) {
             Text(text)
                 .font(pf(14))
-                .foregroundColor(C.subLabel)
+                .foregroundColor(subInk)
                 .multilineTextAlignment(.center)
-            if loc.denied {
+            if showSetting {
                 Button("去设置里打开") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
@@ -243,10 +256,15 @@ struct NearbyPageView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 70)
+        .padding(.top, 80)
     }
 
     /* ---------------------------------------------------------- 数据 */
+
+    private func setFilter(_ f: String) {
+        filter = f
+        Task { await reload(force: true) }
+    }
 
     private func reload(force: Bool) async {
         if loading && !force { return }
@@ -260,7 +278,16 @@ struct NearbyPageView: View {
             people = try await API.shared.nearby(lat: loc.lat, lng: loc.lng, gender: filter)
             tip = ""
         } catch {
-            tip = (error as? APIError)?.errorDescription ?? "加载失败，下拉重试"
+            tip = (error as? APIError)?.errorDescription ?? "加载失败"
+        }
+    }
+
+    private func clearLocation() {
+        Task {
+            try? await API.shared.nearbyClear()
+            people = []
+            app.show("已清除位置信息")
+            dismiss()
         }
     }
 
@@ -274,7 +301,6 @@ struct NearbyPageView: View {
                 _ = try await API.shared.nearbyHello(userId: p.id, text: say)
                 app.show("已打招呼")
                 await app.loadChats()
-                await app.refreshAll()
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发送失败")
             }

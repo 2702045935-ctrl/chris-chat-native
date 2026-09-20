@@ -121,11 +121,14 @@ struct NearbyPerson: Decodable, Identifiable, Hashable {
 
     var name: String { (nickname?.isEmpty == false) ? nickname! : "附近的人" }
     var isFemale: Bool { (gender ?? "") == "female" }
-    /// 距离文字：不到 1 公里说「xxx m」，其它说「x.x km」
+    /// 距离文字：照参考图那种微信写法 —— 不到 1 公里「500米以内」，超过就「1.2公里以内」
     var distanceText: String {
-        guard let km = km else { return "距离未知" }
-        if km < 1 { return "\(max(10, Int((km * 1000).rounded() / 10) * 10)) m" }
-        return String(format: "%.1f km", km)
+        guard let km = km else { return "" }
+        if km < 1 {
+            let m = max(100, Int(ceil(km * 1000 / 100)) * 100)      // 往大取到 100 米
+            return "\(m)米以内"
+        }
+        return String(format: "%.1f公里以内", km)
     }
     var timeText: String {
         guard let m = minutes else { return "" }
@@ -982,6 +985,11 @@ final class API {
                                                          ["userId": userId, "text": text],
                                                          as: NearbyHelloPayload.self)
         return payload.chatId ?? ""
+    }
+
+    /// 清除自己的位置（从附近的人里消失，和微信的「清除位置信息并退出」一样）
+    func nearbyClear() async throws {
+        _ = try await request("DELETE", "/api/nearby")
     }
 
     func chats() async throws -> [Chat] {

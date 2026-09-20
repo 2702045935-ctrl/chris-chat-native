@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-21 03:55 修复：通话失败不再秒关（显示原因+提示）；打不通也记进聊天"
+    static let build = "2026-09-21 04:20 通话失败不再秒关；会话列表底色可在后台单独调（chatsPageBg/chatsRowBg）"
 }
 
 /* ============================================================
@@ -271,6 +271,10 @@ enum C {
     static var tabInk      : Color { UIConfig.color("tabInkColor", 0x191919, 0xB5B5B5) }
     /// 会话列表页顶部（导航栏 + 搜索框那一块）的底色：按你给的 #F7F7F7
     static var chatsTopBg  : Color { UIConfig.color("chatsTopBg", 0xF7F7F7, 0x18181A) }
+    /* 会话列表（第一页面）自己的两个底色：默认和通讯录一致（页面底色 / 卡片底色）。
+       想让它和通讯录不一样，就在后台「界面文字 → 颜色」里单独改这两项，不用重新打 App。 */
+    static var chatsPageBg : Color { UIConfig.color("chatsPageBg", 0xEDEDED, 0x0B0B0D) }
+    static var chatsRowBg  : Color { UIConfig.color("chatsRowBg", 0xFFFFFF, 0x1C1C1E) }
     static let bubbleMine  = Color.dyn(0x95EC69, 0x3EB575)
     static let bubbleOther = Color.dyn(0xFFFFFF, 0x2D2D30)
     static let bubbleText  = Color.dyn(0x191919, 0xEDEDED)

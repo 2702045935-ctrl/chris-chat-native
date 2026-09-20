@@ -68,7 +68,7 @@ struct SwipeChatRow: View {
 
     /* 会话列表每一行也用「卡片底色」，和通讯录的卡片一个色；
        置顶的仍然用置顶色区分一下 */
-    private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.cardBg }
+    private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.chatsRowBg }
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -235,7 +235,7 @@ struct ChatsView: View {
                             SearchBoxCenter(text: $keyword)
                                 .padding(L.searchPad)
                                 /* 和通讯录一样用「页面底色」，两页看着才是同一个色 */
-                                .background(C.pageBg)
+                                .background(C.chatsPageBg)
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,
@@ -258,8 +258,8 @@ struct ChatsView: View {
             }
             /* 第一页面（会话列表）的底色跟通讯录统一：都用后台的「页面底色」pageBg，
                以前这里用的是 navBg，深色下比通讯录浅一档（#18181A vs #0B0B0D）。 */
-            .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-            .background(C.pageBg.ignoresSafeArea(edges: .top))
+            .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
+            .background(C.chatsPageBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
@@ -304,7 +304,7 @@ struct ChatsView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .background(C.pageBg)
+        .background(C.chatsPageBg)
     }
 
     private func markUnread(_ chat: Chat) {

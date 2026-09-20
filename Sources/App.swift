@@ -375,6 +375,12 @@ struct RootView: View {
             }
         }
         .onChange(of: realtime.event) { ev in
+            /* 后台换了图标/界面配置：服务器会推一条 type=ui，收到就立刻重拉，
+               这样不用划掉 App 重开也能看到新图标。 */
+            if ev.type == "ui" {
+                Task { await app.refreshUI(force: true) }
+                return
+            }
             app.handle(ev)
         }
     }

@@ -49,6 +49,7 @@ struct ChannelsView: View {
     @State private var publishDesc = ""
     @State private var publishMusic = ""
     @State private var pendingVideoPath = ""
+    @State private var uploadMB: Double = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -112,7 +113,7 @@ struct ChannelsView: View {
             Button("发表") { publish() }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("视频已经传好，补充一句文案")
+            Text(uploadMB > 0 ? String(format: "视频已经传好（压缩后 %.1f MB），补充一句文案", uploadMB) : "视频已经传好，补充一句文案")
         }
         .photosPicker(isPresented: $pickOpen, selection: $picked, matching: .videos)
         .onChange(of: picked) { v in Task { await uploadPicked(v) } }
@@ -259,16 +260,45 @@ struct ChannelsView: View {
             guard let data = try await v.loadTransferable(type: Data.self), !data.isEmpty else {
                 app.show("读不到这个视频"); return
             }
+            /* 手机视频动辄几十上百 MB，先在本机压到 720p 再传：
+               体积小一大截，上传快、服务器也扛得住。压不动就用原文件。 */
+            let raw = FileManager.default.temporaryDirectory.appendingPathComponent("feed-raw-\(UUID().uuidString).mov")
+            try data.write(to: raw)
+            let uploadData: Data
+            if let small = await Self.compress(raw), !small.isEmpty {
+                uploadData = small
+            } else {
+                uploadData = data
+            }
+            try? FileManager.default.removeItem(at: raw)
             let payload: [String: Any] = [
-                "dataUrl": "data:video/mp4;base64," + data.base64EncodedString(),
+                "dataUrl": "data:video/mp4;base64," + uploadData.base64EncodedString(),
                 "filename": "feed.mp4"
             ]
             let up = try await API.shared.rawUpload(payload)
             pendingVideoPath = up.url
+            uploadMB = Double(uploadData.count) / 1024 / 1024
             showPublish = true
         } catch {
             app.show((error as? APIError)?.errorDescription ?? "上传失败（视频别超过 20MB）")
         }
+    }
+
+    /// 把视频压成 720p（H.264），返回压缩后的数据；失败返回 nil
+    nonisolated static func compress(_ url: URL) async -> Data? {
+        let asset = AVURLAsset(url: url)
+        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else { return nil }
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("feed-out-\(UUID().uuidString).mp4")
+        export.outputURL = out
+        export.outputFileType = .mp4
+        export.shouldOptimizeForNetworkUse = true
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            export.exportAsynchronously { c.resume() }
+        }
+        guard export.status == .completed else { return nil }
+        let d = try? Data(contentsOf: out)
+        try? FileManager.default.removeItem(at: out)
+        return d
     }
 
     private func publish() {

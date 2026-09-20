@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreLocation
+import CoreMotion
 import AudioToolbox
 
 /* ============================================================
@@ -10,6 +11,31 @@ import AudioToolbox
    5 分钟内不会重复摇到同一个人。没有人在摇就提示「再摇一摇」。
    一个页面深色到底（和微信一样），中间一个大手掌图标，摇到人以后显示对方卡片。
    ============================================================ */
+
+/// 真·摇手机：直接读加速度计（静止时约 1.0g，猛摇会冲到 2g 以上）。
+/// UIKit 的 motionShake 有时候会被输入框之类的东西抢走，所以两个一起用，摇得动就一定触发。
+final class ShakeMotion: ObservableObject {
+    private let mgr = CMMotionManager()
+    private var lastShake = Date(timeIntervalSince1970: 0)
+    var onShake: () -> Void = { }
+
+    func start() {
+        guard mgr.isAccelerometerAvailable, !mgr.isAccelerometerActive else { return }
+        mgr.accelerometerUpdateInterval = 1.0 / 50.0
+        mgr.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let self = self, let a = data?.acceleration else { return }
+            let mag = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
+            guard mag > 2.3 else { return }                       // 轻轻碰不算，得真甩
+            guard Date().timeIntervalSince(self.lastShake) > 1.2 else { return }   // 一次摇只算一下
+            self.lastShake = Date()
+            self.onShake()
+        }
+    }
+
+    func stop() {
+        if mgr.isAccelerometerActive { mgr.stopAccelerometerUpdates() }
+    }
+}
 
 /// 真摇手机：UIKit 的 motionShake 事件（不用申请任何权限）
 struct ShakeDetector: UIViewControllerRepresentable {
@@ -47,6 +73,7 @@ struct ShakePageView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var loc = NearbyLocator()
+    @StateObject private var motion = ShakeMotion()
 
     @State private var result: NearbyPerson?
     @State private var shaking = 0
@@ -121,7 +148,12 @@ struct ShakePageView: View {
         } message: {
             Text("给 \(result?.name ?? "") 发一条消息")
         }
-        .task { loc.start() }
+        .task {
+            loc.start()
+            motion.onShake = { shake() }
+            motion.start()
+        }
+        .onDisappear { motion.stop() }
     }
 
     /* ---------------------------------------------------------- 界面 */

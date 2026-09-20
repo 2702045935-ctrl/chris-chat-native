@@ -30,6 +30,7 @@
   <key>NSPhotoLibraryAddUsageDescription</key><string>CHRIS聊天 需要把图片保存到相册</string>
   <key>NSLocalNetworkUsageDescription</key><string>CHRIS聊天 需要访问局域网里的聊天服务器</string>
   <key>NSLocationWhenInUseUsageDescription</key><string>CHRIS聊天 需要用位置来显示「附近的人」（只在你看这个页面时用一次，不会一直跟踪）</string>
+  <key>NSMotionUsageDescription</key><string>CHRIS聊天 需要读取运动数据来实现「摇一摇」（摇手机找人，不会记录你的运动）</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key><true/>

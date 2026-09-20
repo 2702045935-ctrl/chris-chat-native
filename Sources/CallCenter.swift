@@ -40,6 +40,11 @@ final class CallCenter: NSObject, ObservableObject {
     @Published private(set) var speakerOn = false
     @Published private(set) var seconds = 0
     @Published private(set) var tip = ""
+    /// 通话刚结束的那 1.4 秒：通话页先别收，把原因（对方不在线 / 对方无应答…）显示完。
+    /// 以前是一有事就 phase = .idle，用户看到的就是「通话页一闪就没了」。
+    @Published private(set) var ending = false
+    /// 每给一句提示就 +1：界面拿它弹一个 toast（通话页收起来以后也看得到）
+    @Published private(set) var tipTick = 0
     /// 给界面渲染用的远端 / 本地画面
     @Published private(set) var remoteVideo: RTCVideoTrack?
     @Published private(set) var localVideo: RTCVideoTrack?
@@ -432,7 +437,20 @@ final class CallCenter: NSObject, ObservableObject {
         muted = false
         cameraOff = false
         if !wasIdle {
-            phase = .idle
+            if tip.isEmpty {
+                phase = .idle
+            } else {
+                /* 有原因就先在屏幕上停 1.4 秒把话说完（对方不在线 / 对方无应答 / 已取消…），
+                   同时给界面发一个 toast —— 不然通话页一闪就没了，用户什么也没看到。 */
+                ending = true
+                tipTick += 1
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 1_400_000_000)
+                    guard let self = self else { return }
+                    self.ending = false
+                    self.phase = .idle
+                }
+            }
         }
     }
 

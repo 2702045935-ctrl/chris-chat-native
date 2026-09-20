@@ -41,6 +41,12 @@ struct MainTabView: View {
            「上下缩放」就是这么来的。改成不给容器加动画：标签栏直接让位，页面照常推进来。 */
         /* 真人语音/视频通话：来电、通话界面挂在最外层，任何页面都能弹出来 */
         .overlay(CallOverlay())
+        /* 通话结束时给一句提示（对方不在线 / 对方无应答 / 已取消…）：
+           通话页收起来以后，页面上也还能看到这行字 */
+        .onChange(of: CallCenter.shared.tipTick) { _ in
+            let t = CallCenter.shared.tip
+            if !t.isEmpty { app.show(t) }
+        }
     }
 }
 

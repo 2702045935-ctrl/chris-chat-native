@@ -19,9 +19,24 @@ struct CallOverlay: View {
     @ObservedObject private var call = CallCenter.shared
 
     var body: some View {
-        if call.phase != .idle {
+        if call.phase != .idle && !call.ending {
             CallView()
                 .zIndex(999)
+        } else if call.ending {
+            /* 通话刚结束（或者根本没接通）：别直接消失，先把原因显示完再说 ——
+               用户反馈的「通话页秒弹关闭、什么提示都没有」就是这一段。 */
+            ZStack {
+                Color.black.opacity(0.28).ignoresSafeArea()
+                Text(call.tip.isEmpty ? "通话已结束" : call.tip)
+                    .font(pf(15))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.black.opacity(0.72)))
+            }
+            .zIndex(999)
+            .transition(.opacity)
         }
     }
 }

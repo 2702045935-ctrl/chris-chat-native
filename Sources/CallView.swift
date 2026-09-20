@@ -199,8 +199,11 @@ struct CallView: View {
             if call.phase == .incoming {
                 // 来电：拒接 + 接听
                 roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
-                roundKey(icon: "phone.fill", label: "接听",
-                         bg: Color(hex: 0x07C160)) { call.accept() }
+                roundKey(label: "接听", bg: Color(hex: 0x07C160), ink: .white,
+                         action: { call.accept() }) {
+                    Image(systemName: "phone.fill")
+                        .font(.system(size: 27, weight: .medium))
+                }
             } else {
                 roundKey(icon: call.muted ? "mic.slash.fill" : "mic.fill",
                          label: call.muted ? "麦克风已关" : "麦克风已开",

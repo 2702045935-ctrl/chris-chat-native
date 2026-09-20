@@ -30,6 +30,13 @@ struct PushEvent: Equatable {
     var callCandidate: String? = nil
     /// 挂断原因：hangup / rejected / cancel / timeout / offline / disconnected
     var callReason = ""
+    /* ---- 直播专场（弹幕/点赞/在线人数） ---- */
+    var roomId = ""
+    var liveAction = ""
+    var liveText = ""
+    var liveFrom = ""
+    var watching = 0
+    var likes = 0
     var tick = 0
 }
 
@@ -148,6 +155,13 @@ final class Realtime: ObservableObject {
         ev.callPeerAvatar = (obj["peerAvatar"] as? String) ?? ""
         ev.callError = (obj["error"] as? String) ?? ""
         ev.callReason = (obj["reason"] as? String) ?? ""
+        // 直播：进的哪个房间、什么动作（弹幕/点赞/人数）、谁说的、多少人
+        ev.roomId = (obj["roomId"] as? String) ?? ""
+        ev.liveAction = (obj["action"] as? String) ?? ""
+        ev.liveText = (obj["text"] as? String) ?? ""
+        ev.liveFrom = (obj["from"] as? String) ?? ""
+        if let w = obj["watching"] as? Int { ev.watching = w }
+        if let l = obj["likes"] as? Int { ev.likes = l }
         // WebRTC 协商内容：SDP 和 ICE 候选（网页版也是这么传的）
         if let sdp = obj["sdp"] as? [String: Any] { ev.callSDP = (sdp["sdp"] as? String) ?? "" }
         if let cand = obj["candidate"] as? [String: Any],

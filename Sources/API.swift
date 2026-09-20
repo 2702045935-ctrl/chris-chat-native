@@ -153,6 +153,22 @@ struct ShakeResult: Decodable {
     var shaking: Int?
 }
 
+/* ---------------- 直播专场 ---------------- */
+private struct LivePayload: Decodable { var rooms: [LiveRoom] }
+private struct LiveJoinPayload: Decodable { var watching: Int? }
+private struct LiveLikePayload: Decodable { var likes: Int? }
+private struct GamesPayload: Decodable { var items: [MiniGame] }
+
+/// 小游戏：玩法写在客户端，服务器只发列表（后台能改 data/games.json）
+struct MiniGame: Decodable, Identifiable, Hashable {
+    var id: String
+    var label: String?
+    var desc: String?
+    var icon: String?
+    var kind: String?
+    var enabled: Bool?
+}
+
 struct MomentLike: Decodable, Hashable {
     var userId: String?
     var nickname: String?
@@ -1009,6 +1025,34 @@ final class API {
     /// 清除自己的位置（从附近的人里消失，和微信的「清除位置信息并退出」一样）
     func nearbyClear() async throws {
         _ = try await request("DELETE", "/api/nearby")
+    }
+
+    /* ---------------------------------------------------------- 直播专场 */
+
+    func liveRooms() async throws -> [LiveRoom] {
+        let p: LivePayload = try await get("/api/live", as: LivePayload.self)
+        return p.rooms
+    }
+    func liveJoin(_ id: String) async throws -> Int {
+        let p: LiveJoinPayload = try await post("/api/live/\(id)/join", [:], as: LiveJoinPayload.self)
+        return p.watching ?? 0
+    }
+    func liveLeave(_ id: String) async {
+        _ = try? await request("POST", "/api/live/\(id)/leave", body: [:])
+    }
+    func liveDanmaku(_ id: String, text: String) async throws {
+        _ = try await request("POST", "/api/live/\(id)/danmaku", body: ["text": text])
+    }
+    func liveLike(_ id: String) async throws -> Int {
+        let p: LiveLikePayload = try await post("/api/live/\(id)/like", [:], as: LiveLikePayload.self)
+        return p.likes ?? 0
+    }
+
+    /* ---------------------------------------------------------- 游戏页 */
+
+    func games() async throws -> [MiniGame] {
+        let p: GamesPayload = try await get("/api/games", as: GamesPayload.self)
+        return p.items
     }
 
     /* ---------------------------------------------------------- 摇一摇 */

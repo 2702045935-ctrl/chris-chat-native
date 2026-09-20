@@ -55,6 +55,10 @@ struct DiscoverView: View {
                     NearbyPageView()
                 } else if key == "shake" {
                     ShakePageView()
+                } else if key == "live" {
+                    LiveListView()
+                } else if key == "games" {
+                    GamesPageView()
                 } else if key == "news" {
                     ComingSoonView(title: "腾讯新闻")
                 } else if key.hasPrefix("soon:") {
@@ -102,6 +106,8 @@ struct DiscoverView: View {
         case "news": path.append("news")
         case "nearby": path.append("nearby")
         case "shake": path.append("shake")
+        case "live": path.append("live")
+        case "games": path.append("games")
         default: path.append("soon:" + item.label)
         }
     }

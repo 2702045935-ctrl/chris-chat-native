@@ -35,7 +35,9 @@ struct MainTabView: View {
                     .transition(.move(edge: .bottom))
             }
         }
-        .background(C.navBg.ignoresSafeArea())
+        /* 整块内容区的底色跟页面一致（深色下 navBg 是炭黑 #18181A，比页面 #0B0B0D 浅一档，
+           状态栏那一条会看出「顶部是炭黑」）。底栏自己用 tabBg，比页面浅一点是对的。 */
+        .background(C.pageBg.ignoresSafeArea())
         /* 注意：这里以前有一句 .animation(…, value: app.tabBarHidden)。
            它会让「整块内容区」在标签栏显隐时一起做动画 —— 打开聊天页（藏标签栏）那一下
            「上下缩放」就是这么来的。改成不给容器加动画：标签栏直接让位，页面照常推进来。 */

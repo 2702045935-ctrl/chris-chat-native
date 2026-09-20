@@ -51,6 +51,8 @@ struct DiscoverView: View {
             .navigationDestination(for: String.self) { key in
                 if key == "moments" {
                     MomentsView()
+                } else if key == "nearby" {
+                    NearbyPageView()
                 } else if key == "news" {
                     ComingSoonView(title: "腾讯新闻")
                 } else if key.hasPrefix("soon:") {
@@ -96,6 +98,7 @@ struct DiscoverView: View {
         switch item.action ?? "soon" {
         case "moments": path.append("moments")
         case "news": path.append("news")
+        case "nearby": path.append("nearby")
         default: path.append("soon:" + item.label)
         }
     }

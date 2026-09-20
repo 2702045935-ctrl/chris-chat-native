@@ -100,6 +100,44 @@ struct CallMeta: Decodable, Hashable {
     var secs: Int?
 }
 
+/* ============================================================ 附近的人 */
+
+/// 附近名单里的一个人
+struct NearbyPerson: Decodable, Identifiable, Hashable {
+    var id: String
+    var nickname: String?
+    var avatar: String?
+    var gender: String?
+    var region: String?
+    var bio: String?
+    var moodText: String?
+    var moments: Int?
+    var online: Bool?
+    var friend: Bool?
+    /// 距离（公里，服务器算好的，一位小数）
+    var km: Double?
+    /// 几分钟前报的位置
+    var minutes: Int?
+
+    var name: String { (nickname?.isEmpty == false) ? nickname! : "附近的人" }
+    var isFemale: Bool { (gender ?? "") == "female" }
+    /// 距离文字：不到 1 公里说「xxx m」，其它说「x.x km」
+    var distanceText: String {
+        guard let km = km else { return "距离未知" }
+        if km < 1 { return "\(max(10, Int((km * 1000).rounded() / 10) * 10)) m" }
+        return String(format: "%.1f km", km)
+    }
+    var timeText: String {
+        guard let m = minutes else { return "" }
+        if m <= 0 { return "刚刚" }
+        if m < 60 { return "\(m) 分钟前" }
+        return "\(m / 60) 小时前"
+    }
+}
+
+private struct NearbyPayload: Decodable { var people: [NearbyPerson] }
+private struct NearbyHelloPayload: Decodable { var chatId: String?; var text: String? }
+
 struct MomentLike: Decodable, Hashable {
     var userId: String?
     var nickname: String?
@@ -919,6 +957,31 @@ final class API {
         let payload: UserPayload = try await get("/api/users/\(id)", as: UserPayload.self)
         guard let user = payload.user else { throw APIError.message("用户不存在") }
         return user
+    }
+
+    /* ---------------------------------------------------------- 附近的人 */
+
+    /// 上报自己的位置（进「附近的人」页时调一次）；visible=false 就是隐身，不上榜
+    func nearbyReport(lat: Double, lng: Double, visible: Bool = true) async throws {
+        _ = try await request("POST", "/api/nearby", body: [
+            "lat": lat, "lng": lng, "visible": visible
+        ])
+    }
+
+    /// 附近的人名单（按距离排）
+    func nearby(lat: Double?, lng: Double?, gender: String = "all") async throws -> [NearbyPerson] {
+        var path = "/api/nearby?gender=\(gender)"
+        if let lat = lat, let lng = lng { path += "&lat=\(lat)&lng=\(lng)" }
+        let payload: NearbyPayload = try await get(path, as: NearbyPayload.self)
+        return payload.people
+    }
+
+    /// 打招呼：给对方发一条消息（会话就出来了）
+    func nearbyHello(userId: String, text: String) async throws -> String {
+        let payload: NearbyHelloPayload = try await post("/api/nearby/hello",
+                                                         ["userId": userId, "text": text],
+                                                         as: NearbyHelloPayload.self)
+        return payload.chatId ?? ""
     }
 
     func chats() async throws -> [Chat] {

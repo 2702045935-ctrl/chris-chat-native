@@ -364,26 +364,84 @@ struct WalletCardView: View {
 
 struct WorksView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var works: [FeedItem] = []
+    @State private var playing: FeedItem?
+    @State private var loading = true
+    /// 三列方块网格（抖音个人主页那样）
+    private let cols = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
 
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: "作品", back: { dismiss() })
-            VStack(spacing: 10) {
-                Spacer()
-                Image(systemName: "rectangle.stack")
-                    .font(pf(34))
-                    .foregroundColor(C.subLabel)
-                Text("还没有作品")
-                    .font(pf(15))
-                    .foregroundColor(C.subLabel)
-                Spacer()
+            if loading && works.isEmpty {
+                Spacer(); ProgressView(); Spacer()
+            } else if works.isEmpty {
+                VStack(spacing: 10) {
+                    Spacer()
+                    Image(systemName: "rectangle.stack").font(pf(34)).foregroundColor(C.subLabel)
+                    Text("还没有作品").font(pf(15)).foregroundColor(C.subLabel)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: cols, spacing: 3) {
+                        ForEach(works) { w in
+                            Button { playing = w } label: { tile(w) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                }
+                .background(C.pageBg)
             }
-            .frame(maxWidth: .infinity)
-            .background(C.pageBg)
         }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
         .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
+        .sheet(item: $playing) { w in
+            FeedPlayerSheet(item: w, all: works)
+        }
+        .task {
+            works = (try? await API.shared.feedItems()) ?? []
+            loading = false
+        }
+    }
+
+    /// 一个方块：有封面就显示封面，没有就用深色底 + 播放图标 + 点赞数
+    private func tile(_ w: FeedItem) -> some View {
+        ZStack {
+            if !(w.cover ?? "").isEmpty {
+                RemoteImage(path: w.cover ?? "")
+            } else {
+                LinearGradient(colors: [Color(hex: 0x2A2A2E), Color(hex: 0x141416)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            if (w.cover ?? "").isEmpty {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundColor(.white.opacity(0.85))
+            }
+            VStack {
+                Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: "play.fill").font(.system(size: 10))
+                    Text("\(w.likes ?? 0)").font(pf(11.5, .medium))
+                    Spacer(minLength: 0)
+                    if w.mine == true {
+                        Text("我的").font(pf(10.5)).padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Capsule().fill(C.green))
+                    }
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+            }
+        }
+        .aspectRatio(1, contentMode: .fill)
+        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+        .contentShape(Rectangle())
     }
 }

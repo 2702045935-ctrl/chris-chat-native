@@ -538,6 +538,125 @@ struct FeedCell: View {
 }
 
 /// AVPlayer 的显示层（通话页那个 VideoSurface 是给 WebRTC 用的，这里是本地播放器）
+/// 「作品」页点开一个方块后播这条视频（和视频号一样：先下载到本地再播）
+struct FeedPlayerSheet: View {
+    let item: FeedItem
+    var all: [FeedItem] = []
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
+    @State private var loading = true
+    @State private var liked = false
+    @State private var likes = 0
+    @State private var index = 0
+
+    private var list: [FeedItem] { all.isEmpty ? [item] : all }
+    private var cur: FeedItem { list[min(index, list.count - 1)] }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let p = player { PlayerSurface(player: p) }
+            if loading { ProgressView().tint(.white) }
+            VStack {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+                Spacer()
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("@\(cur.author?.name ?? "用户")")
+                            .font(pf(15, .semibold)).foregroundColor(.white)
+                        Text(cur.desc ?? "").font(pf(13.5)).foregroundColor(.white.opacity(0.95))
+                            .lineLimit(3)
+                        if !(cur.music ?? "").isEmpty {
+                            Text("♪ \(cur.music ?? "")").font(pf(12)).foregroundColor(.white.opacity(0.8))
+                        }
+                    }
+                    Spacer(minLength: 12)
+                    Button {
+                        liked.toggle(); likes += liked ? 1 : -1
+                        Task { _ = try? await API.shared.feedLike(cur.id) }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 26))
+                                .foregroundColor(liked ? Color(hex: 0xFF4D6D) : .white)
+                            Text("\(likes)").font(pf(12.5)).foregroundColor(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, max(20, L.safeBottom + 8))
+            }
+            /* 左右切换（作品页点开的那个列表） */
+            if list.count > 1 {
+                HStack {
+                    Button { step(-1) } label: { chevron("chevron.left") }
+                    Spacer()
+                    Button { step(1) } label: { chevron("chevron.right") }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 6)
+            }
+        }
+        .onAppear {
+            index = list.firstIndex(where: { $0.id == item.id }) ?? 0
+            liked = cur.liked ?? false
+            likes = cur.likes ?? 0
+            load(cur)
+        }
+    }
+
+    private func chevron(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundColor(.white.opacity(0.75))
+            .frame(width: 44, height: 60)
+    }
+
+    private func step(_ d: Int) {
+        let n = index + d
+        guard n >= 0, n < list.count else { return }
+        index = n
+        liked = cur.liked ?? false
+        likes = cur.likes ?? 0
+        player?.pause()
+        player = nil
+        load(cur)
+    }
+
+    private func load(_ w: FeedItem) {
+        guard let url = API.shared.assetURL(w.video ?? "") else { loading = false; return }
+        loading = true
+        Task { @MainActor in
+            do {
+                let data = try await API.shared.assetData(url)
+                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("work-\(w.id).mp4")
+                try data.write(to: tmp)
+                let p = AVPlayer(url: tmp)
+                p.actionAtItemEnd = .none
+                NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
+                                                       object: p.currentItem, queue: .main) { _ in
+                    p.seek(to: .zero); p.play()
+                }
+                player = p
+                loading = false
+                p.play()
+            } catch { loading = false }
+        }
+    }
+}
+
 struct PlayerSurface: UIViewRepresentable {
     let player: AVPlayer
 

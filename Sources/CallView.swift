@@ -30,6 +30,10 @@ struct CallView: View {
     @ObservedObject private var call = CallCenter.shared
     @EnvironmentObject var app: AppState
     @State private var showInvite = false
+    /// 最小化小窗的位置（nil = 默认贴右上角；拖过之后记住位置，松手会吸附到左右边）
+    @State private var miniX: CGFloat? = nil
+    @State private var miniY: CGFloat? = nil
+    @State private var dragging: CGSize = .zero
 
     private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 60) }
     private var tint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
@@ -296,13 +300,35 @@ struct CallView: View {
     /// 最小化后的样子：**右上角一个小浮窗**（和微信一样）——
     /// 视频通话显示远端画面，语音通话显示头像+名字+计时；点一下回到通话界面，
     /// 右上角那个小 ✕ 可以直接挂断。通话本身一直在继续，不受影响。
+    /// 可以拖着走，松手吸附到左右边（微信就是这样）。
     private var miniWindow: some View {
-        let w: CGFloat = call.isVideo ? 108 : 146
-        let h: CGFloat = call.isVideo ? 144 : 48
-        return VStack {
-            HStack {
-                Spacer(minLength: 0)
-                ZStack(alignment: .topTrailing) {
+        GeometryReader { geo in
+            let w: CGFloat = call.isVideo ? 108 : 146
+            let h: CGFloat = call.isVideo ? 144 : 48
+            let maxX = max(8, geo.size.width - w - 8)
+            let maxY = max(6, geo.size.height - h - 90)
+            let homeX = geo.size.width - w - 10
+            let x = min(max((miniX ?? homeX) + dragging.width, 8), maxX)
+            let y = min(max((miniY ?? 6) + dragging.height, 6), maxY)
+            windowBody(w: w, h: h)
+                .position(x: x + w / 2, y: y + h / 2)
+                .gesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { v in dragging = v.translation }
+                        .onEnded { v in
+                            let nx = (miniX ?? homeX) + v.translation.width
+                            let ny = (miniY ?? 6) + v.translation.height
+                            // 松手吸附：靠近哪边就贴哪边（微信那种手感）
+                            miniX = nx + w / 2 < geo.size.width / 2 ? 8 : maxX
+                            miniY = min(max(ny, 6), maxY)
+                            dragging = .zero
+                        }
+                )
+        }
+    }
+
+    private func windowBody(w: CGFloat, h: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
                     Group {
                         if call.isVideo {
                             ZStack {
@@ -348,13 +374,8 @@ struct CallView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(5)
-                }
-                .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
-            }
-            Spacer(minLength: 0)
         }
-        .padding(.trailing, 10)
-        .padding(.top, 6)
+        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
     }
 
     /// （旧版：一条横条。留着备用，不再使用）

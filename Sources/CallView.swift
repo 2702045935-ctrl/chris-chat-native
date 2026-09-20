@@ -19,25 +19,38 @@ struct CallOverlay: View {
     @ObservedObject private var call = CallCenter.shared
 
     var body: some View {
-        if call.phase != .idle && !call.ending {
+        if call.phase != .idle {
             CallView()
                 .zIndex(999)
-        } else if call.ending {
-            /* 通话刚结束（或者根本没接通）：别直接消失，先把原因显示完再说 ——
-               用户反馈的「通话页秒弹关闭、什么提示都没有」就是这一段。 */
-            ZStack {
-                Color.black.opacity(0.28).ignoresSafeArea()
-                Text(call.tip.isEmpty ? "通话已结束" : call.tip)
-                    .font(pf(15))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.black.opacity(0.72)))
-            }
-            .zIndex(999)
-            .transition(.opacity)
         }
+    }
+}
+
+/// 接通 / 挂断的提示框：**和聊天页那行时间一模一样的圆角小框**（同一个后台配置：
+/// 底色 chatTimeBg、文字色 chatTimeColor、圆角 chatTimeRadius、留白 chatTimePadX/Y）。
+/// 通话页收起来以后它还在，所以「挂断」也看得到。
+struct CallBannerView: View {
+    @ObservedObject private var call = CallCenter.shared
+
+    var body: some View {
+        VStack {
+            if !call.banner.isEmpty {
+                Text(call.banner)
+                    .font(pf(L.msgTimeSize))
+                    .foregroundColor(C.chatTimeInk)
+                    .padding(.horizontal, L.o("chatTimePadX", 8))
+                    .padding(.vertical, L.o("chatTimePadY", 3))
+                    .background(RoundedRectangle(cornerRadius: L.o("chatTimeRadius", 4), style: .continuous)
+                        .fill(C.chatTimeBg))
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, max(8, L.safeTop + 6))
+        .allowsHitTesting(false)
+        .zIndex(1000)
+        .animation(.easeInOut(duration: 0.18), value: call.banner)
     }
 }
 

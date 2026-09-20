@@ -40,11 +40,10 @@ final class CallCenter: NSObject, ObservableObject {
     @Published private(set) var speakerOn = false
     @Published private(set) var seconds = 0
     @Published private(set) var tip = ""
-    /// 通话刚结束的那 1.4 秒：通话页先别收，把原因（对方不在线 / 对方无应答…）显示完。
-    /// 以前是一有事就 phase = .idle，用户看到的就是「通话页一闪就没了」。
-    @Published private(set) var ending = false
-    /// 每给一句提示就 +1：界面拿它弹一个 toast（通话页收起来以后也看得到）
-    @Published private(set) var tipTick = 0
+    /// 接通 / 挂断的提示：和聊天页那行时间一模一样的圆角小框（对话框），
+    /// 屏幕上显示两秒再淡出。用户要的就是这个「框框」，不是一闪而过的通话页。
+    @Published private(set) var banner = ""
+    private var bannerTask: Task<Void, Never>?
     /// 给界面渲染用的远端 / 本地画面
     @Published private(set) var remoteVideo: RTCVideoTrack?
     @Published private(set) var localVideo: RTCVideoTrack?
@@ -422,6 +421,7 @@ final class CallCenter: NSObject, ObservableObject {
 
     private func finish(tip: String) {
         let wasIdle = (phase == .idle)
+        let secs = seconds
         self.tip = tip
         Ringtone.shared.stop()
         ticker?.invalidate()
@@ -437,20 +437,23 @@ final class CallCenter: NSObject, ObservableObject {
         muted = false
         cameraOff = false
         if !wasIdle {
-            if tip.isEmpty {
-                phase = .idle
-            } else {
-                /* 有原因就先在屏幕上停 1.4 秒把话说完（对方不在线 / 对方无应答 / 已取消…），
-                   同时给界面发一个 toast —— 不然通话页一闪就没了，用户什么也没看到。 */
-                ending = true
-                tipTick += 1
-                Task { @MainActor [weak self] in
-                    try? await Task.sleep(nanoseconds: 1_400_000_000)
-                    guard let self = self else { return }
-                    self.ending = false
-                    self.phase = .idle
-                }
-            }
+            phase = .idle
+            /* 挂断原因用「聊天页那个圆角小框」显示出来：
+               接通过的顺带把时长写上，没接通就只写原因。 */
+            let dur = secs > 0 ? String(format: " %02d:%02d", secs / 60, secs % 60) : ""
+            showBanner((tip.isEmpty ? "通话已结束" : tip) + dur)
+        }
+    }
+
+    /// 上面那个提示框：显示两秒自动淡出；又来一条就把上一条顶掉
+    func showBanner(_ text: String, seconds hold: Double = 2.2) {
+        guard !text.isEmpty else { return }
+        bannerTask?.cancel()
+        banner = text
+        bannerTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(hold * 1_000_000_000))
+            guard let self = self, !Task.isCancelled else { return }
+            self.banner = ""
         }
     }
 
@@ -530,6 +533,8 @@ extension CallCenter: RTCPeerConnectionDelegate {
                     self.ringTimer?.invalidate()
                     self.ringTimer = nil
                     self.startTimer()
+                    /* 接通也报一下（和挂断同一个框） */
+                    self.showBanner(self.isVideo ? "视频通话已接通" : "语音通话已接通", seconds: 1.6)
                 }
             case .failed:
                 self.errorText = "通话连接失败，可能是网络挡住了"

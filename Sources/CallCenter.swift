@@ -52,6 +52,8 @@ final class CallCenter: NSObject, ObservableObject {
     private var dialogTask: Task<Void, Never>?
     /// 打不通时那 8 秒的定时器（见 failLater）
     private var failTask: Task<Void, Never>?
+    /// 连不上时的诊断记录（ICE 状态、候选数量…），通话结束时一起报给服务器
+    private var diag: [String] = []
 
     func dismissDialog() {
         dialogTask?.cancel()
@@ -94,6 +96,8 @@ final class CallCenter: NSObject, ObservableObject {
     private var ticker: Timer?
     /// 拨出去没人接的兜底计时（服务端 45 秒也会结束，这里是客户端保险，别让界面卡在"呼叫中"）
     private var ringTimer: Timer?
+    /// 「正在接通」时的 12 秒观察（连不上就给提示）
+    private var connectTimer: Timer?
     private var sub: AnyCancellable?
     /* 打洞 / 中转服务器。默认这套是国内能连上的 STUN + 一个公共 TURN：
        同一个 Wi-Fi 里其实用不到它们，但**跨网络**（4G/别人家宽带）必须靠 TURN 中转，
@@ -147,6 +151,7 @@ final class CallCenter: NSObject, ObservableObject {
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
+        startConnectWatch()
     }
 
     /// 拒接
@@ -266,6 +271,7 @@ final class CallCenter: NSObject, ObservableObject {
             Ringtone.shared.stop()
             phase = .connecting
             tip = "正在接通…"
+            startConnectWatch()
 
         case "sdp":
             guard ev.callId == callId, let sdp = ev.callSDP else { return }
@@ -491,7 +497,17 @@ final class CallCenter: NSObject, ObservableObject {
         ticker = nil
         ringTimer?.invalidate()
         ringTimer = nil
+        connectTimer?.invalidate()
+        connectTimer = nil
         stopMedia()
+        /* 把这一通的 ICE 过程报给服务器（写进 call-trace.log），
+           「一直在连接中」这种问题一看就知道卡在哪一步 */
+        if !diag.isEmpty {
+            let line = (iAmCaller ? "主叫" : "被叫") + (isVideo ? " 视频" : " 语音")
+                + " 结果=" + (tip.isEmpty ? "结束" : tip) + " | " + diag.joined(separator: " ")
+            diag.removeAll()
+            Task { await API.shared.callDiag(line) }
+        }
         callId = ""
         peerId = ""
         remoteOfferSDP = nil
@@ -520,6 +536,47 @@ final class CallCenter: NSObject, ObservableObject {
             try? await Task.sleep(nanoseconds: UInt64(hold * 1_000_000_000))
             guard let self = self, !Task.isCancelled else { return }
             self.finish(tip: text)
+        }
+    }
+
+    /// 记一条诊断（最多留 20 条），通话结束时一起报给服务器
+    private func note(_ s: String) {
+        diag.append(s)
+        if diag.count > 20 { diag.removeFirst() }
+    }
+
+    /// 接通阶段盯 12 秒：还是「正在接通」就把最可能的原因写在屏幕上
+    private func startConnectWatch() {
+        connectTimer?.invalidate()
+        connectTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self, self.phase == .connecting else { return }
+                self.errorText = "声音一直连不上：① 两边都打开「设置 → CHRIS聊天 → 本地网络」；② 两台设备最好在同一个 Wi-Fi"
+                self.tip = self.errorText ?? ""
+            }
+        }
+    }
+
+    private static func iceName(_ s: RTCIceConnectionState) -> String {
+        switch s {
+        case .new: return "new"
+        case .checking: return "checking"
+        case .connected: return "connected"
+        case .completed: return "completed"
+        case .failed: return "failed"
+        case .disconnected: return "disconnected"
+        case .closed: return "closed"
+        case .count: return "count"
+        @unknown default: return "?"
+        }
+    }
+
+    private static func gatherName(_ s: RTCIceGatheringState) -> String {
+        switch s {
+        case .new: return "new"
+        case .gathering: return "gathering"
+        case .complete: return "complete"
+        @unknown default: return "?"
         }
     }
 
@@ -555,11 +612,16 @@ final class CallCenter: NSObject, ObservableObject {
 extension CallCenter: RTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCSignalingState) { }
 
-    nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCIceConnectionState) { }
+    nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCIceConnectionState) {
+        Task { @MainActor in self.note("ice=" + CallCenter.iceName(state)) }
+    }
 
-    nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange newState: RTCIceGatheringState) { }
+    nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange newState: RTCIceGatheringState) {
+        Task { @MainActor in self.note("gathering=" + CallCenter.gatherName(newState)) }
+    }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        Task { @MainActor in self.note("cand=" + (candidate.sdp.hasPrefix("candidate:") ? String(candidate.sdp.prefix(24)) : candidate.sdp)) }
         let body: [String: Any] = ["action": "ice",
                                    "candidate": ["candidate": candidate.sdp,
                                                  "sdpMid": candidate.sdpMid ?? "0",

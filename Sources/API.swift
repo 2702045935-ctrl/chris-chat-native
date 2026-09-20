@@ -1014,6 +1014,11 @@ final class API {
         return try await post("/api/shake", body, as: ShakeResult.self)
     }
 
+    /// 通话诊断：连不上时把 ICE 状态报回服务器（写进 call-trace.log）
+    func callDiag(_ text: String) async {
+        _ = try? await request("POST", "/api/call-diag", body: ["text": text])
+    }
+
     func chats() async throws -> [Chat] {
         let payload: ChatsPayload = try await get("/api/chats", as: ChatsPayload.self)
         return payload.chats

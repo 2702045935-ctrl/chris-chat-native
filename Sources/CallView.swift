@@ -49,7 +49,7 @@ struct CallView: View {
             backdrop
 
             if call.minimized {
-                miniBar
+                miniWindow
             } else {
                 if call.isVideo && call.phase == .active {
                     videoLayer
@@ -293,8 +293,72 @@ struct CallView: View {
         .padding(.top, 19)
     }
 
-    /// 最小化后顶部那条（通话不中断，点「回到通话」还原）
-    private var miniBar: some View {
+    /// 最小化后的样子：**右上角一个小浮窗**（和微信一样）——
+    /// 视频通话显示远端画面，语音通话显示头像+名字+计时；点一下回到通话界面，
+    /// 右上角那个小 ✕ 可以直接挂断。通话本身一直在继续，不受影响。
+    private var miniWindow: some View {
+        let w: CGFloat = call.isVideo ? 108 : 146
+        let h: CGFloat = call.isVideo ? 144 : 48
+        return VStack {
+            HStack {
+                Spacer(minLength: 0)
+                ZStack(alignment: .topTrailing) {
+                    Group {
+                        if call.isVideo {
+                            ZStack {
+                                VideoSurface(track: call.remoteVideo)
+                                if call.remoteVideo == nil {
+                                    Avatar(path: call.peerAvatar, size: 44, radius: 8)
+                                }
+                            }
+                        } else {
+                            HStack(spacing: 9) {
+                                Avatar(path: call.peerAvatar, size: 28, radius: 14)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(call.peerName)
+                                        .font(pfExact(13, .medium))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    Text(call.phase == .active ? timeText : (call.tip.isEmpty ? "通话中" : call.tip))
+                                        .font(pfExact(11))
+                                        .foregroundColor(.white.opacity(0.72))
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 10)
+                            .background(Color(hex: 0x07C160))
+                        }
+                    }
+                    .frame(width: w, height: h)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.black.opacity(0.18), lineWidth: 0.5))
+                    .contentShape(Rectangle())
+                    .onTapGesture { call.restore() }
+
+                    Button {
+                        call.hangup()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(Color.black.opacity(0.55)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(5)
+                }
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.trailing, 10)
+        .padding(.top, 6)
+    }
+
+    /// （旧版：一条横条。留着备用，不再使用）
+    private var miniBarOld: some View {
         HStack(spacing: 8) {
             Circle().fill(C.green).frame(width: 8, height: 8)
             Text(call.phase == .active ? "通话中 \(timeText)" : call.tip)

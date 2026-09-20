@@ -112,6 +112,8 @@ final class VoicePlayer: NSObject, ObservableObject {
     /// 正在播哪条（消息 id），界面拿它显示播放状态
     @Published private(set) var playingID = ""
     private var player: AVAudioPlayer?
+    /// 已经下载过的那几条语音（免得每点一次都重新下）
+    private var cache: [String: Data] = [:]
 
     private override init() { super.init() }
 
@@ -121,11 +123,36 @@ final class VoicePlayer: NSObject, ObservableObject {
         let s = AVAudioSession.sharedInstance()
         try? s.setCategory(.playback, mode: .default)
         try? s.setActive(true)
-        guard let p = try? AVAudioPlayer(contentsOf: url) else { return }
-        p.delegate = self
-        p.play()
-        player = p
         playingID = id
+        /* 语音文件在服务器上（/uploads/xxx.m4a）：
+           以前这里直接 AVAudioPlayer(contentsOf: 网络地址) —— 它只认本地文件，
+           所以点了一点声音都没有。现在先带登录令牌把文件下下来，再用 data 播。 */
+        let key = url.absoluteString
+        if let hit = cache[key], let p = try? AVAudioPlayer(data: hit) {
+            p.delegate = self
+            p.prepareToPlay()
+            p.play()
+            player = p
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            do {
+                let data = try await API.shared.assetData(url)
+                guard !data.isEmpty else { self.playingID = ""; return }
+                self.cache[key] = data
+                if self.cache.count > 24 { self.cache.removeValue(forKey: self.cache.keys.first ?? "") }
+                /* 下载期间用户可能已经点了别的/点了停 */
+                guard self.playingID == id else { return }
+                let p = try AVAudioPlayer(data: data)
+                p.delegate = self
+                p.prepareToPlay()
+                p.play()
+                self.player = p
+            } catch {
+                self.playingID = ""
+            }
+        }
     }
 
     func stop() {

@@ -772,6 +772,12 @@ final class API {
     /// 以前这里用的是不带任何请求头的 session.data(from:)，所以只要拿到的是
     /// 没签名/签名过期的老链接，就一律 403 —— 表现就是「头像能看、背景全加载不出来」。
     func imageData(_ url: URL) async throws -> Data {
+        try await assetData(url)
+    }
+
+    /// 取任意资源（图片 / 语音 / 文件）的字节：**带登录令牌**。
+    /// 语音消息要先把 m4a 下载下来才能播（AVAudioPlayer 只能读本地文件）。
+    func assetData(_ url: URL) async throws -> Data {
         var req = URLRequest(url: url)
         req.timeoutInterval = 15
         if !token.isEmpty { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }

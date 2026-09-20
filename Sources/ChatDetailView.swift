@@ -45,6 +45,7 @@ struct ChatDetailView: View {
     @State private var showCamera = false
     @State private var showLocation = false
     @State private var showTransfer = false
+    @State private var showChatMenu = false
     @State private var showFile = false
     @State private var showCall = false
     @State private var billInfo: TransferInfo?
@@ -60,6 +61,20 @@ struct ChatDetailView: View {
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
+
+    /// 一对一会话里的对方 id（真人语音/视频通话要用它去呼叫）
+    private var peerUserId: String? {
+        guard let ids = chat.memberIds else { return nil }
+        return ids.first(where: { $0 != myId })
+    }
+
+    /// 打给真人（WebRTC）：语音或视频
+    private func startRealCall(video: Bool) {
+        guard !isGroup else { app.show("群聊通话还没做，先在单聊里打"); return }
+        guard let peer = peerUserId else { app.show("找不到对方账号，先刷新一下会话"); return }
+        if CallCenter.shared.phase != .idle { app.show("正在通话中"); return }
+        CallCenter.shared.start(peerId: peer, name: chat.name, avatar: chat.avatar ?? "", video: video)
+    }
 
     private func displayName(_ message: Message) -> String {
         if let n = message.senderName, !n.isEmpty { return n }
@@ -115,7 +130,7 @@ struct ChatDetailView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             NavBar(title: chat.name, back: { dismiss() }) {
                 Button {
-                    app.show("聊天设置排在下一批")
+                    showChatMenu = true
                 } label: {
                     Text("⋯")
                         .font(pf(22))
@@ -137,6 +152,19 @@ struct ChatDetailView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
+        /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */
+        .confirmationDialog("聊天", isPresented: $showChatMenu, titleVisibility: .hidden) {
+            if (chat.botRank ?? 9) < 9 {
+                Button("语音通话") { showCall = true }
+                Button("视频通话") { showCall = true }
+            } else {
+                Button("语音通话") { startRealCall(video: false) }
+                Button("视频通话") { startRealCall(video: true) }
+            }
+            Button("聊天背景") { app.show("换聊天背景：点「我 → 设置 → 聊天背景」") }
+            Button("刷新消息") { Task { await load(initial: true) } }
+            Button("取消", role: .cancel) { }
+        }
         .swipeBack { dismiss() }
         .hidesTabBar()
         .navigationBarBackButtonHidden(true)
@@ -408,9 +436,9 @@ struct ChatDetailView: View {
         case "videocall":
             panel = .none
             if (chat.botRank ?? 9) < 9 {
-                showCall = true
+                showCall = true                       // 机器人：走 AI 通话
             } else {
-                app.show("和真人的实时语音/视频要装 WebRTC 组件（下一版），先用文字或图片聊")
+                startRealCall(video: true)            // 真人：真·视频通话（WebRTC）
             }
         case "voice":
             panel = .none

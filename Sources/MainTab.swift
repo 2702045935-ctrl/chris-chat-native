@@ -37,6 +37,8 @@ struct MainTabView: View {
         }
         .background(C.navBg.ignoresSafeArea())
         .animation(.easeOut(duration: 0.18), value: app.tabBarHidden)
+        /* 真人语音/视频通话：来电、通话界面挂在最外层，任何页面都能弹出来 */
+        .overlay(CallOverlay())
     }
 }
 

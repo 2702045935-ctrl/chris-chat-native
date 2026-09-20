@@ -55,6 +55,8 @@ struct Chat: Decodable, Identifiable, Hashable {
     var pinned: Bool?
     var botRank: Int?
     var memberCount: Int?
+    /// 会话成员（单聊里用来找「对方是谁」，打语音/视频要用）
+    var memberIds: [String]?
     var lastMessage: LastMessage?
     var updatedAt: String?
 
@@ -145,6 +147,8 @@ struct BrandInfo: Decodable, Hashable {
     var chatBackground: String?
     var fontScale: Double?
     var accentColor: String?
+    /// 通话用的 ICE 服务器（后台「语音通话」里配的，跨网络需要 TURN 时填这儿）
+    var iceServers: String?
     /// 登录页外观（后台「🎨 登录页」里配的）
     var login: LoginBrand?
 }

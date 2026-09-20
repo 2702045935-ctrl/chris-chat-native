@@ -23,6 +23,19 @@ jobs:
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
 
+      # 语音/视频通话要用的 WebRTC（官方 iOS 二进制，也是 SPM 上大家用的那份）
+      # 包会大不少（解压后大概 90MB），这是 WebRTC 的固有体积。
+      - name: 下载 WebRTC 框架
+        run: |
+          set -e
+          curl -L --fail -o /tmp/webrtc.zip \
+            https://github.com/stasel/WebRTC/releases/download/153.0.0/WebRTC-M153.xcframework.zip
+          rm -rf WebRTCKit && mkdir -p WebRTCKit
+          unzip -q /tmp/webrtc.zip -d WebRTCKit
+          ls WebRTCKit
+          ls WebRTCKit/WebRTC.xcframework
+          ls WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework
+
       - name: 编译原生 App
         run: |
           set -e
@@ -33,6 +46,9 @@ jobs:
           cp Info.plist "$APP/Info.plist"
           cp AppIcon60x60@2x.png "$APP/"
           cp AppIcon60x60@3x.png "$APP/"
+          # 把 WebRTC 打进 App 里（动态库，运行时从 @executable_path/Frameworks 加载）
+          mkdir -p "$APP/Frameworks"
+          cp -R WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework "$APP/Frameworks/WebRTC.framework"
           xcrun --sdk iphoneos swiftc \
             -sdk "$SDK" \
             -target arm64-apple-ios16.0 \
@@ -40,12 +56,17 @@ jobs:
             -parse-as-library \
             -O \
             -F "$SDK/System/Library/Frameworks" \
+            -F WebRTCKit/WebRTC.xcframework/ios-arm64 \
             -o "$APP/CHRIS" \
             Sources/*.swift \
             -framework SwiftUI -framework UIKit -framework Foundation \
-            -framework LocalAuthentication
+            -framework LocalAuthentication \
+            -framework WebRTC \
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks
           echo "编译完成，体积："
           ls -lh "$APP/CHRIS"
+          echo "依赖了哪些动态库："
+          otool -L "$APP/CHRIS" | head -12
           zip -qry CHRISChat-unsigned.ipa Payload
           ls -lh CHRISChat-unsigned.ipa
 

@@ -24,6 +24,12 @@ struct PushEvent: Equatable {
     var callPeerName = ""
     var callPeerAvatar = ""
     var callError = ""
+    /// 通话里的 SDP（WebRTC 协商用，字符串形式）
+    var callSDP: String? = nil
+    /// 通话里的 ICE 候选（整段 JSON 字符串）
+    var callCandidate: String? = nil
+    /// 挂断原因：hangup / rejected / cancel / timeout / offline / disconnected
+    var callReason = ""
     var tick = 0
 }
 
@@ -126,6 +132,14 @@ final class Realtime: ObservableObject {
         ev.callPeerName = (obj["peerName"] as? String) ?? ""
         ev.callPeerAvatar = (obj["peerAvatar"] as? String) ?? ""
         ev.callError = (obj["error"] as? String) ?? ""
+        ev.callReason = (obj["reason"] as? String) ?? ""
+        // WebRTC 协商内容：SDP 和 ICE 候选（网页版也是这么传的）
+        if let sdp = obj["sdp"] as? [String: Any] { ev.callSDP = (sdp["sdp"] as? String) ?? "" }
+        if let cand = obj["candidate"] as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: cand),
+           let text = String(data: data, encoding: .utf8) {
+            ev.callCandidate = text
+        }
         /* 推送洪水节流：每条都通知界面的话，几千条一来手机就卡死/崩。
            有任务在跑就先攒着，最多每 0.25 秒发一次（最后那条一定会发出去）。 */
         if publishTask == nil {

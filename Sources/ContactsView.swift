@@ -560,7 +560,13 @@ struct ContactCardView: View {
         case "msg":
             openChat()
         case "call":
-            openChat { app.show("和真人的实时语音/视频要装 WebRTC 组件（下一版），先用文字或图片聊") }
+            /* 真人语音通话（WebRTC）。id 就是对方的用户 id，直接呼叫 */
+            if CallCenter.shared.phase != .idle {
+                app.show("正在通话中")
+            } else {
+                CallCenter.shared.start(peerId: u.id, name: u.nickname ?? u.username ?? "对方",
+                                        avatar: u.avatar ?? "", video: false)
+            }
         case "add":
             busy = true
             Task {

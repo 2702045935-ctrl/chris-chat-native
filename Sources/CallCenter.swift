@@ -95,7 +95,15 @@ final class CallCenter: NSObject, ObservableObject {
     /// 拨出去没人接的兜底计时（服务端 45 秒也会结束，这里是客户端保险，别让界面卡在"呼叫中"）
     private var ringTimer: Timer?
     private var sub: AnyCancellable?
-    private var iceUrls: [String] = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+    /* 打洞 / 中转服务器。默认这套是国内能连上的 STUN + 一个公共 TURN：
+       同一个 Wi-Fi 里其实用不到它们，但**跨网络**（4G/别人家宽带）必须靠 TURN 中转，
+       不然对称 NAT 下两边根本连不上。后台「语音通话」里填了 iceServers 就用后台的。 */
+    private var iceServers: [RTCIceServer] = [
+        RTCIceServer(urlStrings: ["stun:stun.miwifi.com:3478", "stun:stun.cloudflare.com:3478"]),
+        RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]),
+        RTCIceServer(urlStrings: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443"],
+                     username: "openrelayproject", credential: "openrelayproject")
+    ]
 
     private override init() {
         super.init()
@@ -303,13 +311,32 @@ final class CallCenter: NSObject, ObservableObject {
     /* ---------------------------------------------------------- 媒体 + P2P */
 
     private func loadIce() async {
-        guard let b = await API.shared.branding() else { return }
-        // 后台配了就优先用后台的（跨网络需要 TURN 时在这儿填）
-        if let raw = b.iceServers?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
-            let list = raw.split(whereSeparator: { $0 == "," || $0 == "\n" }).map { String($0).trimmingCharacters(in: .whitespaces) }
-            let urls = list.filter { !$0.isEmpty }
-            if !urls.isEmpty { iceUrls = urls }
+        guard let b = await API.shared.branding(),
+              let raw = b.iceServers?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return }
+        /* 两种写法都认：
+           ① JSON（推荐，能带 TURN 的账号密码）
+              [{"urls":"turn:turn.xxx.com:3478","username":"u","credential":"p"}]
+           ② 老写法：逗号或换行分隔的一串地址 */
+        if let data = raw.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            var out: [RTCIceServer] = []
+            for it in arr {
+                var urls: [String] = []
+                if let one = it["urls"] as? String { urls = [one] }
+                else if let many = it["urls"] as? [String] { urls = many }
+                if urls.isEmpty { continue }
+                out.append(RTCIceServer(urlStrings: urls,
+                                        username: it["username"] as? String,
+                                        credential: it["credential"] as? String))
+            }
+            if !out.isEmpty { iceServers = out }
+            return
         }
+        let list = raw.split(whereSeparator: { $0 == "," || $0 == "\n" })
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        if !list.isEmpty { iceServers = list.map { RTCIceServer(urlStrings: [$0]) } }
     }
 
     private func makeFactory() -> RTCPeerConnectionFactory {
@@ -333,7 +360,8 @@ final class CallCenter: NSObject, ObservableObject {
 
         let f = makeFactory()
         let cfg = RTCConfiguration()
-        cfg.iceServers = iceUrls.map { RTCIceServer(urlStrings: [$0]) }
+        cfg.iceServers = iceServers
+        cfg.iceTransportPolicy = .all          // 先直连，直连不成再由 TURN 中转
         cfg.sdpSemantics = .unifiedPlan
         let pc = f.peerConnection(with: cfg,
                                   constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil),

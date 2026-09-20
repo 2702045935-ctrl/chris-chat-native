@@ -3,6 +3,30 @@ import SwiftUI
 /// 图标全部从网页版 m.html 里原样抄过来，保证和手机微信/网页版长得一样
 enum I {
 
+    // ---------------- 通话页（后台「UI 图标」里能换：call.*） ----------------
+    static let callMinimize = """
+    <svg data-key="ui.callMinimize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="4.2" width="14.6" height="14.6" rx="3.2"/><rect x="12.4" y="13" width="9" height="7" rx="2.4"/></svg>
+    """
+    static let callAdd = """
+    <svg data-key="ui.callAdd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3.4v17.2M3.4 12h17.2"/></svg>
+    """
+    static let callMic = """
+    <svg data-key="ui.callMic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.8" width="6" height="10.6" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0012.8 0M12 17.8v3.2"/></svg>
+    """
+    static let callMicOff = """
+    <svg data-key="ui.callMicOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.8" width="6" height="10.6" rx="3"/><path d="M5.6 11.4a6.4 6.4 0 0012.8 0M12 17.8v3.2"/><path d="M4.2 3.2l15.6 17.6"/></svg>
+    """
+    static let callSpeaker = """
+    <svg data-key="ui.callSpeaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.4h3.8L13 5.8v12.4l-4.8-3.6H4.4z"/><path d="M16.2 9.6a3.4 3.4 0 010 4.8M18.6 7.4a6.6 6.6 0 010 9.2"/></svg>
+    """
+    static let callSpeakerOff = """
+    <svg data-key="ui.callSpeakerOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.4h3.8L13 5.8v12.4l-4.8-3.6H4.4z"/><path d="M16.4 9.8l4.2 4.4M20.6 9.8l-4.2 4.4"/></svg>
+    """
+    /// 挂断/取消：一条宽横梁、两头朝下（参考图实测 67×16pt）
+    static let callHangup = """
+    <svg data-key="ui.callHangup" viewBox="0 0 24 24" fill="currentColor"><path d="M1.6 10.1Q12 6.9 22.4 10.1L22.4 13.6Q17.2 11.7 12 11.7Q6.8 11.7 1.6 13.6Z"/></svg>
+    """
+
     // ---------------- 导航 / 搜索 ----------------
     static let plusRing = """
     <svg data-key="i.plusRing" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"><circle cx="12" cy="12" r="9.15"/><path d="M12 7.7v8.6M7.7 12h8.6"/></svg>

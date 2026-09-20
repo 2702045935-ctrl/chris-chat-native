@@ -205,12 +205,16 @@ struct CallView: View {
                         .font(.system(size: 27, weight: .medium))
                 }
             } else {
-                roundKey(icon: call.muted ? "mic.slash.fill" : "mic.fill",
+                roundKey(key: call.muted ? "ui.callMicOff" : "ui.callMic",
+                         symbol: call.muted ? "mic.slash.fill" : "mic.fill",
+                         builtin: call.muted ? I.callMicOff : I.callMic,
                          label: call.muted ? "麦克风已关" : "麦克风已开",
                          engaged: call.muted) { call.toggleMute() }
                 roundKey(label: call.phase == .active ? "挂断" : "取消",
                          bg: Color(hex: 0xFA5151)) { call.hangup() }
-                roundKey(icon: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                roundKey(key: call.speakerOn ? "ui.callSpeaker" : "ui.callSpeakerOff",
+                         symbol: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                         builtin: call.speakerOn ? I.callSpeaker : I.callSpeakerOff,
                          label: call.speakerOn ? "扬声器已开" : "扬声器已关",
                          engaged: call.speakerOn) { call.toggleSpeaker() }
             }
@@ -219,22 +223,26 @@ struct CallView: View {
     }
 
     /// 左右两颗（麦克风 / 扬声器）：打开时**变白底 + 深色图标**（和微信一样），
-    /// 关着的时候是半透明黑底 + 白色图标。
-    private func roundKey(icon: String, label: String, engaged: Bool,
+    /// 关着的时候是半透明黑底 + 白色图标。图标本身后台「UI 图标」里能换。
+    private func roundKey(key: String, symbol: String, builtin: String,
+                          label: String, engaged: Bool,
                           action: @escaping () -> Void) -> some View {
+        let ink: Color = engaged ? .black : .white
+        return
         roundKey(label: label,
                  bg: engaged ? Color.white : Color.white.opacity(0.18),
-                 ink: engaged ? Color.black : Color.white,
+                 ink: ink,
                  action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 27, weight: .medium))
+            CallIcon(key: key, symbol: symbol, builtin: builtin, size: 30, color: ink)
         }
     }
 
     /// 挂断/取消那颗：图标是微信那种宽横梁（SF Symbols 里没有一样的，自己画）
     private func roundKey(label: String, bg: Color,
                           action: @escaping () -> Void) -> some View {
-        roundKey(label: label, bg: bg, ink: .white, action: action) { HangUpIcon() }
+        roundKey(label: label, bg: bg, ink: .white, action: action) {
+            CallIcon(key: "ui.callHangup", symbol: "phone.down.fill", builtin: I.callHangup, size: 72)
+        }
     }
 
     private func roundKey<Icon: View>(label: String, bg: Color, ink: Color,
@@ -262,8 +270,8 @@ struct CallView: View {
             Button {
                 call.minimize()
             } label: {
-                PipIcon()
-                    .frame(width: 20, height: 20)
+                CallIcon(key: "ui.callMinimize", symbol: "rectangle.inset.bottomright.filled",
+                         builtin: I.callMinimize, size: 20)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -275,8 +283,7 @@ struct CallView: View {
             Button {
                 showInvite = true
             } label: {
-                PlusIcon()
-                    .frame(width: 17, height: 17)
+                CallIcon(key: "ui.callAdd", symbol: "plus", builtin: I.callAdd, size: 17)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -303,7 +310,7 @@ struct CallView: View {
             Button {
                 call.hangup()
             } label: {
-                HangUpIcon(width: 22)
+                CallIcon(key: "ui.callHangup", symbol: "phone.down.fill", builtin: I.callHangup, size: 24)
             }
             .buttonStyle(.plain)
             .padding(.leading, 8)
@@ -411,6 +418,39 @@ struct PlusIcon: View {
                 p.addLine(to: CGPoint(x: w / 2, y: w))
             }
             .stroke(Color.white, style: StrokeStyle(lineWidth: max(1.6, w * 0.11), lineCap: .round))
+        }
+    }
+}
+
+/// 通话页的图标：后台「UI 图标」里配过（ui.callMinimize / ui.callAdd / ui.callMic /
+/// ui.callMicOff / ui.callSpeaker / ui.callSpeakerOff / ui.callHangup）就用配的，
+/// 可以传 SVG、图片地址（上传的图）或者 emoji；没配就用内置的。
+struct CallIcon: View {
+    let key: String
+    var symbol: String = "circle"
+    var builtin: String? = nil
+    var size: CGFloat = 24
+    var color: Color = .white
+
+    var body: some View {
+        if let v = IconOverrides.custom(key), !v.isEmpty {
+            if v.hasPrefix("<svg") {
+                SVGIcon(markup: v, size: size, color: color)
+            } else if v.hasPrefix("http") || v.hasPrefix("/uploads") || v.hasPrefix("data:") {
+                RemoteImage(path: v).frame(width: size, height: size)
+            } else {
+                Text(v)
+                    .font(.system(size: size * 0.9))
+                    .foregroundColor(color)
+                    .frame(width: size, height: size)
+            }
+        } else if let b = builtin {
+            SVGIcon(markup: b, size: size, color: color)
+        } else {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.9, weight: .medium))
+                .foregroundColor(color)
+                .frame(width: size, height: size)
         }
     }
 }

@@ -59,7 +59,7 @@ struct FavoritesView: View {
             .refreshable { await load() }
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -157,7 +157,7 @@ struct StickerView: View {
             }
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -293,7 +293,7 @@ struct StatusView: View {
             }
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -345,7 +345,7 @@ struct WalletCardView: View {
             }
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -381,7 +381,7 @@ struct WorksView: View {
             .frame(maxWidth: .infinity)
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()

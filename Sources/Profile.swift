@@ -89,7 +89,7 @@ struct ProfileEditView: View {
             }
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -220,7 +220,7 @@ struct NewFriendsView: View {
             .refreshable { await load() }
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -294,7 +294,7 @@ struct AddFriendView: View {
             .padding(16)
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -382,7 +382,7 @@ struct GroupCreateView: View {
             .background(C.cardBg)
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -517,7 +517,7 @@ struct ServiceView: View {
             }
             .background(C.pageBg)
         }
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()

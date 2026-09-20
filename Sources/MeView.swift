@@ -301,7 +301,7 @@ struct SettingsView: View {
             .background(C.pageBg)
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-        .background(C.navBg.ignoresSafeArea(edges: .top))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()

@@ -183,15 +183,14 @@ struct CallView: View {
         HStack(spacing: 51) {
             if call.phase == .incoming {
                 // 来电：拒接 + 接听
-                roundKey(icon: "phone.down.fill", label: "拒绝",
-                         bg: Color(hex: 0xFA5151)) { call.reject() }
+                roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
                 roundKey(icon: "phone.fill", label: "接听",
                          bg: Color(hex: 0x07C160)) { call.accept() }
             } else {
                 roundKey(icon: call.muted ? "mic.slash.fill" : "mic.fill",
                          label: call.muted ? "麦克风已关" : "麦克风已开",
                          bg: Color.white.opacity(call.muted ? 0.34 : 0.18)) { call.toggleMute() }
-                roundKey(icon: "phone.down.fill", label: call.phase == .active ? "挂断" : "取消",
+                roundKey(label: call.phase == .active ? "挂断" : "取消",
                          bg: Color(hex: 0xFA5151)) { call.hangup() }
                 roundKey(icon: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
                          label: call.speakerOn ? "扬声器已开" : "扬声器已关",
@@ -203,11 +202,25 @@ struct CallView: View {
 
     private func roundKey(icon: String, label: String, bg: Color,
                           action: @escaping () -> Void) -> some View {
+        roundKey(label: label, bg: bg, action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 27, weight: .medium))
+                .foregroundColor(.white)
+        }
+    }
+
+    /// 挂断/取消那颗：图标是微信那种宽横梁（SF Symbols 里没有一样的，自己画）
+    private func roundKey(label: String, bg: Color,
+                          action: @escaping () -> Void) -> some View {
+        roundKey(label: label, bg: bg, action: action) { HangUpIcon() }
+    }
+
+    private func roundKey<Icon: View>(label: String, bg: Color,
+                                      action: @escaping () -> Void,
+                                      @ViewBuilder icon: () -> Icon) -> some View {
         VStack(spacing: 14) {
             Button(action: action) {
-                Image(systemName: icon)
-                    .font(.system(size: 27, weight: .medium))
-                    .foregroundColor(.white)
+                icon()
                     .frame(width: 72, height: 72)
                     .background(Circle().fill(bg))
             }
@@ -216,6 +229,30 @@ struct CallView: View {
                 .font(pfExact(14))
                 .foregroundColor(.white.opacity(0.92))
         }
+    }
+}
+
+/// 微信「挂断 / 取消」那个图标：一条略带弧度的宽横梁，两头向下收，宽高比约 4:1。
+/// 参考图实测 67×16pt（在 72pt 的圆里几乎占满宽度）。
+struct HangUpIcon: View {
+    var width: CGFloat = 66
+    var body: some View {
+        let h = width * 0.25
+        let s = width / 66
+        return Path { p in
+            p.move(to: CGPoint(x: 3 * s, y: 5.4 * s))
+            p.addQuadCurve(to: CGPoint(x: 63 * s, y: 5.4 * s),
+                           control: CGPoint(x: 33 * s, y: 0.4 * s))       // 上沿：中间略高
+            p.addLine(to: CGPoint(x: 63 * s, y: 9.2 * s))
+            p.addQuadCurve(to: CGPoint(x: 43 * s, y: 13.2 * s),
+                           control: CGPoint(x: 53 * s, y: 13.4 * s))      // 右腿向下收
+            p.addLine(to: CGPoint(x: 23 * s, y: 13.2 * s))
+            p.addQuadCurve(to: CGPoint(x: 3 * s, y: 9.2 * s),
+                           control: CGPoint(x: 13 * s, y: 13.4 * s))      // 左腿向下收
+            p.closeSubpath()
+        }
+        .fill(Color.white)
+        .frame(width: width, height: max(8, h))
     }
 }
 

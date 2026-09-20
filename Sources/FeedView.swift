@@ -291,6 +291,7 @@ struct FeedCell: View {
     var onDelete: () -> Void
 
     @State private var player: AVPlayer?
+    @State private var loadingVideo = true
     @State private var liked = false
     @State private var likes = 0
     @State private var bounced = false
@@ -303,6 +304,9 @@ struct FeedCell: View {
             }
             if let p = player {
                 PlayerSurface(player: p)
+            }
+            if loadingVideo {
+                ProgressView().tint(.white)
             }
             LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.65)],
                            startPoint: .top, endPoint: .bottom)
@@ -389,17 +393,29 @@ struct FeedCell: View {
     private func setup() {
         liked = item.liked ?? false
         likes = item.likes ?? 0
-        if player == nil, let url = API.shared.assetURL(item.video ?? "") {
-            let p = AVPlayer(url: url)
-            p.isMuted = false
-            p.actionAtItemEnd = .none
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
-                                                   object: p.currentItem, queue: .main) { _ in
-                p.seek(to: .zero)
-                p.play()
+        guard player == nil, let url = API.shared.assetURL(item.video ?? "") else { return }
+        /* 注意：AVPlayer 自己有网络栈，**不认服务器那张自签证书**，直接播 https 会黑屏。
+           所以先带令牌把视频下到本地临时文件，再用本地文件播（几 MB 的短视频，秒下）。 */
+        Task { @MainActor in
+            do {
+                let data = try await API.shared.assetData(url)
+                let tmp = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("feed-\(item.id).mp4")
+                try data.write(to: tmp)
+                let p = AVPlayer(url: tmp)
+                p.isMuted = false
+                p.actionAtItemEnd = .none
+                NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
+                                                       object: p.currentItem, queue: .main) { _ in
+                    p.seek(to: .zero)
+                    p.play()
+                }
+                player = p
+                loadingVideo = false
+                if active { p.play() }
+            } catch {
+                loadingVideo = false
             }
-            player = p
-            if active { p.play() }
         }
     }
 }

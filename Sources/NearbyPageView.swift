@@ -78,6 +78,10 @@ struct NearbyPageView: View {
     /// all / female / male —— 和微信 ⋯ 里那三个选项一样
     @State private var filter = "all"
     @State private var showMenu = false
+    /// 现在看多大的范围（默认 5 公里；5 公里没人可以点「扩大范围」）
+    @State private var maxKm: Double = 5
+    /// 20 公里内有几个人（用来提示「扩大范围」）
+    @State private var wider = 0
 
     @State private var helloFor: NearbyPerson?
     @State private var helloText = "你好呀，我是在附近的人里看到你的"
@@ -132,9 +136,25 @@ struct NearbyPageView: View {
                     } else if loading && people.isEmpty {
                         ProgressView().tint(.white).padding(.top, 70)
                     } else if people.isEmpty {
-                        hint(tip.isEmpty
-                             ? "5 公里内还没有其他人\n（对方也要在这个页面里，并且就在你附近）"
-                             : tip, showSetting: false)
+                        VStack(spacing: 12) {
+                            hint(tip.isEmpty
+                                 ? "\(Int(maxKm)) 公里内还没有其他人\n（对方也要打开「附近的人」，并且就在你附近）"
+                                 : tip, showSetting: false)
+                            if tip.isEmpty && maxKm < 20 {
+                                if wider > 0 {
+                                    Button("扩大到 20 公里（有 \(wider) 人）") {
+                                        maxKm = 20
+                                        Task { await reload(force: true) }
+                                    }
+                                    .font(pf(15))
+                                    .foregroundColor(C.green)
+                                } else {
+                                    Text("20 公里内也没有人")
+                                        .font(pf(13))
+                                        .foregroundColor(subInk.opacity(0.7))
+                                }
+                            }
+                        }
                     } else {
                         ForEach(people) { p in
                             personRow(p)
@@ -275,7 +295,9 @@ struct NearbyPageView: View {
             if let la = loc.lat, let ln = loc.lng {
                 try? await API.shared.nearbyReport(lat: la, lng: ln)
             }
-            people = try await API.shared.nearby(lat: loc.lat, lng: loc.lng, gender: filter)
+            let r = try await API.shared.nearby(lat: loc.lat, lng: loc.lng, gender: filter, maxKm: maxKm)
+            people = r.people
+            wider = r.wider
             tip = ""
         } catch {
             tip = (error as? APIError)?.errorDescription ?? "加载失败"

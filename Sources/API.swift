@@ -138,7 +138,12 @@ struct NearbyPerson: Decodable, Identifiable, Hashable {
     }
 }
 
-private struct NearbyPayload: Decodable { var people: [NearbyPerson] }
+private struct NearbyPayload: Decodable {
+    var people: [NearbyPerson]
+    /// 5 公里内没人时：20 公里内有几个（提示「扩大范围」用）
+    var wider: Int?
+    var maxKm: Double?
+}
 private struct NearbyHelloPayload: Decodable { var chatId: String?; var text: String? }
 
 /// 摇一摇的结果：摇到人就是 matched，没人同时在摇就是 nil
@@ -979,11 +984,12 @@ final class API {
     }
 
     /// 附近的人名单（按距离排）
-    func nearby(lat: Double?, lng: Double?, gender: String = "all") async throws -> [NearbyPerson] {
-        var path = "/api/nearby?gender=\(gender)"
+    func nearby(lat: Double?, lng: Double?, gender: String = "all", maxKm: Double = 5)
+        async throws -> (people: [NearbyPerson], wider: Int, maxKm: Double) {
+        var path = "/api/nearby?gender=\(gender)&maxKm=\(maxKm)"
         if let lat = lat, let lng = lng { path += "&lat=\(lat)&lng=\(lng)" }
         let payload: NearbyPayload = try await get(path, as: NearbyPayload.self)
-        return payload.people
+        return (payload.people, payload.wider ?? 0, payload.maxKm ?? maxKm)
     }
 
     /// 打招呼：给对方发一条消息（会话就出来了）

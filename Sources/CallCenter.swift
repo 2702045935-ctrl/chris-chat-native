@@ -40,10 +40,35 @@ final class CallCenter: NSObject, ObservableObject {
     @Published private(set) var speakerOn = false
     @Published private(set) var seconds = 0
     @Published private(set) var tip = ""
-    /// 接通 / 挂断的提示：和聊天页那行时间一模一样的圆角小框（对话框），
-    /// 屏幕上显示两秒再淡出。用户要的就是这个「框框」，不是一闪而过的通话页。
-    @Published private(set) var banner = ""
-    private var bannerTask: Task<Void, Never>?
+    /// 接通 / 挂断弹的对话框（用户要的就是这个形式：居中一个框 + 「确定」）。
+    /// 颜色/圆角跟聊天页那行时间用的是同一套后台配置，所以长得和聊天的框框一样。
+    struct Dialog: Equatable {
+        var title = ""
+        var detail = ""
+        var okText = "确定"
+        var auto: Double = 0          // > 0 表示过这么多秒自动关掉（接通那种不用手动点）
+    }
+    @Published var dialog: Dialog? = nil
+    private var dialogTask: Task<Void, Never>?
+
+    func dismissDialog() {
+        dialogTask?.cancel()
+        dialogTask = nil
+        dialog = nil
+    }
+
+    /// 弹一个对话框：title 必给，detail 可以空，auto > 0 就是自动关掉
+    func showDialog(_ title: String, detail: String = "", auto: Double = 0) {
+        guard !title.isEmpty else { return }
+        dialogTask?.cancel()
+        dialog = Dialog(title: title, detail: detail, auto: auto)
+        guard auto > 0 else { return }
+        dialogTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(auto * 1_000_000_000))
+            guard let self = self, !Task.isCancelled else { return }
+            self.dialog = nil
+        }
+    }
     /// 给界面渲染用的远端 / 本地画面
     @Published private(set) var remoteVideo: RTCVideoTrack?
     @Published private(set) var localVideo: RTCVideoTrack?
@@ -88,6 +113,7 @@ final class CallCenter: NSObject, ObservableObject {
     func start(peerId: String, name: String, avatar: String, video: Bool) {
         guard phase == .idle else { errorText = "正在通话中"; return }
         guard !peerId.isEmpty else { errorText = "找不到对方账号"; return }
+        dismissDialog()                 // 上一通留下的对话框别压在新通话上面
         self.peerId = peerId
         peerName = name
         peerAvatar = avatar
@@ -438,22 +464,10 @@ final class CallCenter: NSObject, ObservableObject {
         cameraOff = false
         if !wasIdle {
             phase = .idle
-            /* 挂断原因用「聊天页那个圆角小框」显示出来：
-               接通过的顺带把时长写上，没接通就只写原因。 */
-            let dur = secs > 0 ? String(format: " %02d:%02d", secs / 60, secs % 60) : ""
-            showBanner((tip.isEmpty ? "通话已结束" : tip) + dur)
-        }
-    }
-
-    /// 上面那个提示框：显示两秒自动淡出；又来一条就把上一条顶掉
-    func showBanner(_ text: String, seconds hold: Double = 2.2) {
-        guard !text.isEmpty else { return }
-        bannerTask?.cancel()
-        banner = text
-        bannerTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(hold * 1_000_000_000))
-            guard let self = self, !Task.isCancelled else { return }
-            self.banner = ""
+            /* 挂断原因弹一个对话框（和聊天那个框一样的颜色/圆角）：
+               接通过的把时长写在下面，没接通就只写原因，点「确定」关掉。 */
+            let dur = secs > 0 ? String(format: "通话时长 %02d:%02d", secs / 60, secs % 60) : ""
+            showDialog(tip.isEmpty ? "通话已结束" : tip, detail: dur.isEmpty ? peerName : dur, auto: 8)
         }
     }
 
@@ -533,8 +547,9 @@ extension CallCenter: RTCPeerConnectionDelegate {
                     self.ringTimer?.invalidate()
                     self.ringTimer = nil
                     self.startTimer()
-                    /* 接通也报一下（和挂断同一个框） */
-                    self.showBanner(self.isVideo ? "视频通话已接通" : "语音通话已接通", seconds: 1.6)
+                    /* 接通也弹一下（同一个对话框，2 秒后自己关） */
+                    self.showDialog(self.isVideo ? "视频通话已接通" : "语音通话已接通",
+                                    detail: "", auto: 2)
                 }
             case .failed:
                 self.errorText = "通话连接失败，可能是网络挡住了"

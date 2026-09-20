@@ -26,31 +26,62 @@ struct CallOverlay: View {
     }
 }
 
-/// 接通 / 挂断的提示框：**和聊天页那行时间一模一样的圆角小框**（同一个后台配置：
-/// 底色 chatTimeBg、文字色 chatTimeColor、圆角 chatTimeRadius、留白 chatTimePadX/Y）。
-/// 通话页收起来以后它还在，所以「挂断」也看得到。
-struct CallBannerView: View {
+/// 接通 / 挂断弹的对话框：居中的卡片 + 「确定」，颜色/圆角取后台那套
+/// （和聊天页那行时间同一个配置：底色 chatTimeBg、文字色 chatTimeColor、圆角 chatTimeRadius），
+/// 所以看着就是「聊天的框框」。通话页收起来以后它还在，所以挂断也一定看得到。
+struct CallDialogOverlay: View {
     @ObservedObject private var call = CallCenter.shared
 
     var body: some View {
-        VStack {
-            if !call.banner.isEmpty {
-                Text(call.banner)
-                    .font(pf(L.msgTimeSize))
-                    .foregroundColor(C.chatTimeInk)
-                    .padding(.horizontal, L.o("chatTimePadX", 8))
-                    .padding(.vertical, L.o("chatTimePadY", 3))
-                    .background(RoundedRectangle(cornerRadius: L.o("chatTimeRadius", 4), style: .continuous)
-                        .fill(C.chatTimeBg))
-                    .frame(maxWidth: .infinity)
-                    .transition(.opacity)
+        ZStack {
+            if let d = call.dialog {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture { call.dismissDialog() }
+
+                VStack(spacing: 0) {
+                    VStack(spacing: 6) {
+                        Text(d.title)
+                            .font(pf(16, .medium))
+                            .foregroundColor(C.chatTimeInk)
+                            .multilineTextAlignment(.center)
+                        if !d.detail.isEmpty {
+                            Text(d.detail)
+                                .font(pf(13))
+                                .foregroundColor(C.chatTimeInk.opacity(0.75))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 22)
+                    .padding(.bottom, 18)
+
+                    Rectangle()
+                        .fill(C.chatTimeInk.opacity(0.18))
+                        .frame(height: 0.5)
+
+                    Button {
+                        call.dismissDialog()
+                    } label: {
+                        Text(d.okText)
+                            .font(pf(16, .medium))
+                            .foregroundColor(C.chatTimeInk)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(width: 268)
+                .background(
+                    RoundedRectangle(cornerRadius: max(12, L.o("chatTimeRadius", 4) + 8), style: .continuous)
+                        .fill(C.chatTimeBg)
+                )
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
+                .zIndex(1000)
             }
-            Spacer(minLength: 0)
         }
-        .padding(.top, max(8, L.safeTop + 6))
-        .allowsHitTesting(false)
         .zIndex(1000)
-        .animation(.easeInOut(duration: 0.18), value: call.banner)
+        .animation(.easeOut(duration: 0.16), value: call.dialog)
     }
 }
 

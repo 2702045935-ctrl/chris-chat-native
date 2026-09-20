@@ -51,6 +51,8 @@ struct ChannelsView: View {
     @State private var pendingVideoPath = ""
     @State private var uploadMB: Double = 0
     @State private var trim = 0          // 0=不处理 1=剪底部10% 2=剪底部14% 3=剪右侧12% 4=剪右下角
+    @State private var style = FeedStyle()
+    @State private var flags = FeedFlags()
 
     var body: some View {
         GeometryReader { geo in
@@ -67,6 +69,8 @@ struct ChannelsView: View {
                     ForEach(visible, id: \.item.id) { row in
                         FeedCell(item: row.item,
                                  active: row.offset == 0,
+                                 style: style,
+                                 flags: flags,
                                  onLike: { toggleLike(row.item) },
                                  onComment: { commentFor = row.item; commentText = "" },
                                  onShare: { share(row.item) },
@@ -149,13 +153,16 @@ struct ChannelsView: View {
                 .buttonStyle(.plain)
                 Text("视频号").font(pf(17, .semibold)).foregroundColor(.white)
                 Spacer()
-                Button { pickOpen = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: L.navH)
+                /* 后台把关了「允许前台发视频」就不显示这个 ＋ */
+                if flags.allowPublish != false {
+                    Button { pickOpen = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: L.navH)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 6)
             Spacer()
@@ -175,7 +182,11 @@ struct ChannelsView: View {
     /* ---------------------------------------------------------- 数据 */
 
     private func load() async {
-        items = (try? await API.shared.feedItems()) ?? []
+        if let r = try? await API.shared.feed() {
+            items = r.items
+            style = r.style
+            flags = r.flags
+        }
         loading = false
     }
 
@@ -263,14 +274,17 @@ struct ChannelsView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("剪掉水印").font(pf(14, .medium))
-                Picker("剪掉水印", selection: $trim) {
-                    Text("不处理").tag(0)
-                    Text("剪底部 10%").tag(1)
-                    Text("剪底部 14%").tag(2)
-                    Text("剪右侧 12%").tag(3)
-                    Text("剪右下角").tag(4)
+                /* 后台关了「允许剪水印」就直接不显示这一排 */
+                if flags.allowTrim != false {
+                    Picker("剪掉水印", selection: $trim) {
+                        Text("不处理").tag(0)
+                        Text("剪底部 10%").tag(1)
+                        Text("剪底部 14%").tag(2)
+                        Text("剪右侧 12%").tag(3)
+                        Text("剪右下角").tag(4)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
                 Text("剪完会把画面放大回原尺寸，不会变小 —— 只是把带水印的那一条切掉。")
                     .font(pf(11.5)).foregroundColor(.secondary)
             }
@@ -382,6 +396,8 @@ struct ChannelsView: View {
 struct FeedCell: View {
     let item: FeedItem
     let active: Bool
+    var style = FeedStyle()
+    var flags = FeedFlags()
     var onLike: () -> Void
     var onComment: () -> Void
     var onShare: () -> Void
@@ -409,30 +425,32 @@ struct FeedCell: View {
             LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.65)],
                            startPoint: .top, endPoint: .bottom)
 
-            HStack(alignment: .bottom, spacing: 0) {
-                Spacer()
-                rightRail
+            if flags.showRail != false {
+                HStack(alignment: .bottom, spacing: 0) {
+                    Spacer()
+                    rightRail
+                }
+                .padding(.trailing, 12)
+                .padding(.bottom, 110)
             }
-            .padding(.trailing, 12)
-            .padding(.bottom, 110)
 
             VStack(alignment: .leading, spacing: 8) {
                 Spacer()
                 Text("@\(item.author?.name ?? "用户")")
-                    .font(pf(16, .semibold)).foregroundColor(.white)
+                    .font(pf(style.nameSize ?? 16, .semibold)).foregroundColor(.white)
                 Text(item.desc ?? "")
-                    .font(pf(14)).foregroundColor(.white.opacity(0.95))
+                    .font(pf(style.descSize ?? 14)).foregroundColor(.white.opacity(0.95))
                     .lineLimit(3)
                 HStack(spacing: 5) {
                     Image(systemName: "music.note").font(.system(size: 12))
                     Text(item.music?.isEmpty == false ? (item.music ?? "") : "原创声音")
-                        .font(pf(12.5))
+                        .font(pf(style.musicSize ?? 12.5))
                 }
                 .foregroundColor(.white.opacity(0.9))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
-            .padding(.bottom, max(28, L.safeBottom + 10))
+            .padding(.bottom, max(style.padBottom ?? 28, L.safeBottom + 10))
         }
         .onAppear { setup() }
         .onDisappear { player?.pause() }
@@ -442,9 +460,10 @@ struct FeedCell: View {
     }
 
     private var rightRail: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: style.railGap ?? 20) {
             ZStack(alignment: .bottom) {
-                Avatar(path: item.author?.avatar ?? "", size: 46, radius: 23, circle: true)
+                Avatar(path: item.author?.avatar ?? "", size: style.avatar ?? 46,
+                       radius: (style.avatar ?? 46) / 2, circle: true)
                     .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.5))
                 Button { onFollow() } label: {
                     Image(systemName: "plus")
@@ -479,7 +498,7 @@ struct FeedCell: View {
         Button(action: action) {
             VStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 27))
+                    .font(.system(size: style.railIcon ?? 27))
                     .foregroundColor(tint)
                     .scaleEffect(bounced && icon == "heart.fill" ? 1.25 : 1)
                 Text(text).font(pf(12.5, .medium)).foregroundColor(.white)

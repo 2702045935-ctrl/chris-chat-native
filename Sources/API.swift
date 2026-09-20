@@ -170,7 +170,30 @@ struct MiniGame: Decodable, Identifiable, Hashable {
 }
 
 /* ---------------- 视频号 ---------------- */
-private struct FeedPayload: Decodable { var items: [FeedItem] }
+/// 视频号的后台可调样式（后台「视频号」面板里改）
+struct FeedStyle: Decodable, Hashable {
+    var avatar: Double?
+    var nameSize: Double?
+    var descSize: Double?
+    var musicSize: Double?
+    var railIcon: Double?
+    var railGap: Double?
+    var padBottom: Double?
+}
+
+/// 视频号的开关
+struct FeedFlags: Decodable, Hashable {
+    var allowPublish: Bool?
+    var allowTrim: Bool?
+    var showRail: Bool?
+    var autoPlay: Bool?
+}
+
+private struct FeedPayload: Decodable {
+    var items: [FeedItem]
+    var style: FeedStyle?
+    var flags: FeedFlags?
+}
 private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
 private struct FeedCommentPayload: Decodable { var comments: Int? }
 private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
@@ -1067,6 +1090,11 @@ final class API {
     func feedItems() async throws -> [FeedItem] {
         let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)
         return p.items
+    }
+    /// 列表 + 后台配的样式和开关
+    func feed() async throws -> (items: [FeedItem], style: FeedStyle, flags: FeedFlags) {
+        let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)
+        return (p.items, p.style ?? FeedStyle(), p.flags ?? FeedFlags())
     }
     func feedLike(_ id: String) async throws -> (liked: Bool, likes: Int) {
         let p: FeedLikePayload = try await post("/api/feed/like", ["id": id], as: FeedLikePayload.self)

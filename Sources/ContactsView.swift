@@ -139,7 +139,9 @@ struct ContactsView: View {
                 }
             }
             .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-            .background(C.navBg.ignoresSafeArea(edges: .top))
+            /* 顶部（状态栏那一条）跟页面用同一个底色：深色下导航色比页面底色浅，
+               不这样会看到顶上一条明显的浅色带（用户要求「颜色要到顶一致」） */
+            .background(C.pageBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: User.self) { user in
                 ContactCardView(user: user,

@@ -45,7 +45,8 @@ struct DiscoverView: View {
                 .background(C.pageBg)
             }
             .background(C.pageBg.ignoresSafeArea(edges: .bottom))
-            .background(C.navBg.ignoresSafeArea(edges: .top))
+            /* 顶部（状态栏那一条）跟页面同一个底色，深色下才不会顶出一条浅色带 */
+            .background(C.pageBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: String.self) { key in
                 if key == "moments" {

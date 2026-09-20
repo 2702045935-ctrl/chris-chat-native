@@ -981,7 +981,7 @@ struct MomentSingleImage: View {
             return
         }
         guard let url = API.shared.assetURL(path) else { return }
-        guard let (data, _) = try? await API.shared.session.data(from: url),
+        guard let data = try? await API.shared.imageData(url),
               let img = RemoteImage.downsampled(data, maxSide: 2048), img.size.height > 0 else { return }
         ImageStore.shared.put(path, img)
         aspect = img.size.width / img.size.height

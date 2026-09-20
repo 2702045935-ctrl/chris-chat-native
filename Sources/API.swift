@@ -714,6 +714,18 @@ final class API {
         return URL(string: base + p)
     }
 
+    /// 取图片专用的下载：**带上登录令牌**。
+    /// 服务器对 /uploads 的规则是「要么带签名、要么本人已登录」，
+    /// 以前这里用的是不带任何请求头的 session.data(from:)，所以只要拿到的是
+    /// 没签名/签名过期的老链接，就一律 403 —— 表现就是「头像能看、背景全加载不出来」。
+    func imageData(_ url: URL) async throws -> Data {
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 15
+        if !token.isEmpty { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let (data, _) = try await session.data(for: req)
+        return data
+    }
+
     /* ---------------------------------------------------------- 底层请求 */
 
     private func request(_ method: String, _ path: String, body: [String: Any]? = nil) async throws -> Any {

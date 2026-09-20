@@ -5,7 +5,7 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
     static let version = "1.0"
-    static let build = "2026-09-21 05:10 接通/挂断改成居中对话框（确定按钮，样式同聊天的框）"
+    static let build = "2026-09-21 05:35 修「背景加载不出来」：取图带登录令牌；接通/挂断对话框"
 }
 
 /* ============================================================
@@ -496,7 +496,7 @@ struct RemoteImage: View {
         }
         guard let url = API.shared.assetURL(path) else { return }
         do {
-            let (data, _) = try await API.shared.session.data(from: url)
+            let data = try await API.shared.imageData(url)
             /* 安全：按"解码时就缩小"的方式加载图片。
                直接用 UIImage(data:) 会把原图整张解到内存里 —— 一张 20000×20000 的图
                （文件才 1MB）解码要 1.5GB 内存，手机当场被杀（解压炸弹）。
@@ -883,7 +883,7 @@ struct PhotoPager: View {
         Task {
             var image: UIImage? = ImageStore.shared.get(path)
             if image == nil, let url = API.shared.assetURL(path) {
-                if let (data, _) = try? await API.shared.session.data(from: url) {
+                if let data = try? await API.shared.imageData(url) {
                     image = RemoteImage.downsampled(data, maxSide: 1600)
                 }
             }

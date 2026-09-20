@@ -174,6 +174,7 @@ private struct FeedPayload: Decodable { var items: [FeedItem] }
 private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
 private struct FeedCommentPayload: Decodable { var comments: Int? }
 private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
+private struct FeedTrimPayload: Decodable { var url: String?; var width: Int?; var height: Int? }
 
 struct MomentLike: Decodable, Hashable {
     var userId: String?
@@ -1084,6 +1085,14 @@ final class API {
     }
     func feedDelete(_ id: String) async {
         _ = try? await request("DELETE", "/api/feed/\(id)")
+    }
+    /// 剪水印：把带水印的那条边裁掉，返回新视频地址（服务端 ffmpeg 处理）
+    func feedTrim(_ url: String, top: Double, bottom: Double, left: Double, right: Double) async throws -> String {
+        let p: FeedTrimPayload = try await post("/api/feed/trim",
+                                                ["url": url, "top": top, "bottom": bottom,
+                                                 "left": left, "right": right, "fill": true],
+                                                as: FeedTrimPayload.self)
+        return p.url ?? url
     }
 
     /* ---------------------------------------------------------- 摇一摇 */

@@ -50,6 +50,7 @@ struct ChannelsView: View {
     @State private var publishMusic = ""
     @State private var pendingVideoPath = ""
     @State private var uploadMB: Double = 0
+    @State private var trim = 0          // 0=不处理 1=剪底部10% 2=剪底部14% 3=剪右侧12% 4=剪右下角
 
     var body: some View {
         GeometryReader { geo in
@@ -107,13 +108,8 @@ struct ChannelsView: View {
         .sheet(item: $commentFor) { item in
             commentSheet(item)
         }
-        .alert("发表视频", isPresented: $showPublish) {
-            TextField("说点什么…", text: $publishDesc)
-            TextField("音乐名（可留空）", text: $publishMusic)
-            Button("发表") { publish() }
-            Button("取消", role: .cancel) { }
-        } message: {
-            Text(uploadMB > 0 ? String(format: "视频已经传好（压缩后 %.1f MB），补充一句文案", uploadMB) : "视频已经传好，补充一句文案")
+        .sheet(isPresented: $showPublish) {
+            publishSheet
         }
         .photosPicker(isPresented: $pickOpen, selection: $picked, matching: .videos)
         .onChange(of: picked) { v in Task { await uploadPicked(v) } }
@@ -252,6 +248,49 @@ struct ChannelsView: View {
 
     /* ---------------------------------------------------------- 发表 */
 
+    /// 发表前的小页面：文案、音乐、以及「剪掉水印」
+    private var publishSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("发表视频").font(pf(17, .semibold))
+            if uploadMB > 0 {
+                Text(String(format: "视频已传好（压缩后 %.1f MB）", uploadMB))
+                    .font(pf(12.5)).foregroundColor(.secondary)
+            }
+            TextField("说点什么…", text: $publishDesc)
+                .textFieldStyle(.roundedBorder)
+            TextField("音乐名（可留空）", text: $publishMusic)
+                .textFieldStyle(.roundedBorder)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("剪掉水印").font(pf(14, .medium))
+                Picker("剪掉水印", selection: $trim) {
+                    Text("不处理").tag(0)
+                    Text("剪底部 10%").tag(1)
+                    Text("剪底部 14%").tag(2)
+                    Text("剪右侧 12%").tag(3)
+                    Text("剪右下角").tag(4)
+                }
+                .pickerStyle(.segmented)
+                Text("剪完会把画面放大回原尺寸，不会变小 —— 只是把带水印的那一条切掉。")
+                    .font(pf(11.5)).foregroundColor(.secondary)
+            }
+
+            Button { publish() } label: {
+                Text("发表").font(pf(16, .medium)).foregroundColor(.white)
+                    .frame(maxWidth: .infinity).frame(height: 46)
+                    .background(RoundedRectangle(cornerRadius: 23).fill(C.green))
+            }
+            .buttonStyle(.plain)
+            Button { showPublish = false } label: {
+                Text("取消").font(pf(15)).foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity).frame(height: 38)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(20)
+        .presentationDetents([.height(430)])
+    }
+
     private func uploadPicked(_ v: PhotosPickerItem?) async {
         guard let v = v else { return }
         uploading = true
@@ -306,9 +345,27 @@ struct ChannelsView: View {
         let music = publishMusic.trimmingCharacters(in: .whitespacesAndNewlines)
         publishDesc = ""
         publishMusic = ""
+        let crop = trim
+        showPublish = false
         Task {
             do {
-                _ = try await API.shared.feedPublish(video: pendingVideoPath, desc: desc, music: music)
+                var video = pendingVideoPath
+                if crop > 0 {
+                    let area: (top: Double, bottom: Double, left: Double, right: Double)
+                    switch crop {
+                    case 1: area = (0, 0.10, 0, 0)
+                    case 2: area = (0, 0.14, 0, 0)
+                    case 3: area = (0, 0, 0, 0.12)
+                    default: area = (0, 0.12, 0, 0.10)
+                    }
+                    if let trimmed = try? await API.shared.feedTrim(video, top: area.top, bottom: area.bottom,
+                                                                     left: area.left, right: area.right) {
+                        video = trimmed
+                    } else {
+                        app.show("剪水印失败，就用原视频发了")
+                    }
+                }
+                _ = try await API.shared.feedPublish(video: video, desc: desc, music: music)
                 app.show("发表成功")
                 index = 0
                 await load()
@@ -316,6 +373,7 @@ struct ChannelsView: View {
                 app.show((error as? APIError)?.errorDescription ?? "发表失败")
             }
         }
+        trim = 0
     }
 }
 

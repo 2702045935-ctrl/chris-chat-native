@@ -317,6 +317,13 @@ final class CallCenter: NSObject, ObservableObject {
     /* ---------------------------------------------------------- 媒体 + P2P */
 
     private func loadIce() async {
+        /* 先把自己服务器的内置 TURN 加进去：它永远在（服务器就在跟你说话），
+           直连连不上时靠它中转，比任何公网服务都靠得住。 */
+        let hostOnly = API.shared.server.split(separator: ":").first.map(String.init) ?? ""
+        if !hostOnly.isEmpty {
+            iceServers.insert(RTCIceServer(urlStrings: ["turn:\(hostOnly):3478?transport=udp"],
+                                           username: "chris", credential: "chris1234"), at: 0)
+        }
         guard let b = await API.shared.branding(),
               let raw = b.iceServers?.trimmingCharacters(in: .whitespacesAndNewlines),
               !raw.isEmpty else { return }

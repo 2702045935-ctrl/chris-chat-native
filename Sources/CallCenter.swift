@@ -393,7 +393,8 @@ final class CallCenter: NSObject, ObservableObject {
         seconds = 0
         ticker?.invalidate()
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.seconds += 1 }
+            guard let self = self else { return }
+            Task { @MainActor in self.seconds += 1 }
         }
     }
 }
@@ -401,6 +402,8 @@ final class CallCenter: NSObject, ObservableObject {
 /* ---------------------------------------------------------- WebRTC 回调 */
 
 extension CallCenter: RTCPeerConnectionDelegate {
+    nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCSignalingState) { }
+
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCIceConnectionState) { }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange newState: RTCIceGatheringState) { }
@@ -429,6 +432,8 @@ extension CallCenter: RTCPeerConnectionDelegate {
         guard let track = receiver.track as? RTCVideoTrack else { return }
         Task { @MainActor in self.remoteVideo = track }
     }
+
+    nonisolated func peerConnection(_ pc: RTCPeerConnection, didRemove receiver: RTCRtpReceiver, streams: [RTCMediaStream]) { }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didRemove stream: RTCMediaStream) { }
 

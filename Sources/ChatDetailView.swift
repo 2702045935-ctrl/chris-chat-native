@@ -296,12 +296,7 @@ struct ChatDetailView: View {
                             }
                             /* 系统消息（通话记录、撤回提示这种）：微信是居中一行灰字，没有头像和气泡 */
                             if message.kindName == "system" {
-                                Text(message.body)
-                                    .font(pf(12.5))
-                                    .foregroundColor(C.msgTime)
-                                    .multilineTextAlignment(.center)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.horizontal, 40)
+                                SystemLine(message: message)
                                     .padding(.bottom, 15)
                             } else {
                             MessageRow(message: message,
@@ -711,6 +706,29 @@ struct ChatDetailView: View {
 }
 
 /* ============================================================ 单条消息 */
+
+/// 系统消息行：通话记录就是「📞 通话时长 00:12」这样居中的一行灰字（和微信一样）。
+/// 图标后台能换：ui.callRecord（语音）/ ui.callRecordVideo（视频）。
+struct SystemLine: View {
+    let message: Message
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if message.isCallRecord {
+                CallIcon(key: message.isVideoCall ? "ui.callRecordVideo" : "ui.callRecord",
+                         symbol: message.isVideoCall ? "video.fill" : "phone.fill",
+                         builtin: message.isVideoCall ? I.callRecordVideo : I.callRecord,
+                         size: 13, color: C.msgTime)
+            }
+            Text(message.body)
+                .font(pf(12.5))
+                .foregroundColor(C.msgTime)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 40)
+    }
+}
 
 struct MessageRow: View {
     let message: Message

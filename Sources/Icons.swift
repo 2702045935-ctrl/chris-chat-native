@@ -27,6 +27,16 @@ enum I {
     <svg data-key="ui.callHangup" viewBox="0 0 24 24" fill="currentColor"><path d="M1.6 10.1Q12 6.9 22.4 10.1L22.4 13.6Q17.2 11.7 12 11.7Q6.8 11.7 1.6 13.6Z"/></svg>
     """
 
+    // ---------------- 聊天页里的通话记录（后台「UI 图标」能换：ui.callRecord* ） ----------------
+    /// 语音通话记录前面的小电话
+    static let callRecord = """
+    <svg data-key="ui.callRecord" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 2.4c.5 0 1 .3 1.2.8l1.5 3.3c.2.5.1 1.1-.3 1.5l-1.3 1.3c1 2 2.6 3.6 4.6 4.6l1.3-1.3c.4-.4 1-.5 1.5-.3l3.3 1.5c.5.2.8.7.8 1.2v3.2c0 .8-.6 1.5-1.4 1.6-.6.1-1.2.1-1.9.1C9.7 19.9 4.1 14.3 3.3 6.6c-.1-.7-.1-1.3 0-1.9.1-.8.8-1.4 1.6-1.4h1.7z"/></svg>
+    """
+    /// 视频通话记录前面的小摄像机
+    static let callRecordVideo = """
+    <svg data-key="ui.callRecordVideo" viewBox="0 0 24 24" fill="currentColor"><rect x="2.2" y="5.6" width="13.2" height="12.8" rx="3.4"/><path d="M16.9 10.4l3.9-2.6c.5-.3 1.1 0 1.1.6v7.2c0 .6-.6.9-1.1.6l-3.9-2.6z"/></svg>
+    """
+
     // ---------------- 导航 / 搜索 ----------------
     static let plusRing = """
     <svg data-key="i.plusRing" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"><circle cx="12" cy="12" r="9.15"/><path d="M12 7.7v8.6M7.7 12h8.6"/></svg>

@@ -249,7 +249,7 @@ final class CallCenter: NSObject, ObservableObject {
                 switch ev.callReason {
                 case "rejected":     why = "对方已拒绝"
                 case "cancel":       why = iAmCaller ? "已取消" : "对方已取消"
-                case "timeout":      why = "未接听"
+                case "timeout":      why = iAmCaller ? "对方无应答" : "未接听"
                 case "offline":      why = "对方不在线"
                 case "disconnected": why = "对方已断开"
                 case "hangup":       why = "通话已结束"
@@ -445,17 +445,19 @@ final class CallCenter: NSObject, ObservableObject {
         }
     }
 
-    /// 45 秒还没接通就自己挂掉（服务端也会推 end，两边都做才不会被网络问题卡住）
+    /// 响了没人接：服务端 45 秒会自己收尾（记「对方无应答」），
+    /// 这里 50 秒兜底一次——网络把服务端的 end 丢了也不会一直响下去。
+    /// 主动方自己挂断时带 reason:'timeout'，让服务端记「对方无应答」而不是「已取消」。
     private func startRingTimeout() {
         ringTimer?.invalidate()
-        ringTimer = Timer.scheduledTimer(withTimeInterval: 45, repeats: false) { [weak self] _ in
+        ringTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             Task { @MainActor in
                 guard self.phase == .outgoing || self.phase == .incoming else { return }
-                if !self.callId.isEmpty {
-                    self.sendCall(["action": self.iAmCaller ? "cancel" : "reject"])
+                if !self.callId.isEmpty && self.iAmCaller {
+                    self.sendCall(["action": "cancel", "reason": "timeout"])
                 }
-                self.finish(tip: "未接听")
+                self.finish(tip: self.iAmCaller ? "对方无应答" : "未接听")
             }
         }
     }

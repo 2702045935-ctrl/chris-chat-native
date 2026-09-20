@@ -75,10 +75,29 @@ struct Message: Decodable, Identifiable, Hashable {
     var recalled: Bool?
     var senderName: String?
     var senderAvatar: String?
+    /// 通话记录专用的附加信息（服务端写系统消息时带上）
+    var call: CallMeta?
 
     var kindName: String { kind ?? "text" }
     var body: String { content ?? "" }
     var isRecalled: Bool { recalled ?? false }
+
+    /// 这行系统消息是不是一条通话记录
+    var isCallRecord: Bool {
+        if call != nil { return true }
+        let t = body
+        return t.contains("通话") || t == "已取消" || t == "未接听" || t == "对方无应答"
+            || t == "对方已拒绝" || t == "对方忙线中" || t == "对方不在线"
+    }
+    /// 视频通话（图标画摄像机）
+    var isVideoCall: Bool { (call?.media ?? "").contains("video") || body.contains("视频") }
+}
+
+/// 通话系统消息的附加信息：媒体类型、状态、时长
+struct CallMeta: Decodable, Hashable {
+    var media: String?
+    var state: String?
+    var secs: Int?
 }
 
 struct MomentLike: Decodable, Hashable {

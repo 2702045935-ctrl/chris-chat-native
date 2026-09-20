@@ -102,8 +102,8 @@ struct LiveListView: View {
                           : LinearGradient(colors: [Color(hex: 0x222225), Color(hex: 0x191919)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(height: 132)
-                if !r.cover.isEmpty {
-                    RemoteImage(path: r.cover).frame(height: 132).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                if !(r.cover ?? "").isEmpty {
+                    RemoteImage(path: r.cover ?? "").frame(height: 132).clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 HStack(spacing: 6) {
                     if r.isLive {

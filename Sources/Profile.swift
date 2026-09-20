@@ -7,6 +7,8 @@ struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var nickname = ""
+    @ObservedObject private var ring = Ringtone.shared
+    @State private var showRingtone = false
     @State private var bio = ""
     @State private var region = ""
     @State private var gender = "male"
@@ -77,6 +79,25 @@ struct ProfileEditView: View {
                         field("手机号", $phone)
                     }
 
+                    GroupCard {
+                        Button {
+                            showRingtone = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text("来电铃声").font(pf(17)).foregroundColor(C.label)
+                                Spacer()
+                                Text(ring.currentName)
+                                    .font(pf(15))
+                                    .foregroundColor(C.subLabel)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     Text("手机号一年只能改一次；头像、昵称、地区、签名想改就改。")
                         .font(pf(12.5))
                         .foregroundColor(C.subLabel)
@@ -102,6 +123,9 @@ struct ProfileEditView: View {
         }
         .sheet(isPresented: $showPhoto) {
             PhotoPicker { image in changeAvatar(image) }
+        }
+        .sheet(isPresented: $showRingtone) {
+            RingtonePicker()
         }
     }
 

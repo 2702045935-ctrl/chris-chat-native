@@ -104,6 +104,12 @@ struct CallView: View {
                 .font(pfExact(15))
                 .foregroundColor(.white.opacity(0.7))
                 .padding(.top, 6)
+                .opacity(call.phase == .outgoing ? 0 : 1)
+            if call.phase == .outgoing {
+                // 等对方接的时候：状态文字像滚动屏一样滚（同时放回铃音）
+                MarqueeText(text: "正在等待对方接受邀请…")
+                    .padding(.top, 6)
+            }
             if !hintText.isEmpty {
                 Text(hintText)
                     .font(pfExact(15))
@@ -244,6 +250,104 @@ struct CallView: View {
                 .foregroundColor(.white.opacity(0.92))
         }
     }
+
+    /* ---------------------------------------------------------- 顶部两个按钮（照参考图） */
+
+    /// 参考图实测：左上那个「画中画/最小化」在 x29-47 y79-97；右上「+」在 x384-400 y78-94
+    private var topBar: some View {
+        HStack {
+            Button {
+                call.minimize()
+            } label: {
+                PipIcon()
+                    .frame(width: 20, height: 20)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Button {
+                showInvite = true
+            } label: {
+                PlusIcon()
+                    .frame(width: 17, height: 17)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 6)
+        }
+        .padding(.top, 19)
+    }
+
+    /// 最小化后顶部那条（通话不中断，点「回到通话」还原）
+    private var miniBar: some View {
+        HStack(spacing: 8) {
+            Circle().fill(C.green).frame(width: 8, height: 8)
+            Text(call.phase == .active ? "通话中 \(timeText)" : call.tip)
+                .font(pfExact(14))
+                .foregroundColor(.white)
+            Spacer(minLength: 0)
+            Button {
+                call.restore()
+            } label: {
+                Text("回到通话").font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
+            }
+            .buttonStyle(.plain)
+            Button {
+                call.hangup()
+            } label: {
+                HangUpIcon(width: 22)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 8)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 42)
+        .background(Capsule().fill(Color.black.opacity(0.72)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /* ---------------------------------------------------------- 邀请好友（右上 +） */
+
+    private var inviteSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(app.contacts) { u in
+                        Button {
+                            showInvite = false
+                            let name = u.nickname ?? u.username ?? "好友"
+                            Task {
+                                let msg = await call.invite(userId: u.id, name: name)
+                                app.show(msg)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Avatar(path: u.avatar ?? "", size: 36, radius: 6)
+                                Text(u.nickname ?? u.username ?? "好友").foregroundColor(C.label)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("邀请好友加入通话")
+                } footer: {
+                    Text("对方会收到一条邀请消息；多人同时在同一个通话里（会议模式）还在做，先保证人能叫到。")
+                }
+            }
+            .navigationTitle("添加通话")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
 }
 
 /// 微信「挂断 / 取消」那个图标：一条略带弧度的宽横梁，两头向下收，宽高比约 4:1。
@@ -308,6 +412,34 @@ struct PlusIcon: View {
     }
 }
 
+/// 「滚动屏」：文字从右边缘慢慢滚到左边，循环滚（等对方接的时候用）
+struct MarqueeText: View {
+    let text: String
+    var size: CGFloat = 15
+    var duration: Double = 7
+    @State private var x: CGFloat = 0
+    @State private var ready = false
+
+    var body: some View {
+        GeometryReader { geo in
+            Text(text)
+                .font(pfExact(size))
+                .foregroundColor(.white.opacity(0.72))
+                .fixedSize()
+                .offset(x: x)
+                .onAppear {
+                    guard !ready else { return }
+                    ready = true
+                    x = geo.size.width
+                    withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                        x = -geo.size.width
+                    }
+                }
+        }
+        .frame(height: size + 6)
+    }
+}
+
 /* ---------------------------------------------------------- 视频画面 */
 
 /// 把 WebRTC 的画面接到 SwiftUI 里（Metal 渲染，省电、延迟低）
@@ -339,100 +471,3 @@ struct VideoSurface: UIViewRepresentable {
         coordinator.attached?.remove(view)
     }
 }
-    /* ---------------------------------------------------------- 顶部两个按钮（照参考图） */
-
-    /// 参考图实测：左上那个「画中画/最小化」在 x29-47 y79-97；右上「+」在 x384-400 y78-94
-    private var topBar: some View {
-        HStack {
-            Button { call.minimize() } label: {
-                PipIcon()
-                    .frame(width: 20, height: 20)
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 16)
-
-            Spacer()
-
-            Button { showInvite = true } label: {
-                PlusIcon()
-                    .frame(width: 17, height: 17)
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 6)
-        }
-        .padding(.top, 19)
-    }
-
-    /// 最小化后顶部那条（通话不中断，点「回到通话」还原）
-    private var miniBar: some View {
-        HStack(spacing: 8) {
-            Circle().fill(C.green).frame(width: 8, height: 8)
-            Text(call.phase == .active ? "通话中 \(timeText)" : call.tip)
-                .font(pfExact(14))
-                .foregroundColor(.white)
-            Spacer(minLength: 0)
-            Button {
-                call.restore()
-            } label: {
-                Text("回到通话").font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
-            }
-            .buttonStyle(.plain)
-            Button {
-                call.hangup()
-            } label: {
-                Image(systemName: "phone.down.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color(hex: 0xFA5151))
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 10)
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(Capsule().fill(Color.black.opacity(0.72)))
-        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    /* ---------------------------------------------------------- 邀请好友（右上 +） */
-
-    private var inviteSheet: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(app.contacts) { u in
-                        Button {
-                            showInvite = false
-                            let name = u.nickname ?? u.username ?? "好友"
-                            Task {
-                                let msg = await call.invite(userId: u.id, name: name)
-                                app.show(msg)
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Avatar(path: u.avatar ?? "", size: 36, radius: 6)
-                                Text(u.nickname ?? u.username ?? "好友").foregroundColor(C.label)
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                } header: {
-                    Text("邀请好友加入通话")
-                } footer: {
-                    Text("对方会收到一条邀请消息；多人同时在同一个通话里（会议模式）还在做，先保证人能叫到。")
-                }
-            }
-            .navigationTitle("添加通话")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }

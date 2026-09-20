@@ -95,12 +95,14 @@ final class CallCenter: NSObject, ObservableObject {
         callId = "call" + String(Int(Date().timeIntervalSince1970 * 1000)) + String(UUID().uuidString.prefix(4))
         phase = .outgoing
         startRingTimeout()
+        Ringtone.shared.startRingback()        // 等对方接的时候放回铃音（嘟——）
         Task { await beginMedia() }
     }
 
     /// 接听（来电界面点绿键）
     func accept() {
         guard phase == .incoming else { return }
+        Ringtone.shared.stop()
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
@@ -206,6 +208,7 @@ final class CallCenter: NSObject, ObservableObject {
             tip = isVideo ? "邀请你视频通话…" : "邀请你语音通话…"
             phase = .incoming
             startRingTimeout()
+            Ringtone.shared.startIncoming()    // 来电铃声响起来（重复放到接/挂）
             UINotification.buzz()          // 震动提醒
 
         case "ringing":
@@ -214,6 +217,7 @@ final class CallCenter: NSObject, ObservableObject {
 
         case "accepted":
             guard ev.callId == callId else { return }
+            Ringtone.shared.stop()
             phase = .connecting
             tip = "正在接通…"
 
@@ -413,6 +417,7 @@ final class CallCenter: NSObject, ObservableObject {
     private func finish(tip: String) {
         let wasIdle = (phase == .idle)
         self.tip = tip
+        Ringtone.shared.stop()
         ticker?.invalidate()
         ticker = nil
         ringTimer?.invalidate()
@@ -498,6 +503,7 @@ extension CallCenter: RTCPeerConnectionDelegate {
             switch newState {
             case .connected:
                 if self.phase != .active {
+                    Ringtone.shared.stop()
                     self.phase = .active
                     self.tip = self.isVideo ? "视频通话中" : "通话中"
                     self.ringTimer?.invalidate()

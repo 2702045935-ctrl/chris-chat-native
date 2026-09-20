@@ -66,7 +66,9 @@ struct SwipeChatRow: View {
     private var btnFont: CGFloat { UIConfig.num("swipeFont", 17) }
     private var fullW: CGFloat { btnW * 3 }
 
-    private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.chatRowBg }
+    /* 会话列表每一行也用「卡片底色」，和通讯录的卡片一个色；
+       置顶的仍然用置顶色区分一下 */
+    private var rowBg: Color { chat.pinned == true ? C.pinnedBg : C.cardBg }
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -232,7 +234,8 @@ struct ChatsView: View {
                                下拉会跟着列表一起下来 —— 微信就是这样（参考图里第二张搜索框已经滚没了）。 */
                             SearchBoxCenter(text: $keyword)
                                 .padding(L.searchPad)
-                                .background(C.navBg)      // 和顶栏同色，滚起来是一条连续的
+                                /* 和通讯录一样用「页面底色」，两页看着才是同一个色 */
+                                .background(C.pageBg)
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,
@@ -253,8 +256,10 @@ struct ChatsView: View {
                     .coordinateSpace(name: "chatsScroll")
                 }
             }
-            .background(C.navBg.ignoresSafeArea(edges: .bottom))
-            .background(C.navBg.ignoresSafeArea(edges: .top))
+            /* 第一页面（会话列表）的底色跟通讯录统一：都用后台的「页面底色」pageBg，
+               以前这里用的是 navBg，深色下比通讯录浅一档（#18181A vs #0B0B0D）。 */
+            .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+            .background(C.pageBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in
                 ChatDetailView(chat: chat)
@@ -299,7 +304,7 @@ struct ChatsView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .background(C.chatRowBg)
+        .background(C.pageBg)
     }
 
     private func markUnread(_ chat: Chat) {

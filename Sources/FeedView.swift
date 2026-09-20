@@ -32,11 +32,6 @@ struct FeedItem: Decodable, Identifiable, Hashable {
     var mine: Bool?
 }
 
-private struct FeedPayload: Decodable { var items: [FeedItem] }
-private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
-private struct FeedCommentPayload: Decodable { var comments: Int? }
-private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
-
 struct ChannelsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss

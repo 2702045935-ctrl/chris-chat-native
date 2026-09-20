@@ -169,6 +169,12 @@ struct MiniGame: Decodable, Identifiable, Hashable {
     var enabled: Bool?
 }
 
+/* ---------------- 视频号 ---------------- */
+private struct FeedPayload: Decodable { var items: [FeedItem] }
+private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
+private struct FeedCommentPayload: Decodable { var comments: Int? }
+private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
+
 struct MomentLike: Decodable, Hashable {
     var userId: String?
     var nickname: String?

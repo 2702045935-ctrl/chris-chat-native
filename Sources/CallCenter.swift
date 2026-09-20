@@ -56,6 +56,8 @@ final class CallCenter: NSObject, ObservableObject {
     private var videoSource: RTCVideoSource?
     private var capturer: RTCCameraVideoCapturer?
     private var ticker: Timer?
+    /// 拨出去没人接的兜底计时（服务端 45 秒也会结束，这里是客户端保险，别让界面卡在"呼叫中"）
+    private var ringTimer: Timer?
     private var sub: AnyCancellable?
     private var iceUrls: [String] = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
 
@@ -88,6 +90,7 @@ final class CallCenter: NSObject, ObservableObject {
         tip = video ? "正在等待对方接受邀请…" : "正在呼叫…"
         callId = "call" + String(Int(Date().timeIntervalSince1970 * 1000)) + String(UUID().uuidString.prefix(4))
         phase = .outgoing
+        startRingTimeout()
         Task { await beginMedia() }
     }
 
@@ -171,6 +174,7 @@ final class CallCenter: NSObject, ObservableObject {
             remoteOfferSDP = ev.callSDP
             tip = isVideo ? "邀请你视频通话…" : "邀请你语音通话…"
             phase = .incoming
+            startRingTimeout()
             UINotification.buzz()          // 震动提醒
 
         case "ringing":
@@ -376,6 +380,8 @@ final class CallCenter: NSObject, ObservableObject {
         self.tip = tip
         ticker?.invalidate()
         ticker = nil
+        ringTimer?.invalidate()
+        ringTimer = nil
         stopMedia()
         callId = ""
         peerId = ""
@@ -395,6 +401,21 @@ final class CallCenter: NSObject, ObservableObject {
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             Task { @MainActor in self.seconds += 1 }
+        }
+    }
+
+    /// 45 秒还没接通就自己挂掉（服务端也会推 end，两边都做才不会被网络问题卡住）
+    private func startRingTimeout() {
+        ringTimer?.invalidate()
+        ringTimer = Timer.scheduledTimer(withTimeInterval: 45, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                guard self.phase == .outgoing || self.phase == .incoming else { return }
+                if !self.callId.isEmpty {
+                    self.sendCall(["action": self.iAmCaller ? "cancel" : "reject"])
+                }
+                self.finish(tip: "未接听")
+            }
         }
     }
 }
@@ -444,6 +465,8 @@ extension CallCenter: RTCPeerConnectionDelegate {
                 if self.phase != .active {
                     self.phase = .active
                     self.tip = self.isVideo ? "视频通话中" : "通话中"
+                    self.ringTimer?.invalidate()
+                    self.ringTimer = nil
                     self.startTimer()
                 }
             case .failed:

@@ -23,10 +23,21 @@ struct CallView: View {
     @EnvironmentObject var app: AppState
 
     private var dark: Color { Color(red: 0.11, green: 0.11, blue: 0.12) }
+    /// 通话页背景：毛玻璃 + 压暗。压暗程度默认 85%，后台 ui.json 里写 callGlassAlpha 可调。
+    private var glassAlpha: CGFloat { UIConfig.num("callGlassAlpha", 0.85) }
+
+    /// 毛玻璃底色（来电、通话中都用它）
+    private var glassBackground: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)          // 磨砂
+            Color.black.opacity(glassAlpha)               // 85% 压暗
+        }
+        .ignoresSafeArea()
+    }
 
     var body: some View {
         ZStack {
-            dark.ignoresSafeArea()
+            glassBackground
 
             if call.isVideo && call.phase == .active {
                 // 视频通话：远端铺满，本地小窗右下角
@@ -79,7 +90,7 @@ struct CallView: View {
                 bottomBar
             }
         }
-        .background(dark)
+        .background(glassBackground)
     }
 
     private var statusText: String {

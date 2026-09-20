@@ -36,7 +36,9 @@ struct MainTabView: View {
             }
         }
         .background(C.navBg.ignoresSafeArea())
-        .animation(.easeOut(duration: 0.18), value: app.tabBarHidden)
+        /* 注意：这里以前有一句 .animation(…, value: app.tabBarHidden)。
+           它会让「整块内容区」在标签栏显隐时一起做动画 —— 打开聊天页（藏标签栏）那一下
+           「上下缩放」就是这么来的。改成不给容器加动画：标签栏直接让位，页面照常推进来。 */
         /* 真人语音/视频通话：来电、通话界面挂在最外层，任何页面都能弹出来 */
         .overlay(CallOverlay())
     }

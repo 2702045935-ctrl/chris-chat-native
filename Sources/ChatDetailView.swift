@@ -57,6 +57,7 @@ struct ChatDetailView: View {
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
+    @ObservedObject private var recorder = VoiceRecorder.shared
     @State private var pushTask: Task<Void, Never>?
 
     private var myId: String { app.me?.id ?? "" }
@@ -123,6 +124,12 @@ struct ChatDetailView: View {
                         .padding(18)
                         .background(RoundedRectangle(cornerRadius: 10).fill(C.cardBg))
                 }
+            }
+
+            /* 按住说话时中间那个浮层：麦克风 + 音量条 + 提示 */
+            if recorder.recording {
+                VoiceHUD(seconds: recorder.seconds, level: recorder.level, willCancel: recorder.willCancel)
+                    .zIndex(50)
             }
 
         }
@@ -310,12 +317,27 @@ struct ChatDetailView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Button {
-                    app.show("按住说话排在下一批")
+                    /* 点一下：提示"按住说话"（真正的录音在下面的长按手势里） */
+                    app.show("按住左边的麦克风说话，松开发送，上滑取消")
                 } label: {
-                    SVGIcon(markup: I.voice, size: L.composerIcon, color: C.iconGray)
+                    SVGIcon(markup: I.voice, size: L.composerIcon,
+                            color: recorder.recording ? C.green : C.iconGray)
                         .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
                 .buttonStyle(.plain)
+                /* 按住说话：按住开始录，松开发送，上滑取消 */
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { v in
+                            if !recorder.recording {
+                                focused = false
+                                panel = .none
+                                Task { _ = await recorder.begin() }
+                            }
+                            recorder.drag(v.translation.height)
+                        }
+                        .onEnded { _ in finishVoice() }
+                )
 
                 HStack(spacing: 0) {
                     TextField("", text: $input)
@@ -442,7 +464,7 @@ struct ChatDetailView: View {
             }
         case "voice":
             panel = .none
-            app.show("按住说话：请在电脑版或聊天页右上角使用")
+            app.show("按住输入框左边的麦克风说话：松开发送，上滑取消")
         case "redpacket":
             panel = .none
             send(kind: "text", content: "🧧 恭喜发财，大吉大利")
@@ -515,6 +537,37 @@ struct ChatDetailView: View {
             }
             uploading = false
             await app.loadChats()
+        }
+    }
+
+    /* ---------------------------------------------------------- 按住说话 */
+
+    /// 松手：录到了就发，太短/取消了就啥也不做
+    private func finishVoice() {
+        guard let got = recorder.end() else { return }
+        sendVoice(url: got.url, seconds: got.seconds)
+    }
+
+    private func sendVoice(url: URL, seconds: Int) {
+        Task {
+            uploading = true
+            defer { uploading = false }
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else {
+                app.show("录音读不到，再录一次")
+                return
+            }
+            let payload: [String: Any] = [
+                "dataUrl": "data:audio/mp4;base64," + data.base64EncodedString(),
+                "filename": "voice.m4a"
+            ]
+            do {
+                let up = try await API.shared.rawUpload(payload)
+                let body = "{\"url\":\"\(up.url)\",\"seconds\":\(seconds),\"bytes\":\(data.count)}"
+                send(kind: "audio", content: body)
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "语音发送失败")
+            }
+            try? FileManager.default.removeItem(at: url)
         }
     }
 
@@ -619,6 +672,8 @@ struct MessageRow: View {
     var onOpenAvatar: ((String) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
+    /// 语音消息播放状态（哪条在播）
+    @ObservedObject private var voicePlayer = VoicePlayer.shared
 
     private var avatarPath: String {
         if let p = message.senderAvatar, !p.isEmpty { return p }
@@ -697,7 +752,7 @@ struct MessageRow: View {
             fileBubble
 
         case "audio":
-            card(icon: I.speaker, title: "语音", detail: "点击播放")
+            audioBubble
 
         default:
             Text(message.body)
@@ -784,6 +839,34 @@ struct MessageRow: View {
         .frame(width: 216, alignment: .leading)
         .background(card)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    /// 语音消息气泡：喇叭 + 秒数，点一下播放（再点一下停）
+    private var audioBubble: some View {
+        let o = dict(message.body)
+        let path = (o["url"] as? String) ?? ""
+        let secs = max(1, (o["seconds"] as? Int) ?? 1)
+        let playing = voicePlayer.playingID == message.id
+        let width = min(210, 74 + CGFloat(secs) * 3.2)
+        return HStack(spacing: 8) {
+            SVGIcon(markup: I.speaker, size: 20,
+                    color: playing ? C.green : C.bubbleText)
+            Text("\(secs)″")
+                .font(pfMoney(12.5))
+                .foregroundColor(C.subLabel)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(width: width, height: 40, alignment: mine ? .trailing : .leading)
+        .background(BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let url = API.shared.assetURL(path) else {
+                app.show("这条语音找不到了")
+                return
+            }
+            voicePlayer.toggle(id: message.id, url: url)
+        }
     }
 
     private var giftBubble: some View {

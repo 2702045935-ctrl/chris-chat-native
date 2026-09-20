@@ -30,7 +30,7 @@ struct CallView: View {
     @ObservedObject private var call = CallCenter.shared
     @EnvironmentObject var app: AppState
 
-    private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 40) }
+    private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 60) }
     private var tint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
 
     /// 通话背景用的聊天背景图（自己设的 → 服务器默认 → 没有）
@@ -65,7 +65,13 @@ struct CallView: View {
     private var backdrop: some View {
         ZStack {
             Color(red: 0.10, green: 0.11, blue: 0.10)
-            if !bgPath.isEmpty {
+            /* 和微信一样：糊的是「对方的头像」那张图（放大糊狠一点），
+               所以背景会带出这个人头像的色调。对方没头像才退回聊天背景图。 */
+            if !call.peerAvatar.isEmpty {
+                RemoteImage(path: call.peerAvatar)
+                    .blur(radius: blurRadius)
+                    .scaleEffect(1.35)
+            } else if !bgPath.isEmpty {
                 RemoteImage(path: bgPath)
                     .blur(radius: blurRadius)
                     .scaleEffect(1.25)                  // 糊完边缘不留白

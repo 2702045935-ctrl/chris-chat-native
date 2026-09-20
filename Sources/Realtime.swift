@@ -37,6 +37,11 @@ struct PushEvent: Equatable {
     var liveFrom = ""
     var watching = 0
     var likes = 0
+    /* 直播信令（真视频直播）：谁发的、什么类型、SDP/候选 */
+    var liveFromId = ""
+    var liveSigKind = ""
+    var liveSDP = ""
+    var liveCandidate = ""
     var tick = 0
 }
 
@@ -162,6 +167,12 @@ final class Realtime: ObservableObject {
         ev.liveFrom = (obj["from"] as? String) ?? ""
         if let w = obj["watching"] as? Int { ev.watching = w }
         if let l = obj["likes"] as? Int { ev.likes = l }
+        ev.liveFromId = (obj["from"] as? String) ?? ""
+        ev.liveSigKind = (obj["sigKind"] as? String) ?? ""
+        if let sdp = obj["sdp"] as? [String: Any] { ev.liveSDP = (sdp["sdp"] as? String) ?? "" }
+        if let cand = obj["candidate"] as? [String: Any],
+           let d2 = try? JSONSerialization.data(withJSONObject: cand),
+           let t2 = String(data: d2, encoding: .utf8) { ev.liveCandidate = t2 }
         // WebRTC 协商内容：SDP 和 ICE 候选（网页版也是这么传的）
         if let sdp = obj["sdp"] as? [String: Any] { ev.callSDP = (sdp["sdp"] as? String) ?? "" }
         if let cand = obj["candidate"] as? [String: Any],

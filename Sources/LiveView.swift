@@ -22,6 +22,9 @@ struct LiveRoom: Decodable, Identifiable, Hashable {
     var hot: Int?
     var watching: Int?
     var likes: Int?
+    /// 主播正在推流（有画面可看）
+    var streaming: Bool?
+    var hostId: String?
     var host: Host?
 
     var isLive: Bool { (status ?? "live") == "live" }
@@ -153,6 +156,7 @@ struct LiveRoomView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     let room: LiveRoom
+    @ObservedObject private var live = LiveCenter.shared
 
     @State private var danmakus: [(who: String, text: String)] = []
     @State private var draft = ""
@@ -179,6 +183,32 @@ struct LiveRoomView: View {
                 Spacer(minLength: 0)
                 danmakuList
                 bottomBar
+            }
+
+            /* 真视频层：观众看到主播画面；主播看到自己的预览（右下小窗） */
+            if live.watching, live.remoteVideo != nil {
+                VideoSurface(track: live.remoteVideo)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            } else if live.publishing, live.localVideo != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        VideoSurface(track: live.localVideo)
+                            .frame(width: 104, height: 148)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .padding(.trailing, 14)
+                            .padding(.bottom, 120)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            if live.watching, live.remoteVideo == nil {
+                VStack(spacing: 8) {
+                    ProgressView().tint(.white)
+                    Text("正在连主播的画面…").font(pf(14)).foregroundColor(.white.opacity(0.8))
+                }
             }
 
             /* 点赞飘心 */
@@ -210,8 +240,16 @@ struct LiveRoomView: View {
             watching = (try? await API.shared.liveJoin(room.id)) ?? 0
             likes = room.likes ?? 0
             danmakus.append(("系统", "欢迎来到「\(room.title ?? "直播间")」，友善聊天哦～"))
+            /* 不是我的房间、而且主播在推流 → 自动看画面 */
+            let isMine = (room.host?.id ?? "") == (app.me?.id ?? "-")
+            if !isMine, let hid = room.host?.id, !hid.isEmpty, room.streaming == true {
+                live.startWatch(room: room.id, host: hid)
+            }
         }
-        .onDisappear { Task { await API.shared.liveLeave(room.id) } }
+        .onDisappear {
+            live.stopWatch()
+            Task { await API.shared.liveLeave(room.id) }
+        }
     }
 
     private var navBar: some View {
@@ -232,11 +270,34 @@ struct LiveRoomView: View {
             Spacer(minLength: 0)
             Text("❤️ \(likes)")
                 .font(pf(13)).foregroundColor(.white.opacity(0.9))
+            /* 我的房间：给一个开播/结束的按钮 */
+            if isMyRoom {
+                Button {
+                    Task {
+                        if live.publishing {
+                            live.stopPublish()
+                        } else {
+                            let ok = await live.startPublish(room: room.id)
+                            if !ok { app.show("要相机和麦克风权限才能开播") }
+                        }
+                    }
+                } label: {
+                    Text(live.publishing ? "结束直播" : "开始直播")
+                        .font(pf(13, .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Capsule().fill(live.publishing ? Color(hex: 0xFA5151) : C.green))
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 8)
+            }
         }
         .padding(.trailing, 14)
         .frame(height: L.navH)
         .background(Color.black.opacity(0.25))
     }
+
+    private var isMyRoom: Bool { (room.host?.id ?? "") == (app.me?.id ?? "-") }
 
     private var danmakuList: some View {
         VStack(alignment: .leading, spacing: 6) {

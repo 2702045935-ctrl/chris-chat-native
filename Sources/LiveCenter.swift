@@ -78,8 +78,13 @@ final class LiveCenter: NSObject, ObservableObject {
         watching = true
         activateAudio()
         let pc = makePC(peer: host, publish: false)
-        _ = pc.addTransceiver(of: .video, init: RTCRtpTransceiverInit(direction: .recvOnly))
-        _ = pc.addTransceiver(of: .audio, init: RTCRtpTransceiverInit(direction: .recvOnly))
+        /* 观众只收不发：两条 recvOnly 的收发器 */
+        let vi = RTCRtpTransceiverInit()
+        vi.direction = .recvOnly
+        _ = pc.addTransceiver(of: .video, init: vi)
+        let ai = RTCRtpTransceiverInit()
+        ai.direction = .recvOnly
+        _ = pc.addTransceiver(of: .audio, init: ai)
         pc.offer(for: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)) { [weak self] sdp, _ in
             Task { @MainActor in
                 guard let self = self, let sdp = sdp else { return }

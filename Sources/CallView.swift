@@ -29,6 +29,7 @@ struct CallOverlay: View {
 struct CallView: View {
     @ObservedObject private var call = CallCenter.shared
     @EnvironmentObject var app: AppState
+    @State private var showInvite = false
 
     private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 60) }
     private var tint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
@@ -47,16 +48,24 @@ struct CallView: View {
         ZStack {
             backdrop
 
-            if call.isVideo && call.phase == .active {
-                videoLayer
+            if call.minimized {
+                miniBar
             } else {
-                avatarLayer
-            }
+                if call.isVideo && call.phase == .active {
+                    videoLayer
+                } else {
+                    avatarLayer
+                }
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                bottomBar
+                VStack(spacing: 0) {
+                    topBar
+                    Spacer(minLength: 0)
+                    bottomBar
+                }
             }
+        }
+        .sheet(isPresented: $showInvite) {
+            inviteSheet
         }
     }
 
@@ -189,38 +198,43 @@ struct CallView: View {
             } else {
                 roundKey(icon: call.muted ? "mic.slash.fill" : "mic.fill",
                          label: call.muted ? "麦克风已关" : "麦克风已开",
-                         bg: Color.white.opacity(call.muted ? 0.34 : 0.18)) { call.toggleMute() }
+                         engaged: call.muted) { call.toggleMute() }
                 roundKey(label: call.phase == .active ? "挂断" : "取消",
                          bg: Color(hex: 0xFA5151)) { call.hangup() }
                 roundKey(icon: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
                          label: call.speakerOn ? "扬声器已开" : "扬声器已关",
-                         bg: Color.white.opacity(call.speakerOn ? 0.34 : 0.18)) { call.toggleSpeaker() }
+                         engaged: call.speakerOn) { call.toggleSpeaker() }
             }
         }
         .padding(.bottom, 54)
     }
 
-    private func roundKey(icon: String, label: String, bg: Color,
+    /// 左右两颗（麦克风 / 扬声器）：打开时**变白底 + 深色图标**（和微信一样），
+    /// 关着的时候是半透明黑底 + 白色图标。
+    private func roundKey(icon: String, label: String, engaged: Bool,
                           action: @escaping () -> Void) -> some View {
-        roundKey(label: label, bg: bg, action: action) {
+        roundKey(label: label,
+                 bg: engaged ? Color.white : Color.white.opacity(0.18),
+                 ink: engaged ? Color.black : Color.white,
+                 action: action) {
             Image(systemName: icon)
                 .font(.system(size: 27, weight: .medium))
-                .foregroundColor(.white)
         }
     }
 
     /// 挂断/取消那颗：图标是微信那种宽横梁（SF Symbols 里没有一样的，自己画）
     private func roundKey(label: String, bg: Color,
                           action: @escaping () -> Void) -> some View {
-        roundKey(label: label, bg: bg, action: action) { HangUpIcon() }
+        roundKey(label: label, bg: bg, ink: .white, action: action) { HangUpIcon() }
     }
 
-    private func roundKey<Icon: View>(label: String, bg: Color,
+    private func roundKey<Icon: View>(label: String, bg: Color, ink: Color,
                                       action: @escaping () -> Void,
                                       @ViewBuilder icon: () -> Icon) -> some View {
         VStack(spacing: 14) {
             Button(action: action) {
                 icon()
+                    .foregroundColor(ink)
                     .frame(width: 72, height: 72)
                     .background(Circle().fill(bg))
             }
@@ -256,6 +270,44 @@ struct HangUpIcon: View {
     }
 }
 
+/// 左上「最小化」：画中画图标（一个大圆角方框，右下角套一个小方框）
+struct PipIcon: View {
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let line = max(1.4, w * 0.09)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: w * 0.16, style: .continuous)
+                    .stroke(Color.white, lineWidth: line)
+                    .frame(width: w * 0.86, height: h * 0.86)
+                RoundedRectangle(cornerRadius: w * 0.12, style: .continuous)
+                    .fill(Color.black.opacity(0.35))
+                    .overlay(RoundedRectangle(cornerRadius: w * 0.12, style: .continuous)
+                        .stroke(Color.white, lineWidth: line))
+                    .frame(width: w * 0.52, height: h * 0.40)
+                    .offset(x: w * 0.48, y: h * 0.60)
+            }
+        }
+    }
+}
+
+/// 右上「+」：两根线交叉（参考图实测横竖各 16pt，线宽约 1.8）
+struct PlusIcon: View {
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: w / 2))
+                p.addLine(to: CGPoint(x: w, y: w / 2))
+                p.move(to: CGPoint(x: w / 2, y: 0))
+                p.addLine(to: CGPoint(x: w / 2, y: w))
+            }
+            .stroke(Color.white, style: StrokeStyle(lineWidth: max(1.6, w * 0.11), lineCap: .round))
+        }
+    }
+}
+
 /* ---------------------------------------------------------- 视频画面 */
 
 /// 把 WebRTC 的画面接到 SwiftUI 里（Metal 渲染，省电、延迟低）
@@ -287,3 +339,100 @@ struct VideoSurface: UIViewRepresentable {
         coordinator.attached?.remove(view)
     }
 }
+    /* ---------------------------------------------------------- 顶部两个按钮（照参考图） */
+
+    /// 参考图实测：左上那个「画中画/最小化」在 x29-47 y79-97；右上「+」在 x384-400 y78-94
+    private var topBar: some View {
+        HStack {
+            Button { call.minimize() } label: {
+                PipIcon()
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Button { showInvite = true } label: {
+                PlusIcon()
+                    .frame(width: 17, height: 17)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 6)
+        }
+        .padding(.top, 19)
+    }
+
+    /// 最小化后顶部那条（通话不中断，点「回到通话」还原）
+    private var miniBar: some View {
+        HStack(spacing: 8) {
+            Circle().fill(C.green).frame(width: 8, height: 8)
+            Text(call.phase == .active ? "通话中 \(timeText)" : call.tip)
+                .font(pfExact(14))
+                .foregroundColor(.white)
+            Spacer(minLength: 0)
+            Button {
+                call.restore()
+            } label: {
+                Text("回到通话").font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
+            }
+            .buttonStyle(.plain)
+            Button {
+                call.hangup()
+            } label: {
+                Image(systemName: "phone.down.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(Color(hex: 0xFA5151))
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 10)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 42)
+        .background(Capsule().fill(Color.black.opacity(0.72)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /* ---------------------------------------------------------- 邀请好友（右上 +） */
+
+    private var inviteSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(app.contacts) { u in
+                        Button {
+                            showInvite = false
+                            let name = u.nickname ?? u.username ?? "好友"
+                            Task {
+                                let msg = await call.invite(userId: u.id, name: name)
+                                app.show(msg)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Avatar(path: u.avatar ?? "", size: 36, radius: 6)
+                                Text(u.nickname ?? u.username ?? "好友").foregroundColor(C.label)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("邀请好友加入通话")
+                } footer: {
+                    Text("对方会收到一条邀请消息；多人同时在同一个通话里（会议模式）还在做，先保证人能叫到。")
+                }
+            }
+            .navigationTitle("添加通话")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }

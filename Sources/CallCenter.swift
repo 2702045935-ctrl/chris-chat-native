@@ -45,6 +45,8 @@ final class CallCenter: NSObject, ObservableObject {
     @Published private(set) var localVideo: RTCVideoTrack?
     /// 出错提示（界面弹一下就行）
     @Published var errorText: String?
+    /// 最小化：通话照旧，界面缩成顶部一条（微信左上那个画中画按钮）
+    @Published var minimized = false
 
     private var factory: RTCPeerConnectionFactory?
     private var pc: RTCPeerConnection?
@@ -136,6 +138,22 @@ final class CallCenter: NSObject, ObservableObject {
     func toggleSpeaker() {
         speakerOn.toggle()
         applySpeaker()
+    }
+
+    func minimize() { minimized = true }
+    func restore() { minimized = false }
+
+    /// 邀请好友加入通话：给对方发一条邀请消息（点它就能回拨过来）。
+    /// 提示：多人同时在一个通话里需要服务器支持多路，这块还没做，所以现在是把人叫进来。
+    func invite(userId: String, name: String) async -> String {
+        do {
+            let chat = try await API.shared.directChat(userId: userId)
+            _ = try await API.shared.send(chatId: chat.id, kind: "text",
+                                          content: "邀请你加入语音通话，点这条消息回拨给我")
+            return "已邀请 \(name)"
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "邀请失败"
+        }
     }
 
     private func applySpeaker() {
@@ -370,8 +388,10 @@ final class CallCenter: NSObject, ObservableObject {
 
     private func activateAudioSession() {
         let s = AVAudioSession.sharedInstance()
+        /* 通话就该用 voiceChat 模式：不写 .defaultToSpeaker，默认走听筒（和微信一样，
+           参考图里"扬声器已关"就是听筒），点扬声器再 overrideOutputAudioPort(.speaker)。 */
         try? s.setCategory(.playAndRecord, mode: .voiceChat,
-                           options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
+                           options: [.allowBluetooth])
         try? s.setActive(true)
     }
 

@@ -12,27 +12,63 @@ import AudioToolbox
    一个页面深色到底（和微信一样），中间一个大手掌图标，摇到人以后显示对方卡片。
    ============================================================ */
 
-/// 真·摇手机：直接读加速度计（静止时约 1.0g，猛摇会冲到 2g 以上）。
-/// UIKit 的 motionShake 有时候会被输入框之类的东西抢走，所以两个一起用，摇得动就一定触发。
+/// 真·摇手机：**陀螺仪 + 加速度计**一起判（CMDeviceMotion 是系统把两者融合好的结果）。
+///   · rotationRate：陀螺仪给的旋转速度（rad/s），甩手腕那种转一下就很大
+///   · userAcceleration：去掉重力后的加速度（g），猛甩手机它最大
+/// 两个里任意一个过阈值就算一次摇，1.2 秒冷却（一次摇只算一下）。
+/// UIKit 那个 motionShake 有时候会被输入框之类的东西抢走，所以两条路都留着。
 final class ShakeMotion: ObservableObject {
     private let mgr = CMMotionManager()
     private var lastShake = Date(timeIntervalSince1970: 0)
     var onShake: () -> Void = { }
 
+    private let accelThreshold = 1.5          // g（去重力后；猛甩一般 2~4）
+    private let gyroThreshold = 3.2           // rad/s（甩手腕一般 4~10）
+
     func start() {
-        guard mgr.isAccelerometerAvailable, !mgr.isAccelerometerActive else { return }
-        mgr.accelerometerUpdateInterval = 1.0 / 50.0
-        mgr.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
-            guard let self = self, let a = data?.acceleration else { return }
-            let mag = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
-            guard mag > 2.3 else { return }                       // 轻轻碰不算，得真甩
-            guard Date().timeIntervalSince(self.lastShake) > 1.2 else { return }   // 一次摇只算一下
-            self.lastShake = Date()
-            self.onShake()
+        /* 优先用融合后的 deviceMotion（陀螺仪 + 加速度计） */
+        if mgr.isDeviceMotionAvailable {
+            guard !mgr.isDeviceMotionActive else { return }
+            mgr.deviceMotionUpdateInterval = 1.0 / 60.0
+            mgr.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+                guard let self = self, let m = motion else { return }
+                let a = m.userAcceleration
+                let accel = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
+                let r = m.rotationRate
+                let gyro = (r.x * r.x + r.y * r.y + r.z * r.z).squareRoot()
+                self.check(accel: accel, gyro: gyro)
+            }
+            return
+        }
+        /* 老设备没有 deviceMotion：陀螺仪和加速度计分开读 */
+        if mgr.isGyroAvailable, !mgr.isGyroActive {
+            mgr.gyroUpdateInterval = 1.0 / 60.0
+            mgr.startGyroUpdates(to: .main) { [weak self] data, _ in
+                guard let self = self, let r = data?.rotationRate else { return }
+                let gyro = (r.x * r.x + r.y * r.y + r.z * r.z).squareRoot()
+                self.check(accel: 0, gyro: gyro)
+            }
+        }
+        if mgr.isAccelerometerAvailable, !mgr.isAccelerometerActive {
+            mgr.accelerometerUpdateInterval = 1.0 / 60.0
+            mgr.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+                guard let self = self, let a = data?.acceleration else { return }
+                let mag = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
+                self.check(accel: abs(mag - 1.0), gyro: 0)      // 静止时约 1g
+            }
         }
     }
 
+    private func check(accel: Double, gyro: Double) {
+        guard accel > accelThreshold || gyro > gyroThreshold else { return }
+        guard Date().timeIntervalSince(lastShake) > 1.2 else { return }
+        lastShake = Date()
+        onShake()
+    }
+
     func stop() {
+        if mgr.isDeviceMotionActive { mgr.stopDeviceMotionUpdates() }
+        if mgr.isGyroActive { mgr.stopGyroUpdates() }
         if mgr.isAccelerometerActive { mgr.stopAccelerometerUpdates() }
     }
 }
@@ -252,7 +288,8 @@ struct ShakePageView: View {
         result = nil
         tip = "正在找同时在摇的人…"
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        AudioServicesPlaySystemSound(1104)          // 系统那个「咔」的一声
+        AudioServicesPlaySystemSound(1104)          // 系统那个「咔」的一声（震动/系统音）
+        ShakeSound.shared.click()                   // 自己合成的「咔」（静音键下也响）
         Task {
             defer { busy = false }
             do {
@@ -263,6 +300,7 @@ struct ShakePageView: View {
                     tip = ""
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     AudioServicesPlaySystemSound(1057)
+                    ShakeSound.shared.ding()        // 「叮——」
                 } else {
                     tip = "没摇到人，再摇一摇试试\n（要有别人也在摇才能摇到）"
                 }

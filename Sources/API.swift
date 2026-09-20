@@ -141,6 +141,13 @@ struct NearbyPerson: Decodable, Identifiable, Hashable {
 private struct NearbyPayload: Decodable { var people: [NearbyPerson] }
 private struct NearbyHelloPayload: Decodable { var chatId: String?; var text: String? }
 
+/// 摇一摇的结果：摇到人就是 matched，没人同时在摇就是 nil
+struct ShakeResult: Decodable {
+    var matched: NearbyPerson?
+    /// 现在有几台设备在摇（微信也会提示「同时有 N 人在摇」）
+    var shaking: Int?
+}
+
 struct MomentLike: Decodable, Hashable {
     var userId: String?
     var nickname: String?
@@ -990,6 +997,15 @@ final class API {
     /// 清除自己的位置（从附近的人里消失，和微信的「清除位置信息并退出」一样）
     func nearbyClear() async throws {
         _ = try await request("DELETE", "/api/nearby")
+    }
+
+    /* ---------------------------------------------------------- 摇一摇 */
+
+    /// 摇一下：把自己「正在摇」报上去，服务器把同时摇的人配给我
+    func shake(lat: Double?, lng: Double?) async throws -> ShakeResult {
+        var body: [String: Any] = [:]
+        if let lat = lat, let lng = lng { body["lat"] = lat; body["lng"] = lng }
+        return try await post("/api/shake", body, as: ShakeResult.self)
     }
 
     func chats() async throws -> [Chat] {

@@ -169,9 +169,20 @@ struct CallView: View {
                 .padding(.top, 6)
                 .opacity(call.phase == .outgoing ? 0 : 1)
             if call.phase == .outgoing {
-                // 等对方接的时候：状态文字像滚动屏一样滚（同时放回铃音）
-                MarqueeText(text: "正在等待对方接受邀请…")
-                    .padding(.top, 6)
+                /* 打不通就别再滚「正在等待…」了，直接把原因写在屏幕上
+                   （服务器回了不在线/忙线以后，通话页会停 8 秒让用户看清） */
+                if let err = call.errorText, !err.isEmpty {
+                    Text(err)
+                        .font(pfExact(15, .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                        .padding(.top, 6)
+                } else {
+                    // 等对方接的时候：状态文字像滚动屏一样滚（同时放回铃音）
+                    MarqueeText(text: "正在等待对方接受邀请…")
+                        .padding(.top, 6)
+                }
             }
             if !hintText.isEmpty {
                 Text(hintText)

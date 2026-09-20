@@ -50,6 +50,8 @@ final class CallCenter: NSObject, ObservableObject {
     }
     @Published var dialog: Dialog? = nil
     private var dialogTask: Task<Void, Never>?
+    /// 打不通时那 8 秒的定时器（见 failLater）
+    private var failTask: Task<Void, Never>?
 
     func dismissDialog() {
         dialogTask?.cancel()
@@ -149,6 +151,8 @@ final class CallCenter: NSObject, ObservableObject {
     /// 挂断 / 取消
     func hangup() {
         guard phase.isBusy else { return }
+        failTask?.cancel()
+        failTask = nil
         let started = (phase == .active)
         if !callId.isEmpty {
             sendCall(["action": started ? "hangup" : (iAmCaller ? "cancel" : "reject")])
@@ -215,7 +219,10 @@ final class CallCenter: NSObject, ObservableObject {
     private func handle(_ ev: PushEvent) {
         if ev.type == "call-error" {
             if !ev.callError.isEmpty { errorText = ev.callError }
-            if ev.callId == callId { finish(tip: ev.callError) }
+            /* 打不通（对方不在线 / 忙线 / 不能打）：先留在通话页上把原因显示几秒，
+               再自动挂断。以前是一有 error 就 finish，用户只看到通话页一闪 ——
+               用户要求「显示时间长一点再自动挂断」。 */
+            if ev.callId == callId { failLater(ev.callError) }
             return
         }
         let action = ev.callAction
@@ -448,6 +455,8 @@ final class CallCenter: NSObject, ObservableObject {
     private func finish(tip: String) {
         let wasIdle = (phase == .idle)
         let secs = seconds
+        failTask?.cancel()
+        failTask = nil
         self.tip = tip
         Ringtone.shared.stop()
         ticker?.invalidate()
@@ -471,6 +480,21 @@ final class CallCenter: NSObject, ObservableObject {
         }
     }
 
+    /// 打不通时：先把原因留在通话页上显示一会儿，再自动挂断（默认 8 秒）。
+    /// 这段时间里用户可以自己点挂断，也可以看着原因看完它自己收。
+    private func failLater(_ tip: String, hold: Double = 8) {
+        guard phase != .idle else { return }
+        let text = tip.isEmpty ? "对方没有接听" : tip
+        errorText = text
+        self.tip = text
+        failTask?.cancel()
+        failTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(hold * 1_000_000_000))
+            guard let self = self, !Task.isCancelled else { return }
+            self.finish(tip: text)
+        }
+    }
+
     private func startTimer() {
         seconds = 0
         ticker?.invalidate()
@@ -480,12 +504,12 @@ final class CallCenter: NSObject, ObservableObject {
         }
     }
 
-    /// 响了没人接：服务端 45 秒会自己收尾（记「对方无应答」），
-    /// 这里 50 秒兜底一次——网络把服务端的 end 丢了也不会一直响下去。
+    /// 响了没人接：服务端 60 秒会自己收尾（记「对方无应答」），
+    /// 这里 65 秒兜底一次——网络把服务端的 end 丢了也不会一直响下去。
     /// 主动方自己挂断时带 reason:'timeout'，让服务端记「对方无应答」而不是「已取消」。
     private func startRingTimeout() {
         ringTimer?.invalidate()
-        ringTimer = Timer.scheduledTimer(withTimeInterval: 50, repeats: false) { [weak self] _ in
+        ringTimer = Timer.scheduledTimer(withTimeInterval: 65, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             Task { @MainActor in
                 guard self.phase == .outgoing || self.phase == .incoming else { return }
@@ -552,8 +576,8 @@ extension CallCenter: RTCPeerConnectionDelegate {
                                     detail: "", auto: 2)
                 }
             case .failed:
-                self.errorText = "通话连接失败，可能是网络挡住了"
-                self.finish(tip: "通话失败")
+                /* 通话中途断：也留 5 秒让用户看清原因 */
+                self.failLater("通话连接失败，可能是网络挡住了", hold: 5)
             case .disconnected:
                 // 断开 3 秒还没恢复就结束（和网页版一致）
                 try? await Task.sleep(nanoseconds: 3_000_000_000)

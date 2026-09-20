@@ -1,0 +1,432 @@
+import SwiftUI
+import AVKit
+import PhotosUI
+
+/* ============================================================
+   视频号（发现 → 视频号）—— 抖音式上下刷
+     · 一次一屏，手指上滑看下一条（松手吸附，跟手）
+     · 右侧动作栏：头像+关注 / ❤️ / 💬 / ↗️
+     · 底部：作者 + 文案 + 🎵 音乐名
+     · 右上角 ＋ 可以发表自己的视频（从相册选，传到服务器）
+   视频列表在服务器的 data/feed.json（后台可改），用户发的会追加进去。
+   ============================================================ */
+
+struct FeedAuthor: Decodable, Hashable {
+    var id: String?
+    var name: String?
+    var avatar: String?
+}
+
+struct FeedItem: Decodable, Identifiable, Hashable {
+    var id: String
+    var video: String?
+    var cover: String?
+    var desc: String?
+    var music: String?
+    var tag: String?
+    var author: FeedAuthor?
+    var likes: Int?
+    var liked: Bool?
+    var comments: Int?
+    var shares: Int?
+    var mine: Bool?
+}
+
+private struct FeedPayload: Decodable { var items: [FeedItem] }
+private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
+private struct FeedCommentPayload: Decodable { var comments: Int? }
+private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
+
+struct ChannelsView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var items: [FeedItem] = []
+    @State private var index = 0
+    @State private var drag: CGFloat = 0
+    @State private var loading = true
+    @State private var commentFor: FeedItem?
+    @State private var commentText = ""
+    @State private var pickOpen = false
+    @State private var picked: PhotosPickerItem?
+    @State private var uploading = false
+    @State private var showPublish = false
+    @State private var publishDesc = ""
+    @State private var publishMusic = ""
+    @State private var pendingVideoPath = ""
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if loading && items.isEmpty {
+                    ProgressView().tint(.white)
+                } else if items.isEmpty {
+                    Text("视频号还没有内容\n去后台 data/feed.json 加，或者点右上角 ＋ 发一条")
+                        .font(pf(14)).foregroundColor(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                } else {
+                    /* 三条一组：上一条、当前、下一条，跟着手指上下移动 */
+                    ForEach(visible, id: \.item.id) { row in
+                        FeedCell(item: row.item,
+                                 active: row.offset == 0,
+                                 onLike: { toggleLike(row.item) },
+                                 onComment: { commentFor = row.item; commentText = "" },
+                                 onShare: { share(row.item) },
+                                 onFollow: { follow(row.item) },
+                                 onDelete: { remove(row.item) })
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .offset(y: CGFloat(row.offset) * geo.size.height + drag)
+                    }
+                }
+                topBar
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { v in
+                        guard !items.isEmpty else { return }
+                        drag = v.translation.height
+                    }
+                    .onEnded { v in
+                        guard !items.isEmpty else { return }
+                        let h = geo.size.height
+                        let far = abs(v.translation.height) > h * 0.22
+                        let fast = abs(v.predictedEndTranslation.height) > h * 0.45
+                        if (far || fast), v.translation.height < 0, index < items.count - 1 {
+                            withAnimation(.easeOut(duration: 0.22)) { drag = -h }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { index += 1; drag = 0 }
+                        } else if (far || fast), v.translation.height > 0, index > 0 {
+                            withAnimation(.easeOut(duration: 0.22)) { drag = h }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { index -= 1; drag = 0 }
+                        } else {
+                            withAnimation(.easeOut(duration: 0.22)) { drag = 0 }
+                        }
+                    }
+            )
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .hidesTabBar()
+        .swipeBack { dismiss() }
+        .sheet(item: $commentFor) { item in
+            commentSheet(item)
+        }
+        .alert("发表视频", isPresented: $showPublish) {
+            TextField("说点什么…", text: $publishDesc)
+            TextField("音乐名（可留空）", text: $publishMusic)
+            Button("发表") { publish() }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("视频已经传好，补充一句文案")
+        }
+        .photosPicker(isPresented: $pickOpen, selection: $picked, matching: .videos)
+        .onChange(of: picked) { v in Task { await uploadPicked(v) } }
+        .overlay(alignment: .center) {
+            if uploading {
+                ZStack {
+                    Color.black.opacity(0.4).ignoresSafeArea()
+                    ProgressView("正在上传视频…").tint(.white).foregroundColor(.white)
+                        .padding(18).background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.7)))
+                }
+            }
+        }
+        .task { await load() }
+    }
+
+    /* ---------------------------------------------------------- 顶部 */
+
+    private var topBar: some View {
+        VStack {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
+                Text("视频号").font(pf(17, .semibold)).foregroundColor(.white)
+                Spacer()
+                Button { pickOpen = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 6)
+            Spacer()
+        }
+    }
+
+    private struct Row { let item: FeedItem; let offset: Int }
+    private var visible: [Row] {
+        var out: [Row] = []
+        for o in -1...1 {
+            let i = index + o
+            if i >= 0 && i < items.count { out.append(Row(item: items[i], offset: o)) }
+        }
+        return out
+    }
+
+    /* ---------------------------------------------------------- 数据 */
+
+    private func load() async {
+        items = (try? await API.shared.feedItems()) ?? []
+        loading = false
+    }
+
+    private func toggleLike(_ item: FeedItem) {
+        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return }
+        Task {
+            if let r = try? await API.shared.feedLike(item.id) {
+                items[i].liked = r.liked
+                items[i].likes = r.likes
+            }
+        }
+    }
+
+    private func share(_ item: FeedItem) {
+        UIPasteboard.general.string = (item.video ?? "") 
+        app.show("链接已复制，可以去聊天里粘贴")
+    }
+
+    private func follow(_ item: FeedItem) {
+        guard let uid = item.author?.id, !uid.isEmpty else { return }
+        Task {
+            do {
+                try await API.shared.addFriend(username: uid)
+                app.show("已发送关注（好友申请）")
+            } catch {
+                app.show("关注失败，可能已经是好友了")
+            }
+        }
+    }
+
+    private func remove(_ item: FeedItem) {
+        Task {
+            await API.shared.feedDelete(item.id)
+            await load()
+            if index >= items.count { index = max(0, items.count - 1) }
+        }
+    }
+
+    private func sendComment(_ item: FeedItem) {
+        let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        commentFor = nil
+        Task {
+            if let n = try? await API.shared.feedComment(item.id, text: text),
+               let i = items.firstIndex(where: { $0.id == item.id }) {
+                items[i].comments = n
+            }
+            app.show("评论成功")
+        }
+    }
+
+    private func commentSheet(_ item: FeedItem) -> some View {
+        VStack(spacing: 14) {
+            Text("评论").font(pf(16, .medium)).padding(.top, 16)
+            Text(item.desc ?? "").font(pf(13)).foregroundColor(.secondary)
+                .multilineTextAlignment(.center).padding(.horizontal, 20)
+            TextField("说点什么…", text: $commentText)
+                .textFieldStyle(.roundedBorder).padding(.horizontal, 20)
+            Button { sendComment(item) } label: {
+                Text("发送").font(pf(16, .medium)).foregroundColor(.white)
+                    .frame(maxWidth: .infinity).frame(height: 46)
+                    .background(RoundedRectangle(cornerRadius: 23).fill(C.green))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            Spacer()
+        }
+        .presentationDetents([.height(260)])
+    }
+
+    /* ---------------------------------------------------------- 发表 */
+
+    private func uploadPicked(_ v: PhotosPickerItem?) async {
+        guard let v = v else { return }
+        uploading = true
+        defer { uploading = false }
+        do {
+            guard let data = try await v.loadTransferable(type: Data.self), !data.isEmpty else {
+                app.show("读不到这个视频"); return
+            }
+            let payload: [String: Any] = [
+                "dataUrl": "data:video/mp4;base64," + data.base64EncodedString(),
+                "filename": "feed.mp4"
+            ]
+            let up = try await API.shared.rawUpload(payload)
+            pendingVideoPath = up.url
+            showPublish = true
+        } catch {
+            app.show((error as? APIError)?.errorDescription ?? "上传失败（视频别超过 20MB）")
+        }
+    }
+
+    private func publish() {
+        let desc = publishDesc.trimmingCharacters(in: .whitespacesAndNewlines)
+        let music = publishMusic.trimmingCharacters(in: .whitespacesAndNewlines)
+        publishDesc = ""
+        publishMusic = ""
+        Task {
+            do {
+                _ = try await API.shared.feedPublish(video: pendingVideoPath, desc: desc, music: music)
+                app.show("发表成功")
+                index = 0
+                await load()
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? "发表失败")
+            }
+        }
+    }
+}
+
+/* ---------------------------------------------------------- 单条视频 */
+
+struct FeedCell: View {
+    let item: FeedItem
+    let active: Bool
+    var onLike: () -> Void
+    var onComment: () -> Void
+    var onShare: () -> Void
+    var onFollow: () -> Void
+    var onDelete: () -> Void
+
+    @State private var player: AVPlayer?
+    @State private var liked = false
+    @State private var likes = 0
+    @State private var bounced = false
+
+    var body: some View {
+        ZStack {
+            Color.black
+            if !(item.cover ?? "").isEmpty {
+                RemoteImage(path: item.cover ?? "").opacity(player == nil ? 1 : 0.001)
+            }
+            if let p = player {
+                PlayerSurface(player: p)
+            }
+            LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.65)],
+                           startPoint: .top, endPoint: .bottom)
+
+            HStack(alignment: .bottom, spacing: 0) {
+                Spacer()
+                rightRail
+            }
+            .padding(.trailing, 12)
+            .padding(.bottom, 110)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Spacer()
+                Text("@\(item.author?.name ?? "用户")")
+                    .font(pf(16, .semibold)).foregroundColor(.white)
+                Text(item.desc ?? "")
+                    .font(pf(14)).foregroundColor(.white.opacity(0.95))
+                    .lineLimit(3)
+                HStack(spacing: 5) {
+                    Image(systemName: "music.note").font(.system(size: 12))
+                    Text(item.music?.isEmpty == false ? (item.music ?? "") : "原创声音")
+                        .font(pf(12.5))
+                }
+                .foregroundColor(.white.opacity(0.9))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, max(28, L.safeBottom + 10))
+        }
+        .onAppear { setup() }
+        .onDisappear { player?.pause() }
+        .onChange(of: active) { on in
+            if on { player?.play() } else { player?.pause(); player?.seek(to: .zero) }
+        }
+    }
+
+    private var rightRail: some View {
+        VStack(spacing: 20) {
+            ZStack(alignment: .bottom) {
+                Avatar(path: item.author?.avatar ?? "", size: 46, radius: 23, circle: true)
+                    .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.5))
+                Button { onFollow() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color(hex: 0xFA5151)))
+                        .offset(y: 9)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 10)
+
+            railButton(icon: "heart.fill", tint: liked ? Color(hex: 0xFF4D6D) : .white,
+                       text: "\(likes)") {
+                liked.toggle()
+                likes += liked ? 1 : -1
+                bounced = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { bounced = false }
+                onLike()
+            }
+            railButton(icon: "bubble.right.fill", tint: .white, text: "\(item.comments ?? 0)", action: onComment)
+            railButton(icon: "arrowshape.turn.up.right.fill", tint: .white,
+                       text: "\(item.shares ?? 0)", action: onShare)
+            if item.mine == true {
+                railButton(icon: "trash.fill", tint: .white, text: "删除", action: onDelete)
+            }
+        }
+    }
+
+    private func railButton(icon: String, tint: Color, text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 27))
+                    .foregroundColor(tint)
+                    .scaleEffect(bounced && icon == "heart.fill" ? 1.25 : 1)
+                Text(text).font(pf(12.5, .medium)).foregroundColor(.white)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func setup() {
+        liked = item.liked ?? false
+        likes = item.likes ?? 0
+        if player == nil, let url = API.shared.assetURL(item.video ?? "") {
+            let p = AVPlayer(url: url)
+            p.isMuted = false
+            p.actionAtItemEnd = .none
+            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
+                                                   object: p.currentItem, queue: .main) { _ in
+                p.seek(to: .zero)
+                p.play()
+            }
+            player = p
+            if active { p.play() }
+        }
+    }
+}
+
+/// AVPlayer 的显示层（通话页那个 VideoSurface 是给 WebRTC 用的，这里是本地播放器）
+struct PlayerSurface: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerView {
+        let v = PlayerView()
+        v.backgroundColor = .black
+        v.playerLayer.player = player
+        v.playerLayer.videoGravity = .resizeAspectFill
+        return v
+    }
+
+    func updateUIView(_ v: PlayerView, context: Context) {
+        v.playerLayer.player = player
+    }
+
+    final class PlayerView: UIView {
+        override static var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    }
+}

@@ -59,6 +59,8 @@ struct DiscoverView: View {
                     LiveListView()
                 } else if key == "games" {
                     GamesPageView()
+                } else if key == "channels" {
+                    ChannelsView()
                 } else if key == "news" {
                     ComingSoonView(title: "腾讯新闻")
                 } else if key.hasPrefix("soon:") {
@@ -108,6 +110,7 @@ struct DiscoverView: View {
         case "shake": path.append("shake")
         case "live": path.append("live")
         case "games": path.append("games")
+        case "channels": path.append("channels")
         default: path.append("soon:" + item.label)
         }
     }

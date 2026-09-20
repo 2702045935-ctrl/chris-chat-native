@@ -1055,6 +1055,31 @@ final class API {
         return p.items
     }
 
+    /* ---------------------------------------------------------- 视频号 */
+
+    func feedItems() async throws -> [FeedItem] {
+        let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)
+        return p.items
+    }
+    func feedLike(_ id: String) async throws -> (liked: Bool, likes: Int) {
+        let p: FeedLikePayload = try await post("/api/feed/like", ["id": id], as: FeedLikePayload.self)
+        return (p.liked ?? false, p.likes ?? 0)
+    }
+    func feedComment(_ id: String, text: String) async throws -> Int {
+        let p: FeedCommentPayload = try await post("/api/feed/comment", ["id": id, "text": text],
+                                                   as: FeedCommentPayload.self)
+        return p.comments ?? 0
+    }
+    func feedPublish(video: String, desc: String, music: String) async throws -> String {
+        let p: FeedPublishPayload = try await post("/api/feed/publish",
+                                                   ["video": video, "desc": desc, "music": music],
+                                                   as: FeedPublishPayload.self)
+        return p.id ?? ""
+    }
+    func feedDelete(_ id: String) async {
+        _ = try? await request("DELETE", "/api/feed/\(id)")
+    }
+
     /* ---------------------------------------------------------- 摇一摇 */
 
     /// 摇一下：把自己「正在摇」报上去，服务器把同时摇的人配给我

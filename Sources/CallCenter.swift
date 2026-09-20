@@ -36,6 +36,8 @@ final class CallCenter: NSObject, ObservableObject {
     @Published private(set) var isVideo = false
     @Published private(set) var muted = false
     @Published private(set) var cameraOff = false
+    /// 扬声器（扬声器已开 / 已关，参考图底下那排有这一项）
+    @Published private(set) var speakerOn = false
     @Published private(set) var seconds = 0
     @Published private(set) var tip = ""
     /// 给界面渲染用的远端 / 本地画面
@@ -128,6 +130,17 @@ final class CallCenter: NSObject, ObservableObject {
         guard isVideo else { return }
         cameraOff.toggle()
         localVideoTrack?.isEnabled = !cameraOff
+    }
+
+    /// 扬声器开关：语音通话默认走听筒（关），视频通话默认开
+    func toggleSpeaker() {
+        speakerOn.toggle()
+        applySpeaker()
+    }
+
+    private func applySpeaker() {
+        let s = AVAudioSession.sharedInstance()
+        try? s.overrideOutputAudioPort(speakerOn ? .speaker : .none)
     }
 
     /// 前后摄像头切换（视频通话中）
@@ -255,6 +268,8 @@ final class CallCenter: NSObject, ObservableObject {
             if !cam { errorText = "没有摄像头权限，去「设置 → CHRIS聊天」里打开"; finish(tip: "没有摄像头权限"); return }
         }
         activateAudioSession()
+        speakerOn = isVideo                    // 视频通话默认外放，语音默认听筒
+        applySpeaker()
 
         let f = makeFactory()
         let cfg = RTCConfiguration()

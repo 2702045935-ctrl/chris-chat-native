@@ -2,8 +2,17 @@ import SwiftUI
 import WebRTC
 
 /* ============================================================
-   通话界面（来电 / 呼叫中 / 通话中，语音和视频两套）
-   挂在 App 最外层，所以不管在哪一页来电都能立刻弹出来。
+   通话界面 —— 照微信参考图做的（420×912pt 量的）：
+
+     · 背景：聊天背景图「糊掉 + 压暗」（不是纯黑）。参考图实测是深橄榄色渐变，
+       说明背后是一张被虚化的照片。没设背景图就退化成深灰。
+     · 头像 96 居中，顶在 y≈251（安全区下面约 156）
+     · 名字 22pt 白色（y≈367）、状态 15pt 白 70%（y≈404）
+     · 提示（比如"暂时无法接通…"）15pt 白 55%（y≈559）
+     · 底部三个 72pt 圆按钮 + 各自标签（y≈726 圆、y≈812 标签）：
+         麦克风已开/已关      取消（红，视频/语音通话中）      扬声器已开/已关
+       来电时换成：拒接（红） / 接听（绿）
+   两个后台参数：callBackdropBlur（模糊，默认 40）、callGlassTint（压暗，默认 0.45）
    ============================================================ */
 
 struct CallOverlay: View {
@@ -12,7 +21,6 @@ struct CallOverlay: View {
     var body: some View {
         if call.phase != .idle {
             CallView()
-                .transition(.opacity)
                 .zIndex(999)
         }
     }
@@ -22,158 +30,186 @@ struct CallView: View {
     @ObservedObject private var call = CallCenter.shared
     @EnvironmentObject var app: AppState
 
-    private var dark: Color { Color(red: 0.11, green: 0.11, blue: 0.12) }
-    /* 通话页背景：毛玻璃。
-       之前写成「85% 黑压上去」，出来就是纯黑；现在是
-         ① 磨砂层（把背后的界面糊掉）—— callGlassAlpha 控制它的不透明度，默认 0.85
-         ② 一层很淡的暗色（保证白字看得清）—— callGlassTint 控制，默认 0.30
-       两个值都能在后台 ui.json 里调：越小越透，越大越暗。 */
-    private var glassAlpha: CGFloat { UIConfig.num("callGlassAlpha", 0.85) }
-    private var glassTint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
+    private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 40) }
+    private var tint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
 
-    private var glassBackground: some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-                .opacity(glassAlpha)
-            Color.black.opacity(glassTint)
+    /// 通话背景用的聊天背景图（自己设的 → 服务器默认 → 没有）
+    private var bgPath: String {
+        let v = app.me?.chatBackground ?? "auto"
+        if v.isEmpty || v == "auto" {
+            let def = app.defaultChatBackground
+            return (def == "auto") ? "" : def
         }
-        .ignoresSafeArea()
+        return v
     }
 
     var body: some View {
         ZStack {
-            glassBackground
+            backdrop
 
             if call.isVideo && call.phase == .active {
-                // 视频通话：远端铺满，本地小窗右下角
-                ZStack {
-                    VideoSurface(track: call.remoteVideo)
-                        .ignoresSafeArea()
-                    if call.remoteVideo == nil {
-                        VStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text("正在连接画面…").foregroundColor(.white.opacity(0.7)).font(pf(14))
-                        }
-                    }
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            VideoSurface(track: call.localVideo)
-                                .frame(width: 110, height: 150)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.25), lineWidth: 1))
-                                .opacity(call.cameraOff ? 0.15 : 1)
-                                .padding(.trailing, 16)
-                                .padding(.bottom, 172)
-                        }
-                    }
-                }
+                videoLayer
             } else {
-                VStack(spacing: 0) {
-                    Spacer().frame(height: 80)
-                    Avatar(path: call.peerAvatar, size: 96, radius: 14)
-                    Text(call.peerName)
-                        .font(pf(22, .medium))
-                        .foregroundColor(.white)
-                        .padding(.top, 18)
-                    Text(statusText)
-                        .font(pf(15))
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(.top, 8)
-                    Spacer()
-                }
+                avatarLayer
             }
 
-            VStack {
-                Text(call.peerName)
-                    .font(pf(17, .medium))
-                    .foregroundColor(.white)
-                    .padding(.top, 8)
-                    .opacity(call.isVideo && call.phase == .active ? 1 : 0)
-                Spacer()
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
                 bottomBar
             }
         }
     }
 
+    /* ---------------------------------------------------------- 背景 */
+
+    private var backdrop: some View {
+        ZStack {
+            Color(red: 0.10, green: 0.11, blue: 0.10)
+            if !bgPath.isEmpty {
+                RemoteImage(path: bgPath)
+                    .blur(radius: blurRadius)
+                    .scaleEffect(1.25)                  // 糊完边缘不留白
+            }
+            Color.black.opacity(tint)                   // 压暗，保证白字看得清
+        }
+        .ignoresSafeArea()
+    }
+
+    /* ---------------------------------------------------------- 语音/呼叫中：头像 + 名字 */
+
+    private var avatarLayer: some View {
+        VStack(spacing: 0) {
+            Spacer().frame(height: max(40, 251 - L.safeTop))
+            Avatar(path: call.peerAvatar, size: 96, radius: 12)
+            Text(call.peerName)
+                .font(pfExact(22, .medium))
+                .foregroundColor(.white)
+                .padding(.top, 20)
+            Text(statusText)
+                .font(pfExact(15))
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.top, 6)
+            if !hintText.isEmpty {
+                Text(hintText)
+                    .font(pfExact(15))
+                    .foregroundColor(.white.opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                    .padding(.top, 142)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /* ---------------------------------------------------------- 视频通话：远端铺满 + 本地小窗 */
+
+    private var videoLayer: some View {
+        ZStack {
+            VideoSurface(track: call.remoteVideo)
+                .ignoresSafeArea()
+            if call.remoteVideo == nil {
+                VStack(spacing: 10) {
+                    ProgressView().tint(.white)
+                    Text("正在连接画面…")
+                        .font(pfExact(14))
+                        .foregroundColor(.white.opacity(0.75))
+                }
+            }
+            VStack {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(call.peerName)
+                            .font(pfExact(17, .medium))
+                            .foregroundColor(.white)
+                        Text(statusText)
+                            .font(pfExact(13))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                Spacer()
+                HStack {
+                    Spacer()
+                    VideoSurface(track: call.localVideo)
+                        .frame(width: 104, height: 148)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.22), lineWidth: 1))
+                        .opacity(call.cameraOff ? 0.12 : 1)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 150)
+                }
+            }
+        }
+    }
+
+    /* ---------------------------------------------------------- 文字 */
+
     private var statusText: String {
         switch call.phase {
-        case .incoming:  return call.isVideo ? "邀请你视频通话…" : "邀请你语音通话…"
-        case .outgoing:  return call.tip.isEmpty ? "正在呼叫…" : call.tip
+        case .incoming:   return call.isVideo ? "邀请你视频通话…" : "邀请你语音通话…"
+        case .outgoing:   return "正在等待对方接受邀请…"
         case .connecting: return "正在接通…"
-        case .active:    return timeText
-        case .idle:      return ""
+        case .active:     return timeText
+        case .idle:       return ""
         }
+    }
+
+    /// 参考图里"暂时无法接通，建议稍后尝试…"那一行：只在有话说的时候显示
+    private var hintText: String {
+        let t = call.tip
+        if call.phase == .idle { return "" }
+        if t == "未接听" || t == "对方已拒绝" || t == "对方不在线" { return t + "，建议稍后尝试" }
+        if t.contains("失败") || t.contains("断开") { return t }
+        return ""
     }
 
     private var timeText: String {
-        let m = call.seconds / 60
-        let s = call.seconds % 60
-        return String(format: "%02d:%02d", m, s)
+        String(format: "%02d:%02d", call.seconds / 60, call.seconds % 60)
     }
 
-    /* ---------------------------------------------------------- 底部按键 */
+    /* ---------------------------------------------------------- 底部三个圆按钮 */
 
     private var bottomBar: some View {
-        VStack(spacing: 26) {
-            if call.phase == .active || call.phase == .connecting {
-                HStack(spacing: 34) {
-                    roundButton(icon: call.muted ? "mic.slash.fill" : "mic.fill",
-                                label: call.muted ? "已静音" : "静音",
-                                on: call.muted) { call.toggleMute() }
-                    if call.isVideo {
-                        roundButton(icon: call.cameraOff ? "video.slash.fill" : "video.fill",
-                                    label: call.cameraOff ? "已关摄像头" : "摄像头",
-                                    on: call.cameraOff) { call.toggleCamera() }
-                        roundButton(icon: "arrow.triangle.2.circlepath.camera",
-                                    label: "翻转", on: false) { call.flipCamera() }
-                    }
-                }
+        HStack(spacing: 51) {
+            if call.phase == .incoming {
+                // 来电：拒接 + 接听
+                roundKey(icon: "phone.down.fill", label: "拒绝",
+                         bg: Color(hex: 0xFA5151)) { call.reject() }
+                roundKey(icon: "phone.fill", label: "接听",
+                         bg: Color(hex: 0x07C160)) { call.accept() }
+            } else {
+                roundKey(icon: call.muted ? "mic.slash.fill" : "mic.fill",
+                         label: call.muted ? "麦克风已关" : "麦克风已开",
+                         bg: Color.white.opacity(call.muted ? 0.34 : 0.18)) { call.toggleMute() }
+                roundKey(icon: "phone.down.fill", label: call.phase == .active ? "挂断" : "取消",
+                         bg: Color(hex: 0xFA5151)) { call.hangup() }
+                roundKey(icon: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                         label: call.speakerOn ? "扬声器已开" : "扬声器已关",
+                         bg: Color.white.opacity(call.speakerOn ? 0.34 : 0.18)) { call.toggleSpeaker() }
             }
-
-            HStack(spacing: 90) {
-                if call.phase == .incoming {
-                    // 拒接
-                    bigButton(color: Color(hex: 0xFA5151), icon: "phone.down.fill") { call.reject() }
-                    bigButton(color: Color(hex: 0x07C160), icon: "phone.fill") { call.accept() }
-                } else {
-                    bigButton(color: Color(hex: 0xFA5151),
-                              icon: call.phase == .outgoing ? "phone.down.fill" : "phone.down.fill") { call.hangup() }
-                }
-            }
-            Text(call.phase == .incoming ? "滑动接听 · 点红键拒接" : "点红键结束")
-                .font(pf(12))
-                .foregroundColor(.white.opacity(0.45))
-                .opacity(call.phase == .incoming ? 1 : 0)
-            Spacer().frame(height: 24)
         }
+        .padding(.bottom, 54)
     }
 
-    private func roundButton(icon: String, label: String, on: Bool, action: @escaping () -> Void) -> some View {
-        VStack(spacing: 8) {
+    private func roundKey(icon: String, label: String, bg: Color,
+                          action: @escaping () -> Void) -> some View {
+        VStack(spacing: 14) {
             Button(action: action) {
                 Image(systemName: icon)
-                    .font(.system(size: 21, weight: .medium))
+                    .font(.system(size: 27, weight: .medium))
                     .foregroundColor(.white)
-                    .frame(width: 62, height: 62)
-                    .background(Circle().fill(on ? Color.white.opacity(0.9) : Color.white.opacity(0.16)))
-                    .foregroundColor(on ? .black : .white)
+                    .frame(width: 72, height: 72)
+                    .background(Circle().fill(bg))
             }
             .buttonStyle(.plain)
-            Text(label).font(pf(12)).foregroundColor(.white.opacity(0.7))
+            Text(label)
+                .font(pfExact(14))
+                .foregroundColor(.white.opacity(0.92))
         }
-    }
-
-    private func bigButton(color: Color, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 26, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 72, height: 72)
-                .background(Circle().fill(color))
-        }
-        .buttonStyle(.plain)
     }
 }
 

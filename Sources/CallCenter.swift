@@ -549,8 +549,9 @@ final class CallCenter: NSObject, ObservableObject {
     private func startConnectWatch() {
         connectTimer?.invalidate()
         connectTimer = Timer.scheduledTimer(withTimeInterval: 12, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
             Task { @MainActor in
-                guard let self = self, self.phase == .connecting else { return }
+                guard self.phase == .connecting else { return }
                 self.errorText = "声音一直连不上：① 两边都打开「设置 → CHRIS聊天 → 本地网络」；② 两台设备最好在同一个 Wi-Fi"
                 self.tip = self.errorText ?? ""
             }

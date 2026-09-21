@@ -30,6 +30,9 @@ struct GroupInfoView: View {
     @State private var confirmClear = false
     @State private var confirmQuit = false
     @State private var kickTarget: User?
+    @State private var showQR = false
+    @State private var muteAll = false
+    @State private var kickMode = "kick"          // kick = 移出群聊，mute = 禁言
 
     private var isOwner: Bool { !ownerId.isEmpty && ownerId == app.me?.id }
 
@@ -74,6 +77,7 @@ struct GroupInfoView: View {
         .task {
             pinned = chat.pinned == true
             muted = chat.muted == true
+            muteAll = chat.muteAll == true
             if let r = try? await API.shared.chatMembers(chatId: chat.id) {
                 members = r.members
                 ownerId = r.ownerId
@@ -85,6 +89,7 @@ struct GroupInfoView: View {
         .sheet(isPresented: $showAnnounce) { announceEditor }
         .sheet(isPresented: $showRename) { renameEditor }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
+        .sheet(isPresented: $showQR) { GroupQRView(chat: chat) }
         .confirmationDialog("清空聊天记录？", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("清空", role: .destructive) { clearHistory() }
             Button("取消", role: .cancel) { }
@@ -94,11 +99,27 @@ struct GroupInfoView: View {
             Button(isOwner ? "解散并退出" : "退出", role: .destructive) { quitGroup() }
             Button("取消", role: .cancel) { }
         }
-        .confirmationDialog("把 TA 移出群聊？",
+        .confirmationDialog(kickMode == "kick" ? "把 TA 移出群聊？" : "禁言 TA？",
                             isPresented: Binding(get: { kickTarget != nil }, set: { if !$0 { kickTarget = nil } }),
                             titleVisibility: .visible) {
-            Button("移出群聊", role: .destructive) { kick() }
+            if kickMode == "kick" {
+                Button("移出群聊", role: .destructive) { kick() }
+            } else {
+                Button("禁言", role: .destructive) { muteMember() }
+            }
             Button("取消", role: .cancel) { kickTarget = nil }
+        }
+    }
+
+    private func muteMember() {
+        guard let target = kickTarget else { return }
+        Task {
+            if let err = await API.shared.setMemberMuted(chatId: chat.id, userId: target.id, muted: true) {
+                app.show(err)
+            } else {
+                app.show("已禁言 \(target.name)")
+            }
+            kickTarget = nil
         }
     }
 
@@ -271,9 +292,22 @@ struct GroupInfoView: View {
                         }
                         /* 群主长按成员 → 移出群聊（对应清单里的「群踢人」） */
                         .contentShape(Rectangle())
-                        .onLongPressGesture {
-                            if isOwner && u.id != app.me?.id { kickTarget = u }
-                            else if !isOwner { app.show("只有群主能移出成员") }
+                        .contextMenu {
+                            if isOwner && u.id != app.me?.id {
+                                Button {
+                                    kickMode = "kick"
+                                    kickTarget = u
+                                } label: { Label("移出群聊", systemImage: "person.badge.minus") }
+                                Button {
+                                    kickMode = "mute"
+                                    kickTarget = u
+                                } label: { Label("禁言", systemImage: "speaker.slash") }
+                                Button {
+                                    Task { _ = await API.shared.setMemberMuted(chatId: chat.id, userId: u.id, muted: false) }
+                                } label: { Label("取消禁言", systemImage: "speaker.wave.2") }
+                            } else {
+                                Button { } label: { Label("只有群主能管理成员", systemImage: "info.circle") }
+                            }
                         }
                     }
                 }
@@ -356,6 +390,32 @@ struct GroupInfoView: View {
             .padding(.horizontal, 14)
             .frame(height: 50)
             divider
+            if isOwner {
+                /* 群禁言：开了以后只有群主能说话（对应清单里的「群禁言」） */
+                HStack(spacing: 10) {
+                    Text("全员禁言")
+                        .font(pf(16))
+                        .foregroundColor(C.label)
+                    Spacer(minLength: 8)
+                    Toggle("", isOn: Binding(
+                        get: { muteAll },
+                        set: { v in
+                            muteAll = v
+                            Task {
+                                if let err = await API.shared.setMuteAll(chatId: chat.id, on: v) {
+                                    app.show(err)
+                                    muteAll = !v
+                                }
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(C.green)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 50)
+                divider
+            }
             /* 群屏蔽：消息免打扰（每个人自己设） */
             HStack(spacing: 10) {
                 Text("消息免打扰")
@@ -389,6 +449,18 @@ struct GroupInfoView: View {
             Button { showSearch = true } label: {
                 HStack(spacing: 10) {
                     Text("查找聊天记录").font(pf(16)).foregroundColor(C.label)
+                    Spacer(minLength: 8)
+                    Chevron(size: 9, line: 1.6)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 50)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            divider
+            Button { showQR = true } label: {
+                HStack(spacing: 10) {
+                    Text("群二维码").font(pf(16)).foregroundColor(C.label)
                     Spacer(minLength: 8)
                     Chevron(size: 9, line: 1.6)
                 }

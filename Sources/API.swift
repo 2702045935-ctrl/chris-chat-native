@@ -66,6 +66,9 @@ struct Chat: Decodable, Identifiable, Hashable {
     var ownerId: String?
     /// 群公告（群聊才有）
     var announce: String?
+    /// 群禁言：全员禁言 / 我有没有被单独禁言
+    var muteAll: Bool?
+    var meMuted: Bool?
 
     var name: String { (title?.isEmpty == false) ? title! : "会话" }
     var unreadCount: Int { unread ?? 0 }
@@ -1049,6 +1052,16 @@ final class API {
         return (p.status ?? "pending", p.user, p.token)
     }
 
+    /// 已登录的这台设备去确认别人（网页版点「微信授权登录」出的那个数字）
+    @discardableResult
+    func pairApprove(code: String) async -> String? {
+        do {
+            struct ApprovePayload: Decodable { var approved: Bool? }
+            let _: ApprovePayload = try await post("/api/pair/approve", ["code": code], as: ApprovePayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "确认失败" }
+    }
+
     func loginPhone(phone: String, code: String) async throws -> User {
         let payload: LoginPayload = try await post("/api/login/phone",
                                                    ["phone": phone, "code": code],
@@ -1263,6 +1276,43 @@ final class API {
                                                        ["userId": userId], as: GroupActionPayload.self)
             return nil
         } catch { return (error as? APIError)?.errorDescription ?? "移出失败" }
+    }
+
+    /// 群二维码：拿到邀请码和二维码 SVG
+    func groupInvite(chatId: String) async -> (code: String, url: String, rows: [String]) {
+        struct InvitePayload: Decodable { var code: String?; var url: String?; var svg: String?; var rows: [String]? }
+        guard let p: InvitePayload = try? await post("/api/chats/\(chatId)/invite", [:], as: InvitePayload.self)
+        else { return ("", "", []) }
+        return (p.code ?? "", p.url ?? "", p.rows ?? [])
+    }
+
+    /// 扫码（打开链接）进群
+    @discardableResult
+    func joinByInvite(code: String) async -> String? {
+        do {
+            _ = try await post("/api/join", ["code": code], as: SendPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "进群失败" }
+    }
+
+    /// 全员禁言（群主）
+    @discardableResult
+    func setMuteAll(chatId: String, on: Bool) async -> String? {
+        do {
+            struct MuteAllPayload: Decodable { var muteAll: Bool? }
+            let _: MuteAllPayload = try await post("/api/chats/\(chatId)/muteall", ["on": on], as: MuteAllPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "设置失败" }
+    }
+
+    /// 禁言 / 取消禁言某个群成员（群主）
+    @discardableResult
+    func setMemberMuted(chatId: String, userId: String, muted: Bool) async -> String? {
+        do {
+            _ = try await post("/api/chats/\(chatId)/mutemember",
+                               ["userId": userId, "muted": muted], as: SendPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "设置失败" }
     }
 
     /// 退出群聊（群主退群会自动把群主交给下一个人）
@@ -1567,8 +1617,14 @@ final class API {
         _ = try? await request("DELETE", "/api/moments/\(id)")
     }
 
-    func postMoment(content: String, images: [String]) async throws {
-        _ = try await request("POST", "/api/moments", body: ["content": content, "images": images])
+    /// 发朋友圈：谁可以看（public 公开 / private 仅自己 / partial 部分可见 / exclude 不给谁看）
+    func postMoment(content: String, images: [String],
+                    visibility: String = "public",
+                    visibleTo: [String] = [], hiddenFrom: [String] = []) async throws {
+        _ = try await request("POST", "/api/moments", body: [
+            "content": content, "images": images,
+            "visibility": visibility, "visibleTo": visibleTo, "hiddenFrom": hiddenFrom
+        ])
     }
 
     func updateMe(_ fields: [String: Any]) async {

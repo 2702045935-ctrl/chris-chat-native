@@ -58,12 +58,14 @@ struct TabBar: View {
     /// 「我」上那个小红点（后台可以设成一直亮）
     var meDot: Bool = false
 
-    private let items: [(String, String, String)] = [
-        ("message", "message.fill", "微信"),
-        ("person.2", "person.2.fill", "通讯录"),
-        ("safari", "safari", "发现"),
-        ("person.crop.circle", "person.crop.circle.fill", "我")
-    ]
+    private var items: [(String, String, String)] {
+        [
+            ("message", "message.fill", C.tabText0),
+            ("person.2", "person.2.fill", C.tabText1),
+            ("safari", "safari", C.tabText2),
+            ("person.crop.circle", "person.crop.circle.fill", C.tabText3)
+        ]
+    }
 
     /// 每个图标能单独调大小：ui.json 里写 tabIcon0 / tabIcon1 / tabIcon2 / tabIcon3
     /// （0=微信 1=通讯录 2=发现 3=我）。SF Symbols 各图标自带的留白不一样，

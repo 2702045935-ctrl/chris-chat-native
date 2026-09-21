@@ -202,7 +202,7 @@ struct ChatsView: View {
     private var navTitle: String {
         let total = app.chats.reduce(0) { $0 + ($1.unread ?? 0) }
         /* 顶栏文字后台可改（tabTitle0），有未读时还是「文字(3)」 */
-        return total > 0 ? "\(C.tabTitle0)(\(total))" : C.tabTitle0
+        return total > 0 ? "\(C.tabText0)(\(total))" : C.tabText0
     }
 
     var body: some View {

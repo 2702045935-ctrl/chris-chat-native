@@ -17,6 +17,7 @@ struct ProfileEditView: View {
     @State private var showBirthday = false
     @State private var showPhoto = false
     @State private var busy = false
+    @State private var cropImage: UIImage?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -143,7 +144,17 @@ struct ProfileEditView: View {
             birthday = app.me?.birthday ?? ""
         }
         .sheet(isPresented: $showPhoto) {
-            PhotoPicker { image in changeAvatar(image) }
+            /* 先裁成正方形再上传（对应功能清单里的「头像裁剪」） */
+            PhotoPicker { image in cropImage = image }
+        }
+        .sheet(isPresented: Binding(get: { cropImage != nil },
+                                    set: { if !$0 { cropImage = nil } })) {
+            if let img = cropImage {
+                AvatarCropSheet(image: img) { cropped in
+                    changeAvatar(cropped)
+                    cropImage = nil
+                }
+            }
         }
         .sheet(isPresented: $showRingtone) {
             RingtonePicker()

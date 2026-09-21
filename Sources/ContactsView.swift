@@ -52,7 +52,7 @@ private let funcs: [(String, String, Color, String)] = [
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: C.tabTitle1) {
+                NavBar(title: C.tabText1) {
                     Button {
                         path.append("addFriend")
                     } label: {

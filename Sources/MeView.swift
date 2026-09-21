@@ -253,6 +253,8 @@ struct SettingsView: View {
     @State private var hasPay = false
     @State private var showFeedback = false
     @State private var showAbout = false
+    @State private var showLang = false
+    @State private var showPairApprove = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -270,6 +272,9 @@ struct SettingsView: View {
                         HairLine(inset: 16)
                         settingRow("账号与安全", "") { app.show("账号与安全排在下一批") }
                         HairLine(inset: 16)
+                        /* 网页版「微信授权登录 / QQ 授权登录」出的 6 位数字在这里确认 */
+                        settingRow("设备确认登录", "") { showPairApprove = true }
+                        HairLine(inset: 16)
                         /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
                         settingLink("支付密码", hasPay ? "已设置" : "未设置", key: "paypwd")
                         HairLine(inset: 16)
@@ -281,6 +286,8 @@ struct SettingsView: View {
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
+                        settingRow("界面语言", Lang.name) { showLang = true }
+                        HairLine(inset: 16)
                         settingRow("意见反馈", "") { showFeedback = true }
                         HairLine(inset: 16)
                         settingRow("关于我们 · 版本更新", "1.0 · " + AppInfo.build) { showAbout = true }
@@ -331,6 +338,12 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showFeedback) { FeedbackView() }
         .sheet(isPresented: $showAbout) { AboutView() }
+        .sheet(isPresented: $showPairApprove) { PairApproveView() }
+        .confirmationDialog("界面语言", isPresented: $showLang, titleVisibility: .visible) {
+            Button("简体中文") { setLang("zh") }
+            Button("English") { setLang("en") }
+            Button("取消", role: .cancel) { }
+        }
         .task { hasPay = await API.shared.hasPayPassword() }
         .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) {
@@ -342,6 +355,12 @@ struct SettingsView: View {
             }
             Button("取消", role: .cancel) { }
         }
+    }
+
+    /// 切换界面语言：存下来 + 让标签栏那些文案立刻重绘
+    private func setLang(_ code: String) {
+        Lang.code = code
+        app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
     }
 
     private func changeBg(_ image: UIImage) {

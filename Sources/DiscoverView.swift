@@ -18,7 +18,7 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: C.tabTitle2)
+                NavBar(title: C.tabText2)
                     .measure("discover.nav")
                 ScrollView {
                     VStack(spacing: 0) {
@@ -242,6 +242,13 @@ struct MomentsView: View {
     @State private var cardUser: User?
     /// 朋友圈往下翻页：还有没有更多 / 正在加载 / 一共多少条
     @State private var hasMoreMoments = false
+    /* 发朋友圈：谁可以看 */
+    @State private var visibility = "public"
+    @State private var showVisibility = false
+    @State private var showPick = false
+    @State private var pickMode = "partial"
+    @State private var visibleTo: Set<String> = []
+    @State private var hiddenFrom: Set<String> = []
     @State private var loadingMore = false
     @State private var momentTotal = 0
     /// 下拉刷新：拉出来的距离 / 正在刷新 / 彩球自转角度
@@ -602,6 +609,29 @@ struct MomentsView: View {
                     Label("添加图片", systemImage: "photo.on.rectangle")
                         .font(pf(15))
                 }
+                /* 谁可以看（对应功能清单里的「好友公开 / 私密 / 部分可见 / 不给谁看」） */
+                Button {
+                    showVisibility = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "eye")
+                        Text("谁可以看：\(visibilityName)")
+                        Spacer()
+                        Chevron(size: 9, line: 1.6)
+                    }
+                    .font(pf(15))
+                    .foregroundColor(C.label)
+                    .padding(.horizontal, 12)
+                    .frame(height: 44)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+                }
+                if visibility == "partial" || visibility == "exclude" {
+                    Text(visibility == "partial"
+                         ? "只给这 \(visibleTo.count) 个人看"
+                         : "不给这 \(hiddenFrom.count) 个人看")
+                        .font(pf(12.5))
+                        .foregroundColor(C.subLabel)
+                }
                 Spacer()
             }
             .padding(16)
@@ -618,6 +648,14 @@ struct MomentsView: View {
                     }
                 }
             }
+            .confirmationDialog("谁可以看", isPresented: $showVisibility, titleVisibility: .visible) {
+                Button("公开（所有好友可见）") { visibility = "public" }
+                Button("私密（仅自己可见）") { visibility = "private" }
+                Button("部分可见…") { visibility = "partial"; pickMode = "partial"; showPick = true }
+                Button("不给谁看…") { visibility = "exclude"; pickMode = "exclude"; showPick = true }
+                Button("取消", role: .cancel) { }
+            }
+            .sheet(isPresented: $showPick) { friendPickSheet }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") { posting = false }
@@ -627,6 +665,44 @@ struct MomentsView: View {
                         .disabled(uploading || (draft.isEmpty && picked.isEmpty))
                 }
             }
+        }
+    }
+
+    private var visibilityName: String {
+        switch visibility {
+        case "private": return "仅自己"
+        case "partial": return "部分可见"
+        case "exclude": return "不给谁看"
+        default: return "公开"
+        }
+    }
+
+    private var friendPickSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(app.contacts) { u in
+                    Button {
+                        if pickMode == "partial" {
+                            if visibleTo.contains(u.id) { visibleTo.remove(u.id) } else { visibleTo.insert(u.id) }
+                        } else {
+                            if hiddenFrom.contains(u.id) { hiddenFrom.remove(u.id) } else { hiddenFrom.insert(u.id) }
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Avatar(path: u.avatarPath, size: 38, radius: 6)
+                            Text(u.name).font(pf(16)).foregroundColor(C.label)
+                            Spacer()
+                            let on = pickMode == "partial" ? visibleTo.contains(u.id) : hiddenFrom.contains(u.id)
+                            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(on ? C.green : C.subLabel)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .navigationTitle(pickMode == "partial" ? "选择可见的好友" : "选择不看的好友")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("好了") { showPick = false } } }
         }
     }
 
@@ -700,13 +776,19 @@ struct MomentsView: View {
                 if let url = try? await API.shared.upload(image: image) { urls.append(url) }
             }
             do {
-                try await API.shared.postMoment(content: draft, images: urls)
+                try await API.shared.postMoment(content: draft, images: urls,
+                                                visibility: visibility,
+                                                visibleTo: Array(visibleTo),
+                                                hiddenFrom: Array(hiddenFrom))
                 app.show("已发表")
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发表失败")
             }
             draft = ""
             picked = []
+            visibility = "public"
+            visibleTo = []
+            hiddenFrom = []
             uploading = false
             posting = false
             await reload()

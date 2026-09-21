@@ -7,10 +7,10 @@ struct CrashLogView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "上次崩溃信息", back: { dismiss() })
+            NavBar(title: Tr("上次崩溃信息"), back: { dismiss() })
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("把这一页截图发给我，就能定位到崩在哪一行。")
+                    Text(Tr("把这一页截图发给我，就能定位到崩在哪一行。"))
                         .font(pf(13)).foregroundColor(C.subLabel)
                     Text(UserDefaults.standard.string(forKey: "chris.lastCrashAt") ?? "")
                         .font(pf(12)).foregroundColor(C.subLabel)
@@ -29,7 +29,7 @@ struct CrashLogView: View {
                 UserDefaults.standard.removeObject(forKey: "chris.lastCrashAt")
                 dismiss()
             } label: {
-                Text("已截图，清掉这条")
+                Text(Tr("已截图，清掉这条"))
                     .font(pf(16, .medium))
                     .foregroundColor(C.green)
                     .frame(maxWidth: .infinity)

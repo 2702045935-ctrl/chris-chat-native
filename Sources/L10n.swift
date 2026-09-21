@@ -9,6 +9,10 @@ func Tr(_ zh: String) -> String {
 
 enum L10n {
     static let dict: [String: String] = [
+        "精彩视频": "Channels",
+        "上次崩溃信息": "Last crash log",
+        "把这一页截图发给我，就能定位到崩在哪一行。": "Send me a screenshot of this page so I can locate the crash.",
+        "已截图，清掉这条": "Screenshotted - clear this",
         "取消": "Cancel",
         "发送": "Send",
         "验证码已发送": "Code sent",

@@ -172,7 +172,9 @@ struct MeView: View {
                         Text("＋").foregroundColor(C.subLabel)
                         Text(Tr("状态"))
                     }
-                } action: {
+                } bg1: app.me?.moodText?.isEmpty == false ? (app.me?.moodColor ?? "") : "",
+                   bg2: app.me?.moodText?.isEmpty == false ? (app.me?.moodColor2 ?? "") : "",
+                   action: {
                     path.append("status")
                 }
                 chip {
@@ -193,15 +195,33 @@ struct MeView: View {
         .background(C.cardBg)
     }
 
-    private func chip<Content: View>(@ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {
+    /// bg1/bg2：状态那一条要跟着所选状态的颜色变（两个色就是渐变）
+    private func chip<Content: View>(bg1: String = "", bg2: String = "",
+                                     @ViewBuilder content: () -> Content,
+                                     action: @escaping () -> Void) -> some View {
+        let hasColor = !bg1.isEmpty
         Button(action: action) {
             HStack(spacing: L.v(2, 1, 4)) { content() }
                 .font(pf(L.v(12.5, 3.4, 13.5)))
-                .foregroundColor(Color.dyn(0x191919, 0xF2F2F7))
+                .foregroundColor(hasColor ? .white : Color.dyn(0x191919, 0xF2F2F7))
                 .padding(.horizontal, L.v(10, 3.2, 13))
                 .frame(height: L.v(28, 8, 32))
+                .background(
+                    Group {
+                        if hasColor {
+                            Capsule().fill(
+                                LinearGradient(colors: [Color(hexString: bg1),
+                                                        Color(hexString: bg2.isEmpty ? bg1 : bg2)],
+                                               startPoint: .leading, endPoint: .trailing)
+                            )
+                        } else {
+                            Capsule().fill(Color.clear)
+                        }
+                    }
+                )
                 .overlay(
-                    Capsule().stroke(Color.dyn(0xE5E5E5, 0x333335), lineWidth: 0.5)
+                    Capsule().stroke(hasColor ? Color.white.opacity(0.25)
+                                              : Color.dyn(0xE5E5E5, 0x333335), lineWidth: 0.5)
                 )
         }
         .buttonStyle(.plain)

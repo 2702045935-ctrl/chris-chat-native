@@ -291,6 +291,9 @@ enum C {
     })
     static let fieldBg     = Color.dyn(0xF2F2F2, 0x2C2C2E)
     static let iconGray    = Color.dyn(0x6F6F6F, 0x9A9A9A)
+    /// 聊天页底部那一排按钮（麦克风 / 喇叭 / 表情 / ＋）的颜色，后台「界面文字」里能改：
+    /// 写「#浅色|#深色」两份，比如浅色模式想深一点就写 "#333333|#9A9A9A"
+    static var chatBarIcon : Color { UIConfig.color("chatBarIcon", 0x6F6F6F, 0x9A9A9A) }
 
     // 登录页（网页版永远是深色那一套）
     static let loginBg     = Color(hex: 0x111111)

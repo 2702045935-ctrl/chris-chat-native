@@ -368,7 +368,7 @@ struct ChatDetailView: View {
                     app.show("按住左边的麦克风说话，松开发送，上滑取消")
                 } label: {
                     SVGIcon(markup: I.voice, size: L.composerIcon,
-                            color: recorder.recording ? C.green : C.iconGray)
+                            color: recorder.recording ? C.green : C.chatBarIcon)
                         .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
                 .buttonStyle(.plain)
@@ -392,7 +392,7 @@ struct ChatDetailView: View {
                         .font(pf(17))
                         .foregroundColor(C.label)
                         .onTapGesture { panel = .none }
-                    SVGIcon(markup: I.speaker, size: 22, color: C.iconGray)
+                    SVGIcon(markup: I.speaker, size: 22, color: C.chatBarIcon)
                         .padding(.leading, 6)
                 }
                 .padding(.horizontal, 8)
@@ -408,7 +408,7 @@ struct ChatDetailView: View {
                         focused = false
                         panel = (panel == .emoji) ? .none : .emoji
                     } label: {
-                        SVGIcon(markup: I.smile, size: L.composerIcon, color: C.iconGray)
+                        SVGIcon(markup: I.smile, size: L.composerIcon, color: C.chatBarIcon)
                             .frame(width: L.composerIconBox, height: L.composerIconBox)
                     }
                     .buttonStyle(.plain)
@@ -420,7 +420,7 @@ struct ChatDetailView: View {
                             Task { plusItems = (try? await API.shared.plusPanel()) ?? [] }
                         }
                     } label: {
-                        SVGIcon(markup: I.plusCircle, size: L.composerIcon, color: C.iconGray)
+                        SVGIcon(markup: I.plusCircle, size: L.composerIcon, color: C.chatBarIcon)
                             .frame(width: L.composerIconBox, height: L.composerIconBox)
                     }
                     .buttonStyle(.plain)

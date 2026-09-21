@@ -252,12 +252,9 @@ struct GeneralView: View {
     private func setLang(_ code: String) {
         Lang.code = code
         app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
-        /* 关键：先把当前这页关掉，等弹层收完了再重建界面树 ——
-           边弹着 sheet 边重建整棵视图树，SwiftUI 会崩（之前切英文闪退就是这个）。 */
         dismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            app.langVersion += 1
-        }
+        /* 不在运行中重绘界面（重绘这条路试过两次都会闪退）：
+           语言已经存下来了，重开 App 就是新语言。 */
     }
 
     private func changeBg(_ image: UIImage) {

@@ -265,6 +265,7 @@ final class AppState: ObservableObject {
     }
 
     func refreshAll() async {
+        CrashCatcher.install()              // 装上崩溃上报：崩了会把调用栈发到服务器
         LocalNotify.prepare()               // 先要通知权限，之后新消息才会真响真震
         await LocalNotify.refresh()
         await loadChats()

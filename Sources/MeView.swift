@@ -370,11 +370,8 @@ struct SettingsView: View {
     private func setLang(_ code: String) {
         Lang.code = code
         app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
-        /* 先关页面，再重建（边弹着 sheet 边重建会闪退） */
         dismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            app.langVersion += 1
-        }
+        /* 同上：运行中不重绘，重开 App 生效 */
     }
 
     private func changeBg(_ image: UIImage) {

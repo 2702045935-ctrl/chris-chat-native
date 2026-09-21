@@ -5,27 +5,31 @@ import SwiftUI
    所以断网、冷启动都能立刻显示。 */
 struct SplashView: View {
     var body: some View {
-        ZStack {
-            Color.black
-            if let img = UIImage(named: "splash") {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()          // 铺满整屏（不留黑边；深色图，左右裁一点看不出来）
-                    .frame(width: UIScreen.main.bounds.width,
-                           height: UIScreen.main.bounds.height)
-            } else {
-                /* 图没打进包时的兜底：黑底 + 名字 */
-                VStack(spacing: 10) {
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 54))
-                        .foregroundColor(.white)
-                    Text("Luchat")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.white)
+        /* 用 GeometryReader 拿"整块窗口"的真实尺寸（含状态栏/刘海那一条），
+           再用 ignoresSafeArea 铺出去 —— 之前用 UIScreen 尺寸在安全区里布局，
+           顶部会留 ~13pt 露出页面底色，看着就是一条白条。 */
+        GeometryReader { geo in
+            ZStack {
+                Color.black
+                if let img = UIImage(named: "splash") {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                } else {
+                    VStack(spacing: 10) {
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 54))
+                            .foregroundColor(.white)
+                        Text("Luchat")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .ignoresSafeArea()
-        .clipped()
+        .ignoresSafeArea(.all)
     }
 }

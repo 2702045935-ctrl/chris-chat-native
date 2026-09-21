@@ -1661,9 +1661,10 @@ final class API {
         return try await uploadData(data)
     }
 
-    /// 聊天背景用原图上传：尺寸不动、画质几乎无损（只有超过 4096 才缩，省内存）
+    /// 聊天背景：比头像清楚得多（长边 2048、画质 0.95）。
+    /// 注意别设太大：一张 4800 万的相册原图直接按 4096 重绘会把内存打爆闪退。
     func uploadOriginal(image: UIImage) async throws -> String {
-        let data = image.resizedJPEG(maxSide: 4096, quality: 1.0)
+        let data = image.resizedJPEG(maxSide: 2048, quality: 0.95)
         return try await uploadData(data)
     }
 

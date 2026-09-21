@@ -6,6 +6,7 @@ import UIKit
 struct MainTabView: View {
     @EnvironmentObject var app: AppState
     @State private var tab = 0
+    @State private var shownCrash = false
     /* 读一下语言状态：切语言时这一层会重画（不重建整棵树，避免闪退） */
     @ObservedObject private var lang = LangStore.shared
 
@@ -45,6 +46,12 @@ struct MainTabView: View {
            「上下缩放」就是这么来的。改成不给容器加动画：标签栏直接让位，页面照常推进来。 */
         /* 真人语音/视频通话：来电、通话界面挂在最外层，任何页面都能弹出来 */
         .overlay(CallOverlay())
+        /* 上次崩过的话，进来就把崩溃信息弹出来（截图给我就能定位） */
+        .sheet(isPresented: Binding(
+            get: { !(UserDefaults.standard.string(forKey: "chris.lastCrash") ?? "").isEmpty && !shownCrash },
+            set: { shownCrash = true })) {
+                CrashLogView()
+        }
         /* 接通 / 挂断弹的对话框（颜色圆角和聊天那个框一样），等用户点「确定」或超时自己关 */
         .overlay(CallDialogOverlay())
     }

@@ -28,6 +28,10 @@ enum CrashCatcher {
     /// 主动上报（不一定崩，也可以记异常）
     static func report(_ kind: String, _ text: String) {
         let stack = Thread.callStackSymbols.joined(separator: "\n")
+        /* 先存在本机上：万一网络不通，下次打开 App 会把这页弹出来，截图发我一样能看 */
+        UserDefaults.standard.set("\(kind)\n\(text)\n\n\(stack)".prefix(6000).description,
+                                  forKey: "chris.lastCrash")
+        UserDefaults.standard.set(ISO8601DateFormatter().string(from: Date()), forKey: "chris.lastCrashAt")
         let payload: [String: Any] = [
             "kind": kind,
             "text": String(text.prefix(4000)),

@@ -1667,6 +1667,28 @@ final class API {
     }
 
     /// 聊天背景：比头像清楚得多（长边 2048、画质 0.95）。
+    /// 视频/大文件走二进制直传（不再 base64，少传 25%，手机上快一截）
+    func uploadBinary(_ data: Data, mime: String) async throws -> String {
+        guard let url = URL(string: base + "/api/upload/raw") else { throw APIError.message("服务器地址不正确") }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 180
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(mime, forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        let (d, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.message("上传失败（HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)）")
+        }
+        struct RawUpload: Decodable { var url: String? }
+        let parsed = try? JSONDecoder().decode(RawUpload.self, from: d)
+        if let u = parsed?.url, !u.isEmpty { return u }
+        /* 服务器返回的是 {ok,data:{url}} 这种包装，兜底再解一层 */
+        struct Wrapper: Decodable { struct D: Decodable { var url: String? }; var data: D? }
+        if let w = try? JSONDecoder().decode(Wrapper.self, from: d), let u = w.data?.url, !u.isEmpty { return u }
+        throw APIError.message("上传返回异常")
+    }
+
     /// 注意别设太大：一张 4800 万的相册原图直接按 4096 重绘会把内存打爆闪退。
     func uploadOriginal(image: UIImage) async throws -> String {
         let data = image.resizedJPEG(maxSide: 2048, quality: 0.95)

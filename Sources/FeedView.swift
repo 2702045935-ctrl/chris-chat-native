@@ -320,7 +320,9 @@ struct ChannelsView: View {
             try data.write(to: raw)
             let uploadData: Data
             let mb = Double(data.count) / 1024 / 1024
-            if mb <= 40 {
+            /* 发布提速：超过 12MB 就先在手机上压到 1080p（约 4Mbps），
+               这样上传体积能砍一半以上；12MB 以内的原样传，省掉重编码那几十秒。 */
+            if mb <= 12 {
                 uploadData = data
             } else if let small = await Self.compress(raw), !small.isEmpty, small.count < data.count {
                 uploadData = small
@@ -328,12 +330,9 @@ struct ChannelsView: View {
                 uploadData = data
             }
             try? FileManager.default.removeItem(at: raw)
-            let payload: [String: Any] = [
-                "dataUrl": "data:video/mp4;base64," + uploadData.base64EncodedString(),
-                "filename": "feed.mp4"
-            ]
-            let up = try await API.shared.rawUpload(payload)
-            pendingVideoPath = up.url
+            /* 二进制直传：不再 base64（少传 25%） */
+            let url = try await API.shared.uploadBinary(uploadData, mime: "video/mp4")
+            pendingVideoPath = url
             uploadMB = Double(uploadData.count) / 1024 / 1024
             showPublish = true
         } catch {

@@ -105,7 +105,19 @@ final class AppState: ObservableObject {
         }
         switch ev.type {
         case "message", "chat":
-            coalesce { [weak self] in await self?.loadChats() }
+            /* 新消息：按「消息通知」里的设置真响真震（免打扰时段里不响） */
+            let cid = ev.chatId
+            coalesce { [weak self] in
+                await self?.loadChats()
+                guard let self = self else { return }
+                if !cid.isEmpty, let c = self.chats.first(where: { $0.id == cid }) {
+                    if c.muted == true { return }              // 这个会话自己开了免打扰
+                    LocalNotify.incoming(title: c.name,
+                                         body: c.lastMessage?.preview ?? "你收到一条新消息")
+                } else {
+                    LocalNotify.incoming(title: "新消息", body: "你收到一条新消息")
+                }
+            }
         case "transfer":
             /* 转账状态变了（对方收款 / 24 小时自动退回）：
                付款方这边弹一句提示，会话列表跟着刷一遍 */
@@ -253,6 +265,8 @@ final class AppState: ObservableObject {
     }
 
     func refreshAll() async {
+        LocalNotify.prepare()               // 先要通知权限，之后新消息才会真响真震
+        await LocalNotify.refresh()
         await loadChats()
         await loadContacts()
         await loadMoments()

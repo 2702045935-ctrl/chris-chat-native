@@ -1711,8 +1711,10 @@ final class API {
         _ = try? await request("PATCH", "/api/me", body: fields)
     }
 
-    func addFriend(username: String) async throws {
-        _ = try await request("POST", "/api/friends/request", body: ["username": username])
+    func addFriend(username: String, from: String = "") async throws {
+        var body: [String: Any] = ["username": username]
+        if !from.isEmpty { body["from"] = from }
+        _ = try await request("POST", "/api/friends/request", body: body)
     }
 
     func rawUpload(_ body: [String: Any]) async throws -> (url: String, name: String, bytes: Int) {

@@ -18,6 +18,7 @@ struct ProfileEditView: View {
     @State private var showPhoto = false
     @State private var busy = false
     @State private var cropImage: UIImage?
+    @State private var showMyQR = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,6 +54,33 @@ struct ProfileEditView: View {
                         .buttonStyle(.plain)
                         HairLine(inset: 16)
                         field("昵称", $nickname)
+                        HairLine(inset: 16)
+                        /* 微信号（只读）+ 我的二维码：和微信一样排在这一屏最上面 */
+                        HStack(spacing: 12) {
+                            Text(Tr("微信号")).font(pf(17)).foregroundColor(C.label)
+                                .frame(width: 76, alignment: .leading)
+                            Text(app.me?.username ?? "-")
+                                .font(pf(17))
+                                .foregroundColor(C.subLabel)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 56)
+                        HairLine(inset: 16)
+                        Button {
+                            showMyQR = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(Tr("我的二维码")).font(pf(17)).foregroundColor(C.label)
+                                Spacer()
+                                SVGIcon(markup: I.qr, size: 18, color: C.arrow)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     Rectangle().fill(C.pageBg).frame(height: 8)
@@ -162,6 +190,7 @@ struct ProfileEditView: View {
         .sheet(isPresented: $showBirthday) {
             BirthdayPickerSheet(birthday: $birthday)
         }
+        .sheet(isPresented: $showMyQR) { MyQRView() }
     }
 
     private func field(_ title: String, _ text: Binding<String>) -> some View {

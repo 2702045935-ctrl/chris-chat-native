@@ -18,7 +18,7 @@ struct DiscoverView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: "发现")
+                NavBar(title: C.tabTitle2)
                     .measure("discover.nav")
                 ScrollView {
                     VStack(spacing: 0) {

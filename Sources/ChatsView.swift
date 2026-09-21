@@ -201,7 +201,8 @@ struct ChatsView: View {
     /// 和网页版一样：有未读时标题变成「微信(3)」
     private var navTitle: String {
         let total = app.chats.reduce(0) { $0 + ($1.unread ?? 0) }
-        return total > 0 ? "微信(\(total))" : "微信"
+        /* 顶栏文字后台可改（tabTitle0），有未读时还是「文字(3)」 */
+        return total > 0 ? "\(C.tabTitle0)(\(total))" : C.tabTitle0
     }
 
     var body: some View {

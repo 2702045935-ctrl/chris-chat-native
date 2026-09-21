@@ -49,7 +49,7 @@ struct ContactsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-                NavBar(title: "通讯录") {
+                NavBar(title: C.tabTitle1) {
                     Button {
                         path.append("addFriend")
                     } label: {

@@ -18,6 +18,11 @@ enum UIConfig {
     static var scale: CGFloat = 0.94
 
     static func num(_ key: String, _ def: CGFloat) -> CGFloat { numbers[key] ?? def }
+    /// 读后台配的文字（空 = 用默认）
+    static func text(_ key: String, _ def: String) -> String {
+        if let v = strings[key], !v.trimmingCharacters(in: .whitespaces).isEmpty { return v }
+        return def
+    }
 
     static func color(_ key: String, _ light: UInt32, _ dark: UInt32) -> Color {
         guard let raw = strings[key] else { return Color.dyn(light, dark) }
@@ -294,6 +299,11 @@ enum C {
     /// 聊天页底部那一排按钮（麦克风 / 喇叭 / 表情 / ＋）的颜色，后台「界面文字」里能改：
     /// 写「#浅色|#深色」两份，比如浅色模式想深一点就写 "#333333|#9A9A9A"
     static var chatBarIcon : Color { UIConfig.color("chatBarIcon", 0x6F6F6F, 0x9A9A9A) }
+    /* 四个首页顶栏文字：后台「界面文字」里能改（tabTitle0 微信 / 1 通讯录 / 2 发现 / 3 我） */
+    static var tabTitle0: String { UIConfig.text("tabTitle0", "微信") }
+    static var tabTitle1: String { UIConfig.text("tabTitle1", "通讯录") }
+    static var tabTitle2: String { UIConfig.text("tabTitle2", "发现") }
+    static var tabTitle3: String { UIConfig.text("tabTitle3", "我") }
 
     // 登录页（网页版永远是深色那一套）
     static let loginBg     = Color(hex: 0x111111)

@@ -146,7 +146,7 @@ struct MeView: View {
                 Spacer(minLength: 0)
 
                 Button {
-                    app.show(Tr("我的二维码排在下一批"))
+                    showMyQR = true
                 } label: {
                     SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: C.arrow)
                         .frame(width: L.v(26, 7.4, 30), height: L.v(26, 7.4, 30))
@@ -255,6 +255,7 @@ struct SettingsView: View {
     @State private var showAbout = false
     @State private var showLang = false
     @State private var showPairApprove = false
+    @State private var showMyQR = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -339,6 +340,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showFeedback) { FeedbackView() }
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPairApprove) { PairApproveView() }
+        .sheet(isPresented: $showMyQR) { MyQRView() }
         .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
             Button(Tr("简体中文")) { setLang("zh") }
             Button("English") { setLang("en") }

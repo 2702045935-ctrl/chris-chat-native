@@ -1284,6 +1284,32 @@ final class API {
     }
 
     /// 群二维码：拿到邀请码和二维码 SVG
+    /// 我的二维码（每个人一张，扫了能加好友）
+    func myQRCode() async -> (code: String, url: String, rows: [String], user: User?) {
+        struct MyQRPayload: Decodable {
+            var code: String?; var url: String?; var rows: [String]?; var user: User?
+        }
+        guard let p: MyQRPayload = try? await get("/api/me/qrcode", as: MyQRPayload.self)
+        else { return ("", "", [], nil) }
+        return (p.code ?? "", p.url ?? "", p.rows ?? [], p.user)
+    }
+
+    /// 扫到别人的个人二维码：加好友。返回 (提示文案, 对方)
+    func addByCode(_ code: String) async -> (message: String, user: User?) {
+        struct AddPayload: Decodable {
+            var sent: Bool?; var already: Bool?; var pending: Bool?; var accepted: Bool?; var user: User?
+        }
+        do {
+            let p: AddPayload = try await post("/api/add-by-code", ["code": code], as: AddPayload.self)
+            let msg = p.already == true ? "你们已经是好友了"
+                : (p.pending == true ? "已经发过申请了，等对方通过"
+                   : (p.accepted == true ? "对方之前加过你，现在已经是好友" : "好友申请已发出"))
+            return (msg, p.user)
+        } catch {
+            return ((error as? APIError)?.errorDescription ?? "加好友失败", nil)
+        }
+    }
+
     func groupInvite(chatId: String) async -> (code: String, url: String, rows: [String]) {
         struct InvitePayload: Decodable { var code: String?; var url: String?; var svg: String?; var rows: [String]? }
         guard let p: InvitePayload = try? await post("/api/chats/\(chatId)/invite", [:], as: InvitePayload.self)

@@ -5,6 +5,20 @@ import AVFoundation
 @MainActor
 func handleScanned(_ text: String, app: AppState) {
     let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    /* 别人的个人二维码：链接里带 u=个人码 → 直接加好友 */
+    if let r = t.range(of: "u="), t.contains("add.html") {
+        var code = String(t[r.upperBound...])
+        if let amp = code.firstIndex(of: "&") { code = String(code[..<amp]) }
+        code = code.trimmingCharacters(in: .whitespaces)
+        if !code.isEmpty {
+            Task {
+                let res = await API.shared.addByCode(code)
+                app.show(res.user == nil ? res.message : (res.message + "：" + (res.user?.name ?? "")))
+                if res.message.contains("好友") { await app.loadContacts() }
+            }
+            return
+        }
+    }
     /* 群二维码：链接里带 c=邀请码 */
     if let r = t.range(of: "c=") {
         var code = String(t[r.upperBound...])

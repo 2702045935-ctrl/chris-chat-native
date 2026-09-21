@@ -313,7 +313,7 @@ struct BankCardsView: View {
         }
     }
 
-    private func field<C: View>(_ title: String, @ViewBuilder _ c: () -> C) -> some View {
+    private func field<Content: View>(_ title: String, @ViewBuilder _ c: () -> Content) -> some View {
         HStack(spacing: 10) {
             Text(title).font(pf(16)).foregroundColor(C.label)
             Spacer(minLength: 8)
@@ -662,7 +662,7 @@ struct ResetPasswordSheet: View {
         }
     }
 
-    private func field<C: View>(@ViewBuilder _ c: () -> C) -> some View {
+    private func field<Content: View>(@ViewBuilder _ c: () -> Content) -> some View {
         HStack(spacing: 8) { c() }
             .font(.system(size: 15))
             .frame(height: 54)

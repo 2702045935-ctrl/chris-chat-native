@@ -187,6 +187,7 @@ struct ChatsView: View {
     @State private var keyword = ""
     @State private var path = NavigationPath()
     @State private var plusMenu = false
+    @State private var showScan = false
     @State private var openRow: String?
     /// 下拉时露出来的距离（用滚动偏移算，不会抢左右滑的手势）
     @State private var pullY: CGFloat = 0
@@ -280,7 +281,11 @@ struct ChatsView: View {
         .confirmationDialog("", isPresented: $plusMenu, titleVisibility: .hidden) {
             Button("发起群聊") { path.append("newGroup") }
             Button("加好友") { path.append("addFriend") }
+            Button("扫一扫") { showScan = true }
             Button("取消", role: .cancel) { }
+        }
+        .fullScreenCover(isPresented: $showScan) {
+            ScannerView { text in handleScanned(text, app: app) }
         }
         .task {
             // 进页面先拉一次，之后每 4 秒自动刷新一次（这样别人发消息不用切页就能看到）

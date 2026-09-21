@@ -60,7 +60,7 @@ jobs:
             -o "$APP/CHRIS" \
             Sources/*.swift \
             -framework SwiftUI -framework UIKit -framework Foundation \
-            -framework LocalAuthentication \
+            -framework LocalAuthentication -framework AVFoundation \
             -framework WebRTC \
             -Xlinker -rpath -Xlinker @executable_path/Frameworks
           echo "编译完成，体积："

@@ -6,6 +6,8 @@ struct DiscoverView: View {
     /// 后台配的发现页（加一行、改个名，重开 App 或切回本页就变）
     @State private var items: [DiscoverItem] = []
     @State private var loaded = false
+    /// 扫一扫（发现页 → 扫一扫）
+    @State private var showScan = false
     @ObservedObject private var realtime = Realtime.shared
 
     private var latestThumb: String {
@@ -78,6 +80,9 @@ struct DiscoverView: View {
         .task {
             if !loaded { await loadItems() }
         }
+        .fullScreenCover(isPresented: $showScan) {
+            ScannerView { text in handleScanned(text, app: app) }
+        }
     }
 
     /// 按 group 分组：同一组排在一张卡片里（和网页版一致）
@@ -109,9 +114,10 @@ struct DiscoverView: View {
         case "nearby": path.append("nearby")
         case "shake": path.append("shake")
         case "live": path.append("live")
-        case "games": path.append("games")
-        case "channels": path.append("channels")
-        default: path.append("soon:" + item.label)
+    case "games": path.append("games")
+    case "channels": path.append("channels")
+    case "scan": showScan = true
+    default: path.append("soon:" + item.label)
         }
     }
 

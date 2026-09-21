@@ -44,7 +44,15 @@ struct MyQRView: View {
                             Text(Tr("二维码生成失败，稍后再试"))
                                 .font(pf(13.5)).foregroundColor(C.subLabel)
                         } else {
-                            QRCanvas(rows: rows).frame(width: 228, height: 228)
+                            /* 二维码 + 中间本人的头像（和微信一样）：
+                               头像只占 19%，在纠错范围内，扫码不受影响 */
+                            ZStack {
+                                QRCanvas(rows: rows).frame(width: 228, height: 228)
+                                Avatar(path: avatar, size: 44, radius: 8)
+                                    .padding(4)
+                                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.white))
+                            }
+                            .frame(width: 228, height: 228)
                         }
                     }
                     .frame(width: 256, height: 256)
@@ -111,7 +119,13 @@ struct MyQRView: View {
     private func saveToAlbum() {
         guard !rows.isEmpty else { return }
         let card = VStack(spacing: 14) {
-            QRCanvas(rows: rows).frame(width: 520, height: 520)
+            ZStack {
+                QRCanvas(rows: rows).frame(width: 520, height: 520)
+                Avatar(path: avatar, size: 100, radius: 18)
+                    .padding(9)
+                    .background(RoundedRectangle(cornerRadius: 24).fill(Color.white))
+            }
+            .frame(width: 520, height: 520)
             Text(name).font(.system(size: 26, weight: .semibold))
             Text(Tr("微信号：") + username).font(.system(size: 20)).foregroundColor(.gray)
             Text(Tr("扫一扫，加我好友")).font(.system(size: 20)).foregroundColor(.gray)

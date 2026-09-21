@@ -9,6 +9,11 @@ func Tr(_ zh: String) -> String {
 
 enum L10n {
     static let dict: [String: String] = [
+        "仅聊天的朋友": "Chat-only",
+        "标签": "Tags",
+        "服务号": "Service accounts",
+        "企业微信联系人": "WeCom contacts",
+        "我的企业": "My enterprise",
         "精彩视频": "Channels",
         "上次崩溃信息": "Last crash log",
         "把这一页截图发给我，就能定位到崩在哪一行。": "Send me a screenshot of this page so I can locate the crash.",

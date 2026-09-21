@@ -164,17 +164,7 @@ struct MeView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: L.v(8, 2.6, 11)) {
-                chip(bg1: (app.me?.moodText ?? "").isEmpty ? "" : (app.me?.moodColor ?? ""),
-                     bg2: (app.me?.moodText ?? "").isEmpty ? "" : (app.me?.moodColor2 ?? ""),
-                     action: { path.append("status") }) {
-                    if let mood = app.me?.moodText, !mood.isEmpty {
-                        Text(app.me?.moodIcon ?? "")
-                        Text(mood)
-                    } else {
-                        Text("＋").foregroundColor(C.subLabel)
-                        Text(Tr("状态"))
-                    }
-                }
+                statusChip
                 chip {
                     Text(Tr("朋友圈"))
                     Text("\(friendCount) 个朋友")
@@ -193,10 +183,44 @@ struct MeView: View {
         .background(C.cardBg)
     }
 
-    /// bg1/bg2：状态那一条要跟着所选状态的颜色变（两个色就是渐变）
-    private func chip<Content: View>(bg1: String = "", bg2: String = "",
-                                     action: @escaping () -> Void,
-                                     @ViewBuilder content: () -> Content) -> some View {
+    /// 状态那一条：选了状态就跟着状态的颜色走（两个色就是渐变），没选就是普通白条
+    private var statusChip: some View {
+        let mood = app.me?.moodText ?? ""
+        let c1 = app.me?.moodColor ?? ""
+        let c2 = app.me?.moodColor2 ?? ""
+        let hasColor = !mood.isEmpty && !c1.isEmpty
+        return Button {
+            path.append("status")
+        } label: {
+            HStack(spacing: L.v(2, 1, 4)) {
+                if !mood.isEmpty {
+                    Text(app.me?.moodIcon ?? "")
+                    Text(mood)
+                } else {
+                    Text("＋").foregroundColor(C.subLabel)
+                    Text(Tr("状态"))
+                }
+            }
+            .font(pf(L.v(12.5, 3.4, 13.5)))
+            .foregroundColor(hasColor ? .white : Color.dyn(0x191919, 0xF2F2F7))
+            .padding(.horizontal, L.v(10, 3.2, 13))
+            .frame(height: L.v(28, 8, 32))
+            .background(
+                Capsule().fill(hasColor
+                    ? AnyShapeStyle(LinearGradient(colors: [Color(hexString: c1),
+                                                            Color(hexString: c2.isEmpty ? c1 : c2)],
+                                                   startPoint: .leading, endPoint: .trailing))
+                    : AnyShapeStyle(Color.clear))
+            )
+            .overlay(
+                Capsule().stroke(hasColor ? Color.white.opacity(0.25)
+                                          : Color.dyn(0xE5E5E5, 0x333335), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chip<Content: View>(@ViewBuilder content: () -> Content, action: @escaping () -> Void) -> some View {
         let hasColor = !bg1.isEmpty
         Button(action: action) {
             HStack(spacing: L.v(2, 1, 4)) { content() }

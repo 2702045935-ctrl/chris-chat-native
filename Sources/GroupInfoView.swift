@@ -75,7 +75,7 @@ struct GroupInfoView: View {
             Avatar(path: chat.avatar ?? "", size: 62, radius: 8)
             VStack(alignment: .leading, spacing: 5) {
                 Text(chat.name)
-                    .font(pf(17, weight: .semibold))
+                    .font(pf(17, .semibold))
                     .foregroundColor(C.label)
                     .lineLimit(1)
                 Text(members.isEmpty ? "群聊" : "\(members.count) 位成员" + (createdText.isEmpty ? "" : " · " + createdText + "创建"))

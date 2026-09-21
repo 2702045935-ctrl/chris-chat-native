@@ -349,5 +349,19 @@ enum L10n {
         "微信号：": "ID: ",
         "用 App 的「发现 → 扫一扫」扫这张，就能加我好友": "Scan this with Discover → Scan to add me",
         "扫一扫，加我好友": "Scan to add me",
+        "加我为朋友时需要验证": "Verify before adding me",
+        "允许陌生人查看朋友圈": "Let strangers see my Moments",
+        "添加我的方式": "Ways to add me",
+        "微信号": "ID",
+        "手机号": "Phone number",
+        "二维码": "QR code",
+        "关掉之后，别人就不能用这个方式找到你、加你好友。": "When off, others cannot find and add you this way.",
+        "接收新消息通知": "Receive new message alerts",
+        "声音": "Sound",
+        "振动": "Vibrate",
+        "通知显示消息详情": "Show message previews",
+        "免打扰": "Do not disturb",
+        "免打扰时段里收到消息不响不震，进 App 还是能看到小红点。":
+            "During these hours messages arrive silently; you still see the badge in the app.",
     ]
 }

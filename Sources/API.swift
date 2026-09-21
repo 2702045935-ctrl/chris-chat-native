@@ -1285,6 +1285,55 @@ final class API {
 
     /// 群二维码：拿到邀请码和二维码 SVG
     /// 我的二维码（每个人一张，扫了能加好友）
+    /* ---------------- 隐私 / 消息通知 ---------------- */
+    func privacy() async -> PrivacySettings {
+        struct Payload: Decodable {
+            var privacy: Raw?; var notify: Raw?
+            struct Raw: Decodable {
+                var needVerify: Bool?; var strangerMoments: Bool?
+                var addByWx: Bool?; var addByPhone: Bool?; var addByGroup: Bool?; var addByQR: Bool?
+            }
+        }
+        guard let p: Payload = try? await get("/api/me/privacy", as: Payload.self), let r = p.privacy
+        else { return PrivacySettings() }
+        var s = PrivacySettings()
+        s.needVerify = r.needVerify ?? true
+        s.strangerMoments = r.strangerMoments ?? false
+        s.addByWx = r.addByWx ?? true
+        s.addByPhone = r.addByPhone ?? true
+        s.addByGroup = r.addByGroup ?? true
+        s.addByQR = r.addByQR ?? true
+        return s
+    }
+
+    func setPrivacy(_ key: String, _ value: Bool) async {
+        _ = try? await request("PATCH", "/api/me/privacy", body: [key: value])
+    }
+
+    func notifySettings() async -> NotifySettings {
+        struct Payload: Decodable {
+            var notify: Raw?
+            struct Raw: Decodable {
+                var on: Bool?; var sound: Bool?; var vibrate: Bool?; var showDetail: Bool?
+                var muteStart: String?; var muteEnd: String?
+            }
+        }
+        guard let p: Payload = try? await get("/api/me/privacy", as: Payload.self), let r = p.notify
+        else { return NotifySettings() }
+        var s = NotifySettings()
+        s.on = r.on ?? true
+        s.sound = r.sound ?? true
+        s.vibrate = r.vibrate ?? true
+        s.showDetail = r.showDetail ?? true
+        s.muteStart = r.muteStart ?? ""
+        s.muteEnd = r.muteEnd ?? ""
+        return s
+    }
+
+    func setNotify(_ fields: [String: Any]) async {
+        _ = try? await request("PATCH", "/api/me/notify", body: fields)
+    }
+
     func myQRCode() async -> (code: String, url: String, rows: [String], user: User?) {
         struct MyQRPayload: Decodable {
             var code: String?; var url: String?; var rows: [String]?; var user: User?

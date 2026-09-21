@@ -14,18 +14,23 @@ enum Lang {
     static let key = "chris.lang"
 
     static var code: String {
-        get { UserDefaults.standard.string(forKey: key) ?? "zh" }
+        /* 没手动选过就跟随系统语言：系统是英文就用英文（选过就一直按选的来） */
+        get {
+            if let saved = UserDefaults.standard.string(forKey: key) { return saved }
+            let sys = Locale.preferredLanguages.first?.lowercased() ?? "zh"
+            return sys.hasPrefix("en") ? "en" : "zh"
+        }
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }
     static var isEnglish: Bool { code == "en" }
     static func t(_ zh: String, _ en: String) -> String { isEnglish ? en : zh }
 
-    static let name: String = {
+    static var name: String {
         switch code {
         case "en": return "English"
         default: return "简体中文"
         }
-    }()
+    }
 }
 
 /* ---------------------------------------------------------- 群二维码 */

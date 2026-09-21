@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct MeView: View {
+    @State private var showMyQR = false
+    @State private var showPrivacy = false
+    @State private var showNotify = false
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
     /// 后台配的我页下面那几行（加一行、删一行，切回本页就变）
@@ -279,9 +282,9 @@ struct SettingsView: View {
                         /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
                         settingLink(Tr("支付密码"), hasPay ? "已设置" : "未设置", key: "paypwd")
                         HairLine(inset: 16)
-                        settingRow(Tr("新消息通知"), "") { app.show(Tr("通知设置排在下一批")) }
+                        settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)
-                        settingRow(Tr("隐私"), "") { app.show(Tr("隐私设置排在下一批")) }
+                        settingRow(Tr("隐私"), "") { showPrivacy = true }
                     }
 
                     Rectangle().fill(C.pageBg).frame(height: 8)
@@ -341,6 +344,8 @@ struct SettingsView: View {
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPairApprove) { PairApproveView() }
         .sheet(isPresented: $showMyQR) { MyQRView() }
+        .sheet(isPresented: $showPrivacy) { PrivacyView() }
+        .sheet(isPresented: $showNotify) { NotifyView() }
         .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
             Button(Tr("简体中文")) { setLang("zh") }
             Button("English") { setLang("en") }
@@ -362,6 +367,7 @@ struct SettingsView: View {
     /// 切换界面语言：存下来 + 让标签栏那些文案立刻重绘
     private func setLang(_ code: String) {
         Lang.code = code
+        app.langVersion += 1          // 整棵树重建，所有页面立刻换成对应语言
         app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
     }
 

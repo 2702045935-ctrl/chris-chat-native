@@ -43,7 +43,7 @@ struct BillsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "账单", back: { dismiss() }) {
+            NavBar(title: L("账单"), back: { dismiss() }) {
                 Button { showMore = true } label: {
                     Text("⋯")
                         .font(pf(22))
@@ -60,7 +60,7 @@ struct BillsView: View {
                     if loading {
                         ProgressView().padding(.vertical, 40)
                     } else if filtered.isEmpty {
-                        Text("还没有账单")
+                        Text(L("还没有账单"))
                             .font(pf(14))
                             .foregroundColor(C.subLabel)
                             .padding(.vertical, 60)
@@ -85,39 +85,39 @@ struct BillsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
-        .confirmationDialog("账单", isPresented: $showFilter, titleVisibility: .hidden) {
-            Button("全部账单") { filter = "all" }
-            Button("只看支出") { filter = "out" }
-            Button("只看收入") { filter = "in" }
-            Button("取消", role: .cancel) { }
+        .confirmationDialog(L("账单"), isPresented: $showFilter, titleVisibility: .hidden) {
+            Button(L("全部账单")) { filter = "all" }
+            Button(L("只看支出")) { filter = "out" }
+            Button(L("只看收入")) { filter = "in" }
+            Button(L("取消"), role: .cancel) { }
         }
-        .confirmationDialog("按月份看", isPresented: $showMonths, titleVisibility: .hidden) {
-            Button("全部账单") { Task { await load("") } }
+        .confirmationDialog(L("按月份看"), isPresented: $showMonths, titleVisibility: .hidden) {
+            Button(L("全部账单")) { Task { await load("") } }
             ForEach(months, id: \.self) { m in
                 Button(monthLabel(m)) { Task { await load(m) } }
             }
-            Button("取消", role: .cancel) { }
+            Button(L("取消"), role: .cancel) { }
         }
-        .confirmationDialog("收支统计", isPresented: $showStats, titleVisibility: .visible) {
+        .confirmationDialog(L("收支统计"), isPresented: $showStats, titleVisibility: .visible) {
             Button("支出 \(money(summary?.out ?? 0))") { }
             Button("收入 \(money(summary?.inSum ?? 0))（只算已收款的）") { }
             Button("待你收款 \(summary?.pendingIn ?? 0) 笔 · 待对方收款 \(summary?.pendingOut ?? 0) 笔") { }
             Button("一共 \(summary?.count ?? 0) 笔") { }
-            Button("关闭", role: .cancel) { }
+            Button(L("关闭"), role: .cancel) { }
         }
-        .confirmationDialog("账单", isPresented: $showMore, titleVisibility: .hidden) {
-            Button("账单常见问题") { showFaq = true }
-            Button("导出账单（CSV）") { exportCsv() }
-            Button("取消", role: .cancel) { }
+        .confirmationDialog(L("账单"), isPresented: $showMore, titleVisibility: .hidden) {
+            Button(L("账单常见问题")) { showFaq = true }
+            Button(L("导出账单（CSV）")) { exportCsv() }
+            Button(L("取消"), role: .cancel) { }
         }
-        .confirmationDialog("账单常见问题", isPresented: $showFaq, titleVisibility: .visible) {
+        .confirmationDialog(L("账单常见问题"), isPresented: $showFaq, titleVisibility: .visible) {
             ForEach(faq.indices, id: \.self) { i in
                 Button(faq[i].q) { faqAnswer = faq[i].a }
             }
-            Button("关闭", role: .cancel) { }
+            Button(L("关闭"), role: .cancel) { }
         }
         .alert("账单常见问题", isPresented: Binding(get: { faqAnswer != nil }, set: { if !$0 { faqAnswer = nil } })) {
-            Button("知道了", role: .cancel) { faqAnswer = nil }
+            Button(L("知道了"), role: .cancel) { faqAnswer = nil }
         } message: {
             Text(faqAnswer ?? "")
         }
@@ -162,7 +162,7 @@ struct BillsView: View {
 
             Button { showStats = true } label: {
                 HStack(spacing: 5) {
-                    Text("收支统计").font(pf(13)).foregroundColor(sumGray)
+                    Text(L("收支统计")).font(pf(13)).foregroundColor(sumGray)
                     Chevron(size: 6, line: 1.4, color: sumGray)
                 }
             }
@@ -260,7 +260,7 @@ struct BillsView: View {
            let info = TransferInfo(json: s) {
             BillDetailView(chat: chat, info: info)
         } else {
-            Text("这条账单读不出来").font(pf(14)).foregroundColor(C.subLabel)
+            Text(L("这条账单读不出来")).font(pf(14)).foregroundColor(C.subLabel)
         }
     }
 
@@ -311,7 +311,7 @@ struct BillsView: View {
 
     /// 导出账单：拼一份 CSV 复制到剪贴板（手机上先这样，之后可以接分享）
     private func exportCsv() {
-        guard !bills.isEmpty else { app.show("还没有账单可以导出"); return }
+        guard !bills.isEmpty else { app.show(L("还没有账单可以导出")); return }
         var lines = ["时间,对方,方向,金额,状态,说明,支付方式,单号"]
         for b in bills {
             let fields = [

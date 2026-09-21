@@ -179,8 +179,8 @@ struct ShakePageView: View {
         }
         .alert("打招呼", isPresented: $showHello) {
             TextField("说点什么…", text: $helloText)
-            Button("发送") { sendHello() }
-            Button("取消", role: .cancel) { }
+            Button(L("发送")) { sendHello() }
+            Button(L("取消"), role: .cancel) { }
         } message: {
             Text("给 \(result?.name ?? "") 发一条消息")
         }
@@ -196,7 +196,7 @@ struct ShakePageView: View {
 
     private var navBar: some View {
         ZStack {
-            Text("摇一摇").font(pf(17, .semibold)).foregroundColor(ink)
+            Text(L("摇一摇")).font(pf(17, .semibold)).foregroundColor(ink)
             HStack(spacing: 0) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
@@ -248,7 +248,7 @@ struct ShakePageView: View {
                 Button {
                     showHello = true
                 } label: {
-                    Text("打招呼")
+                    Text(L("打招呼"))
                         .font(pf(15))
                         .foregroundColor(.white)
                         .frame(width: 116, height: 38)
@@ -259,7 +259,7 @@ struct ShakePageView: View {
                 Button {
                     openCard(p)
                 } label: {
-                    Text("看资料")
+                    Text(L("看资料"))
                         .font(pf(15))
                         .foregroundColor(ink)
                         .frame(width: 116, height: 38)
@@ -317,7 +317,7 @@ struct ShakePageView: View {
         Task {
             do {
                 _ = try await API.shared.nearbyHello(userId: p.id, text: say)
-                app.show("已打招呼")
+                app.show(L("已打招呼"))
                 await app.loadChats()
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发送失败")

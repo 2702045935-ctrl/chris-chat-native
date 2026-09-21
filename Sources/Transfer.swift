@@ -30,12 +30,12 @@ struct TransferSheet: View {
                     TextField("添加转账说明（选填）", text: $note)
                 }
 
-                Section(header: Text("付款方式")) {
+                Section(header: Text(L("付款方式"))) {
                     Button {
                         method = "balance"
                     } label: {
                         HStack {
-                            Text("零钱").foregroundColor(C.label)
+                            Text(L("零钱")).foregroundColor(C.label)
                             Spacer()
                             Text("¥\(String(format: "%.2f", app.me?.balance ?? 0))")
                                 .font(pfMoney(14))
@@ -49,7 +49,7 @@ struct TransferSheet: View {
                         method = "card"
                     } label: {
                         HStack {
-                            Text("建设银行储蓄卡（2125）").foregroundColor(C.label)
+                            Text(L("建设银行储蓄卡（2125）")).foregroundColor(C.label)
                             Spacer()
                             if method == "card" {
                                 Image(systemName: "checkmark").foregroundColor(C.green)
@@ -58,17 +58,17 @@ struct TransferSheet: View {
                     }
                 }
 
-                Section(footer: Text("没设过支付密码就不用填。钱先从零钱里扣，对方点「收钱」才进他余额，24 小时没人收自动退回。")) {
+                Section(footer: Text(L("没设过支付密码就不用填。钱先从零钱里扣，对方点「收钱」才进他余额，24 小时没人收自动退回。"))) {
                     SecureField("支付密码（没设过可留空）", text: $password)
                         .keyboardType(.numberPad)
                 }
             }
-            .navigationTitle("转账")
+            .navigationTitle(L("转账"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("转账") {
+                    Button(L("转账")) {
                         onConfirm(value, note, method, password)
                         dismiss()
                     }

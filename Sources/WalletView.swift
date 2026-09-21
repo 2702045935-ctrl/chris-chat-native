@@ -173,9 +173,9 @@ struct WalletView: View {
         case "card":
             showCards = true            // 进「银行卡」页（绑定 / 解绑，对应功能清单里的「银行卡」）
         case "settings":
-            app.show("支付设置：还没接后端，先把页面做出来")
+            app.show(L("支付设置：还没接后端，先把页面做出来"))
         case "service":
-            app.show("客服中心：暂时没有在线客服")
+            app.show(L("客服中心：暂时没有在线客服"))
         default:
             app.show("「\(label)」还没接后端，先把页面做出来")
         }

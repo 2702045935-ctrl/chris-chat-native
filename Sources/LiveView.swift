@@ -50,7 +50,7 @@ struct LiveListView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Text("直播专场").font(pf(17, .semibold)).foregroundColor(ink)
+                Text(L("直播专场")).font(pf(17, .semibold)).foregroundColor(ink)
                 HStack(spacing: 0) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
@@ -70,7 +70,7 @@ struct LiveListView: View {
                     if loading && rooms.isEmpty {
                         ProgressView().tint(.white).padding(.top, 60)
                     } else if rooms.isEmpty {
-                        Text("还没有直播间")
+                        Text(L("还没有直播间"))
                             .font(pf(14)).foregroundColor(subInk).padding(.top, 70)
                     } else {
                         ForEach(rooms) { r in
@@ -110,12 +110,12 @@ struct LiveListView: View {
                 }
                 HStack(spacing: 6) {
                     if r.isLive {
-                        Text("直播中")
+                        Text(L("直播中"))
                             .font(pf(11, .semibold)).foregroundColor(.white)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Capsule().fill(Color(hex: 0xFA5151)))
                     } else {
-                        Text("预告")
+                        Text(L("预告"))
                             .font(pf(11, .semibold)).foregroundColor(.white)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Capsule().fill(Color(white: 1, opacity: 0.22)))
@@ -207,7 +207,7 @@ struct LiveRoomView: View {
             if live.watching, live.remoteVideo == nil {
                 VStack(spacing: 8) {
                     ProgressView().tint(.white)
-                    Text("正在连主播的画面…").font(pf(14)).foregroundColor(.white.opacity(0.8))
+                    Text(L("正在连主播的画面…")).font(pf(14)).foregroundColor(.white.opacity(0.8))
                 }
             }
 
@@ -278,7 +278,7 @@ struct LiveRoomView: View {
                             live.stopPublish()
                         } else {
                             let ok = await live.startPublish(room: room.id)
-                            if !ok { app.show("要相机和麦克风权限才能开播") }
+                            if !ok { app.show(L("要相机和麦克风权限才能开播")) }
                         }
                     }
                 } label: {
@@ -321,7 +321,7 @@ struct LiveRoomView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 10) {
-            TextField("", text: $draft, prompt: Text("说点什么…").foregroundColor(.white.opacity(0.5)))
+            TextField("", text: $draft, prompt: Text(L("说点什么…")).foregroundColor(.white.opacity(0.5)))
                 .font(pf(14))
                 .foregroundColor(.white)
                 .padding(.horizontal, 14)

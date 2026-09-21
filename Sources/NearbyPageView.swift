@@ -105,7 +105,7 @@ struct NearbyPageView: View {
         VStack(spacing: 0) {
             /* 顶栏：照参考图，深色 + 居中标题 + 右侧 ⋯ */
             ZStack {
-                Text("附近的人")
+                Text(L("附近的人"))
                     .font(pf(17, .semibold))
                     .foregroundColor(nameInk)
                 HStack(spacing: 0) {
@@ -149,7 +149,7 @@ struct NearbyPageView: View {
                                     .font(pf(15))
                                     .foregroundColor(C.green)
                                 } else {
-                                    Text("20 公里内也没有人")
+                                    Text(L("20 公里内也没有人"))
                                         .font(pf(13))
                                         .foregroundColor(subInk.opacity(0.7))
                                 }
@@ -180,20 +180,20 @@ struct NearbyPageView: View {
             }
         }
         .confirmationDialog("", isPresented: $showMenu, titleVisibility: .hidden) {
-            Button("全部") { setFilter("all") }
-            Button("只看女生") { setFilter("female") }
-            Button("只看男生") { setFilter("male") }
-            Button("刷新") { Task { await reload(force: true) } }
-            Button("清除位置信息并退出", role: .destructive) { clearLocation() }
-            Button("取消", role: .cancel) { }
+            Button(L("全部")) { setFilter("all") }
+            Button(L("只看女生")) { setFilter("female") }
+            Button(L("只看男生")) { setFilter("male") }
+            Button(L("刷新")) { Task { await reload(force: true) } }
+            Button(L("清除位置信息并退出"), role: .destructive) { clearLocation() }
+            Button(L("取消"), role: .cancel) { }
         }
         .alert("打招呼", isPresented: Binding(
             get: { helloFor != nil },
             set: { if !$0 { helloFor = nil } }
         )) {
             TextField("说点什么…", text: $helloText)
-            Button("发送") { sendHello() }
-            Button("取消", role: .cancel) { helloFor = nil }
+            Button(L("发送")) { sendHello() }
+            Button(L("取消"), role: .cancel) { helloFor = nil }
         } message: {
             Text("给 \(helloFor?.name ?? "") 发一条消息")
         }
@@ -246,7 +246,7 @@ struct NearbyPageView: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button { openCard(p) } label: {
-                Label("查看资料", systemImage: "person.text.rectangle")
+                Label(L("查看资料"), systemImage: "person.text.rectangle")
             }
         }
     }
@@ -266,7 +266,7 @@ struct NearbyPageView: View {
                 .foregroundColor(subInk)
                 .multilineTextAlignment(.center)
             if showSetting {
-                Button("去设置里打开") {
+                Button(L("去设置里打开")) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
@@ -308,7 +308,7 @@ struct NearbyPageView: View {
         Task {
             try? await API.shared.nearbyClear()
             people = []
-            app.show("已清除位置信息")
+            app.show(L("已清除位置信息"))
             dismiss()
         }
     }
@@ -321,7 +321,7 @@ struct NearbyPageView: View {
         Task {
             do {
                 _ = try await API.shared.nearbyHello(userId: p.id, text: say)
-                app.show("已打招呼")
+                app.show(L("已打招呼"))
                 await app.loadChats()
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发送失败")

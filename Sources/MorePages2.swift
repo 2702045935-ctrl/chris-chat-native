@@ -44,7 +44,7 @@ struct GroupQRView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: "群二维码", back: { dismiss() }) {
+            NavBar(title: L("群二维码"), back: { dismiss() }) {
                 Button {
                     saveToAlbum()
                 } label: {
@@ -65,7 +65,7 @@ struct GroupQRView: View {
                         if loading {
                             ProgressView()
                         } else if rows.isEmpty {
-                            Text("二维码生成失败，稍后再试")
+                            Text(L("二维码生成失败，稍后再试"))
                                 .font(pf(13.5))
                                 .foregroundColor(C.subLabel)
                         } else {
@@ -89,7 +89,7 @@ struct GroupQRView: View {
                     .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
                     .padding(.horizontal, 24)
 
-                    Text("用手机扫码打开链接就能进群；没登录会先跳到登录页，登录完自动进群")
+                    Text(L("用手机扫码打开链接就能进群；没登录会先跳到登录页，登录完自动进群"))
                         .font(pf(12.5))
                         .foregroundColor(C.subLabel)
                         .multilineTextAlignment(.center)
@@ -122,10 +122,10 @@ struct GroupQRView: View {
         if let img = renderer.uiImage {
             UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
             saved = true
-            app.show("二维码已存到相册")
+            app.show(L("二维码已存到相册"))
             return
         }
-        app.show("保存失败，可以截图")
+        app.show(L("保存失败，可以截图"))
     }
 }
 
@@ -173,7 +173,7 @@ struct AvatarCropSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
-                Text("拖动调整位置，双指缩放，圈里的就是要当头像的部分")
+                Text(L("拖动调整位置，双指缩放，圈里的就是要当头像的部分"))
                     .font(pf(12.5))
                     .foregroundColor(C.subLabel)
                     .multilineTextAlignment(.center)
@@ -211,7 +211,7 @@ struct AvatarCropSheet: View {
                     onDone(crop())
                     dismiss()
                 } label: {
-                    Text("就用这张")
+                    Text(L("就用这张"))
                         .font(pf(16, .medium))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 50)
@@ -222,9 +222,9 @@ struct AvatarCropSheet: View {
                 Spacer()
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle("裁剪头像")
+            .navigationTitle(L("裁剪头像"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } } }
         }
     }
 

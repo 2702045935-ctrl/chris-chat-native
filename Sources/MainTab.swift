@@ -279,7 +279,7 @@ struct SearchBoxCenter: View {
 
             ZStack(alignment: centered ? .center : .leading) {
                 if text.isEmpty {
-                    Text("搜索")
+                    Text(L("搜索"))
                         .font(pf(16))
                         .foregroundColor(C.searchIcon)
                 }
@@ -311,7 +311,7 @@ struct SearchBoxLeft: View {
             SVGIcon(markup: I.searchBig, size: 16, color: C.searchIcon2)
             ZStack(alignment: .leading) {
                 if text.isEmpty {
-                    Text("搜索")
+                    Text(L("搜索"))
                         .font(pf(15))
                         .foregroundColor(C.searchIcon2)
                 }

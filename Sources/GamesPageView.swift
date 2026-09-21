@@ -33,7 +33,7 @@ struct GamesPageView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Text("游戏").font(pf(17, .semibold)).foregroundColor(ink)
+                Text(L("游戏")).font(pf(17, .semibold)).foregroundColor(ink)
                 HStack(spacing: 0) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")
@@ -141,7 +141,7 @@ struct GamePlayView: View {
                     .disabled(rolling)
                     if !result.isEmpty {
                         Button { pickerOpen = true } label: {
-                            Text("发到聊天")
+                            Text(L("发到聊天"))
                                 .font(pf(16)).foregroundColor(.white)
                                 .frame(width: 108, height: 46)
                                 .background(RoundedRectangle(cornerRadius: 23, style: .continuous)
@@ -154,11 +154,11 @@ struct GamePlayView: View {
                 .padding(.bottom, max(24, L.safeBottom))
             }
         }
-        .confirmationDialog("发到哪个聊天", isPresented: $pickerOpen, titleVisibility: .visible) {
+        .confirmationDialog(L("发到哪个聊天"), isPresented: $pickerOpen, titleVisibility: .visible) {
             ForEach(app.chats.prefix(8)) { c in
                 Button(c.name) { share(to: c) }
             }
-            Button("取消", role: .cancel) { }
+            Button(L("取消"), role: .cancel) { }
         }
     }
 

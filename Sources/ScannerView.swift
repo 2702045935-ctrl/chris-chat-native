@@ -16,7 +16,7 @@ func handleScanned(_ text: String, app: AppState) {
                     app.show(err)
                 } else {
                     await app.loadChats()
-                    app.show("已加入群聊")
+                    app.show(L("已加入群聊"))
                 }
             }
             return
@@ -28,14 +28,14 @@ func handleScanned(_ text: String, app: AppState) {
             if let err = await API.shared.pairApprove(code: t) {
                 app.show(err)
             } else {
-                app.show("已确认，那台设备登录成功")
+                app.show(L("已确认，那台设备登录成功"))
             }
         }
         return
     }
     /* 其它内容：是链接就原样显示，是文字就先当微信号试试加好友 */
     if t.hasPrefix("http") {
-        app.show("扫到链接：" + t)
+        app.show(L("扫到链接：") + t)
         return
     }
     if t.count >= 3, t.count <= 24, !t.contains(" ") {
@@ -44,12 +44,12 @@ func handleScanned(_ text: String, app: AppState) {
                 try await API.shared.addFriend(username: t)
                 app.show("已向 \(t) 发送好友请求")
             } catch {
-                app.show("扫到：" + t)
+                app.show(L("扫到：") + t)
             }
         }
         return
     }
-    app.show("扫到：" + t)
+    app.show(L("扫到：") + t)
 }
 
 /* ============================================================
@@ -76,10 +76,10 @@ struct ScannerView: View {
                     Image(systemName: "camera.metering.unknown")
                         .font(.system(size: 40))
                         .foregroundColor(.white.opacity(0.8))
-                    Text("没有相机权限")
+                    Text(L("没有相机权限"))
                         .font(pf(17, .medium))
                         .foregroundColor(.white)
-                    Text("到「设置 → Luchat → 相机」里打开权限再回来")
+                    Text(L("到「设置 → Luchat → 相机」里打开权限再回来"))
                         .font(pf(13))
                         .foregroundColor(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
@@ -106,7 +106,7 @@ struct ScannerView: View {
                         }
                         .buttonStyle(.plain)
                         Spacer()
-                        Text("扫一扫")
+                        Text(L("扫一扫"))
                             .font(pf(17, .semibold))
                             .foregroundColor(.white)
                         Spacer()
@@ -130,7 +130,7 @@ struct ScannerView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Capsule().fill(Color.black.opacity(0.35)))
-                    Text("群二维码扫了直接进群；网页登录出的 6 位数码扫了就是确认登录")
+                    Text(L("群二维码扫了直接进群；网页登录出的 6 位数码扫了就是确认登录"))
                         .font(pf(12))
                         .foregroundColor(.white.opacity(0.6))
                         .multilineTextAlignment(.center)

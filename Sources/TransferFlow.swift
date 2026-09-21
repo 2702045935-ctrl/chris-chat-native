@@ -77,8 +77,8 @@ struct TransferView: View {
         }
         .alert("转账说明", isPresented: $noteEditing) {
             TextField("选填", text: $note)
-            Button("好") { }
-            Button("取消", role: .cancel) { note = "" }
+            Button(L("好")) { }
+            Button(L("取消"), role: .cancel) { note = "" }
         }
         .task {
             hasPwd = await API.shared.hasPayPassword()
@@ -127,7 +127,7 @@ struct TransferView: View {
             amountFocus = false
             openPay()
         } label: {
-            Text("转账")
+            Text(L("转账"))
                 .font(pf(17.5, .medium))
                 .foregroundColor(amount > 0 ? .white : Color.dyn(0x9A9A9A, 0x8A8A8E))
                 .frame(maxWidth: .infinity)
@@ -179,7 +179,7 @@ struct TransferView: View {
 
     private var bodyArea: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("转账金额")
+            Text(L("转账金额"))
                 .font(pf(14.5))
                 .foregroundColor(C.label)
                 .padding(.horizontal, L.v(16, 5, 20))
@@ -300,7 +300,7 @@ struct TransferView: View {
     }
 
     private func openPay() {
-        guard amount > 0 else { app.show("请先输入转账金额"); return }
+        guard amount > 0 else { app.show(L("请先输入转账金额")); return }
         password = ""
         payHint = nil
         badPwd = false
@@ -355,7 +355,7 @@ struct TransferView: View {
 
                 // 付款方式 + 更改
                 HStack {
-                    Text("付款方式")
+                    Text(L("付款方式"))
                         .font(pf(13.5))
                         .foregroundColor(Color.dyn(0x6E6E6E, 0x8F8F8F))
                     Spacer()
@@ -363,7 +363,7 @@ struct TransferView: View {
                         showMethod = true
                     } label: {
                         HStack(spacing: 2) {
-                            Text("更改").font(pf(13.5))
+                            Text(L("更改")).font(pf(13.5))
                             SVGIcon(markup: payChev, size: 12, color: Color.dyn(0x6E6E6E, 0x8F8F8F))
                         }
                         .foregroundColor(Color.dyn(0x6E6E6E, 0x8F8F8F))
@@ -441,7 +441,7 @@ struct TransferView: View {
                         Button {
                             submit(face: false)
                         } label: {
-                            Text("还没设置支付密码，点这里直接支付")
+                            Text(L("还没设置支付密码，点这里直接支付"))
                                 .font(pf(13.5))
                                 .foregroundColor(C.link)
                         }
@@ -516,7 +516,7 @@ struct TransferView: View {
 
             VStack(spacing: 0) {
                 ZStack {
-                    Text("选择付款方式")
+                    Text(L("选择付款方式"))
                         .font(pf(16.5, .semibold))
                         .foregroundColor(C.label)
                     HStack {
@@ -543,7 +543,7 @@ struct TransferView: View {
                 Button {
                     recharge()
                 } label: {
-                    Text("充值余额")
+                    Text(L("充值余额"))
                         .font(pf(14.5))
                         .foregroundColor(C.link)
                         .frame(maxWidth: .infinity)
@@ -567,7 +567,7 @@ struct TransferView: View {
         Button {
             method = key
             withAnimation(.easeOut(duration: 0.22)) { showMethod = false }
-            app.show("付款方式：" + (key == "card" ? "建设银行储蓄卡" : "余额 ¥" + money(balance)))
+            app.show(L("付款方式：") + (key == "card" ? "建设银行储蓄卡" : "余额 ¥" + money(balance)))
         } label: {
             HStack(spacing: L.v(8, 2.6, 11)) {
                 SVGIcon(markup: key == "card" ? payCardIcon : payBalanceIcon,
@@ -607,7 +607,7 @@ struct TransferView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 64))
                 .foregroundColor(C.green)
-            Text("待好友确认收款")
+            Text(L("待好友确认收款"))
                 .font(pf(17))
                 .foregroundColor(C.label)
                 .padding(.top, 14)
@@ -633,7 +633,7 @@ struct TransferView: View {
             Button {
                 dismiss()
             } label: {
-                Text("完成")
+                Text(L("完成"))
                     .font(pf(17))
                     .foregroundColor(C.green)
                     .frame(maxWidth: .infinity)
@@ -661,7 +661,7 @@ struct TransferView: View {
 
     /// 「使用面容」：先让系统真的验一次脸/指纹，过了才把 face=true 发给服务器
     private func facePay() {
-        guard amount > 0 else { app.show("请先输入转账金额"); return }
+        guard amount > 0 else { app.show(L("请先输入转账金额")); return }
         Task {
             let r = await Biometrics.authenticate(
                 reason: "验证身份，向 \(chat.name) 转账 ¥\(money(amount))")

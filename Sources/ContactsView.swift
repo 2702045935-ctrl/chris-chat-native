@@ -16,17 +16,20 @@ struct ContactsView: View {
     @FocusState private var searchFocused: Bool
     @ObservedObject private var realtime = Realtime.shared
 
-private let funcs: [(String, String, Color, String)] = [
-    /* 6 个图标底色统一加深一档（原来偏粉嫩，深色更有质感）：
-       琥珀 / 石板灰 / 靛蓝 / 靛蓝 / 松绿 / 松绿 */
-    ("新的朋友", I.newFriends, Color(hex: 0xD9822B), "newFriends"),
-    ("群聊", I.groups, Color(hex: 0x1F8A70), "groups"),
-    ("仅聊天的朋友", I.chatOnly, Color(hex: 0x6F6F78), "chatOnly"),
-    ("标签", I.tag, Color(hex: 0x3E7BC4), "tags"),
-    ("服务号", I.service, Color(hex: 0x3E7BC4), "service"),
-    ("企业微信联系人", I.workMate, Color(hex: 0x2E8A66), "work"),
-    ("我的企业", I.myWork, Color(hex: 0x2E8A66), "myWork")
-]
+/* 6 个图标底色统一加深一档（原来偏粉嫩，深色更有质感）：
+   琥珀 / 石板灰 / 靛蓝 / 靛蓝 / 松绿 / 松绿
+   文案走 L()：切成英文时显示英文，中文时显示中文（所以这里是计算属性，不是常量） */
+private var funcs: [(String, String, Color, String)] {
+    [
+        (L("新的朋友"), I.newFriends, Color(hex: 0xD9822B), "newFriends"),
+        (L("群聊"), I.groups, Color(hex: 0x1F8A70), "groups"),
+        (L("仅聊天的朋友"), I.chatOnly, Color(hex: 0x6F6F78), "chatOnly"),
+        (L("标签"), I.tag, Color(hex: 0x3E7BC4), "tags"),
+        (L("服务号"), I.service, Color(hex: 0x3E7BC4), "service"),
+        (L("企业微信联系人"), I.workMate, Color(hex: 0x2E8A66), "work"),
+        (L("我的企业"), I.myWork, Color(hex: 0x2E8A66), "myWork")
+    ]
+}
 
     private var filtered: [User] {
         let sorted = app.contacts.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
@@ -194,11 +197,11 @@ private let funcs: [(String, String, Color, String)] = [
             switch item.3 {
             case "newFriends": path.append("newFriends")
             case "groups": path.append("groupList")
-            case "chatOnly": app.show("仅聊天的朋友：只有聊天记录、没加好友的人会出现在这里")
-            case "tags": app.show("标签：还没建过标签")
-            case "service": app.show("服务号：暂时没有关注的服务号")
-            case "work": app.show("企业微信联系人：还没绑定微信企业")
-            default: app.show("我的企业：还没创建企业")
+            case "chatOnly": app.show(L("仅聊天的朋友：只有聊天记录、没加好友的人会出现在这里"))
+            case "tags": app.show(L("标签：还没建过标签"))
+            case "service": app.show(L("服务号：暂时没有关注的服务号"))
+            case "work": app.show(L("企业微信联系人：还没绑定微信企业"))
+            default: app.show(L("我的企业：还没创建企业"))
             }
         } label: {
             HStack(spacing: L.ctGap) {
@@ -335,19 +338,19 @@ struct ContactCardView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .confirmationDialog("", isPresented: $showMore, titleVisibility: .hidden) {
-            Button("设置备注和标签") { app.show("备注和标签还没开，先看下面的资料") }
-            Button("朋友圈权限") { app.show("默认：能看他的朋友圈") }
-            Button("取消", role: .cancel) { }
+            Button(L("设置备注和标签")) { app.show(L("备注和标签还没开，先看下面的资料")) }
+            Button(L("朋友圈权限")) { app.show(L("默认：能看他的朋友圈")) }
+            Button(L("取消"), role: .cancel) { }
         }
         .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
             Button("昵称：\(u.name)") { }
             Button("微信号：\(u.username ?? "—")") { }
             Button("地区：\((u.region?.isEmpty == false) ? u.region! : "未知")") { }
-            Button("取消", role: .cancel) { }
+            Button(L("取消"), role: .cancel) { }
         }
         .confirmationDialog("", isPresented: $showPhone, titleVisibility: .hidden) {
             Button("拨打 \(phone)") { dial() }
-            Button("取消", role: .cancel) { }
+            Button(L("取消"), role: .cancel) { }
         }
         .task { await load() }
     }
@@ -414,7 +417,7 @@ struct ContactCardView: View {
         VStack(spacing: 0) {
             Button { showInfo = true } label: {
                 HStack(spacing: 0) {
-                    Text("朋友资料")
+                    Text(L("朋友资料"))
                         .font(pf(L.cdLineSize))
                         .foregroundColor(ink)
                         .frame(width: L.cdLabelW, alignment: .leading)
@@ -431,7 +434,7 @@ struct ContactCardView: View {
                 Spacer().frame(height: L.cdRowGap)
                 Button { showPhone = true } label: {
                     HStack(spacing: 0) {
-                        Text("电话")
+                        Text(L("电话"))
                             .font(pf(L.cdLineSize))
                             .foregroundColor(ink)
                             .frame(width: L.cdLabelW, alignment: .leading)
@@ -460,7 +463,7 @@ struct ContactCardView: View {
 
     private var momentsCard: some View {
         HStack(alignment: .top, spacing: 0) {
-            Text("朋友圈")
+            Text(L("朋友圈"))
                 .font(pf(L.cdLineSize))
                 .foregroundColor(ink)
                 .frame(width: L.cdLabelW, height: L.cdLineH, alignment: .leading)
@@ -568,7 +571,7 @@ struct ContactCardView: View {
         case "call":
             /* 真人语音通话（WebRTC）。id 就是对方的用户 id，直接呼叫 */
             if CallCenter.shared.phase != .idle {
-                app.show("正在通话中")
+                app.show(L("正在通话中"))
             } else {
                 CallCenter.shared.start(peerId: u.id, name: u.nickname ?? u.username ?? "对方",
                                         avatar: u.avatar ?? "", video: false)
@@ -578,7 +581,7 @@ struct ContactCardView: View {
             Task {
                 do {
                     try await API.shared.addFriend(username: u.username ?? "")
-                    app.show("好友申请已发出")
+                    app.show(L("好友申请已发出"))
                     await app.loadContacts()
                     await load()
                 } catch {
@@ -593,16 +596,16 @@ struct ContactCardView: View {
                    let req = all.incoming.first(where: { $0.id == u.id }),
                    let rid = req.requestId {
                     await API.shared.respondFriend(rid, accept: true)
-                    app.show("已同意，现在可以聊天了")
+                    app.show(L("已同意，现在可以聊天了"))
                     await app.loadContacts()
                     await load()
                 } else {
-                    app.show("到「通讯录 → 新的朋友」里同意")
+                    app.show(L("到「通讯录 → 新的朋友」里同意"))
                 }
                 busy = false
             }
         default:
-            app.show("已经发过申请了，等对方通过")
+            app.show(L("已经发过申请了，等对方通过"))
         }
     }
 
@@ -613,7 +616,7 @@ struct ContactCardView: View {
                 onOpenChat(chat)
                 after?()
             } else {
-                app.show("打不开聊天")
+                app.show(L("打不开聊天"))
             }
             busy = false
         }

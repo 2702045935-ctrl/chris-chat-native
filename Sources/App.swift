@@ -43,6 +43,8 @@ final class AppState: ObservableObject {
     @Published var momentsUnread = 0
     /// 切换界面语言时 +1：让整棵界面树重建，所有文案立刻变
     @Published var langVersion = 0
+    /// 启动页是否已经展示过（放全局：界面刷新、从后台切回来都不会重弹）
+    @Published var splashDone = false
     /// 服务器上配的默认聊天背景（自己没设时用它，和网页版一致）
     @Published var defaultChatBackground = ""
     @Published var toast: String?
@@ -350,8 +352,6 @@ struct CHRISApp: App {
 
 struct RootView: View {
     @EnvironmentObject var app: AppState
-    /// 自己的启动页：进来先显示 1 秒，再淡出（图片打包在 App 里，名字 splash.png）
-    @State private var showSplash = true
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var realtime = Realtime.shared
 
@@ -385,7 +385,7 @@ struct RootView: View {
             .background(C.pageBg.ignoresSafeArea())
             /* 自己的启动页：进来先盖 1 秒，再淡出 */
             .overlay {
-                if showSplash {
+                if !app.splashDone {
                     SplashView()
                         .transition(.opacity)
                         .zIndex(999)
@@ -396,9 +396,10 @@ struct RootView: View {
         }
         .task { await app.boot() }
         .onAppear {
-            /* 启动页显示 1 秒（用户要求 1s），然后 0.35 秒淡出 */
+            /* 启动页只在冷启动显示 1 秒；从后台切回来、界面刷新都不再弹 */
+            guard !app.splashDone else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
+                withAnimation(.easeOut(duration: 0.35)) { app.splashDone = true }
             }
         }
         .onChange(of: scenePhase) { phase in

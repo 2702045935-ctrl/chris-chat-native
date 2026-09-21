@@ -137,9 +137,6 @@ struct ChannelsView: View {
             try? s.setActive(true)
         }
         .onDisappear {
-            /* 退出这一页要把画面和声音一起停掉（以前只关了音频会话，声音还在响） */
-            player?.pause()
-            player = nil
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }

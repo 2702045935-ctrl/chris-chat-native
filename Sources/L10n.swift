@@ -344,5 +344,10 @@ enum L10n {
         "转账结果": "Transfer result",
         "支付设置：还没接后端，先把页面做出来": "Payment settings are coming soon",
         "客服中心：暂时没有在线客服": "Support: no live agents yet",
+        "我的二维码": "My QR code",
+        "已存": "Saved",
+        "微信号：": "ID: ",
+        "用 App 的「发现 → 扫一扫」扫这张，就能加我好友": "Scan this with Discover → Scan to add me",
+        "扫一扫，加我好友": "Scan to add me",
     ]
 }

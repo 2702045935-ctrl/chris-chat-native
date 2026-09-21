@@ -797,64 +797,68 @@ struct LoginView: View {
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
                         .padding(.top, 16)
-                    Text("欢迎回来，请选择登录方式")
-                        .font(.system(size: 14))
+                    Text("登录后同步最近的聊天记录")
+                        .font(.system(size: 13))
                         .foregroundColor(LoginTheme.sub ?? .secondary)
-                        .padding(.top, 20)
+                        .padding(.top, 18)
 
-                    Spacer(minLength: 48)
+                    Spacer(minLength: 44)
 
-                    // 微信登录按钮
+                    // 主按钮：没勾协议点不动，就算点到也会给提示
                     Button {
-                        if isAgree { loginWithWechat() }
+                        guard requireAgree() else { return }
+                        loginWithWechat()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "message.fill")
                                 .resizable()
-                                .frame(width: 24, height: 24)
+                                .frame(width: 22, height: 22)
                             Text("微信登录")
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .background(isAgree ? LoginTheme.accent : LoginTheme.disabledAccent)
-                        .cornerRadius(16)
+                        .cornerRadius(14)
                     }
                     .disabled(!isAgree)
 
-                    // 手机号登录 ｜ 账号密码登录（保持你代码的样式，做成可点，否则没法登录）
-                    HStack(spacing: 6) {
-                        Button("手机号登录") { sheet = .phone }
-                        Text("｜").foregroundColor(LoginTheme.disabledGray)
-                        Button("账号密码登录") { sheet = .password }
+                    /* 其他三种登录方式并成一行，不再堆两行：
+                       手机号登录 · 账号密码登录 · 人脸（没勾协议一样进不去） */
+                    HStack(spacing: 9) {
+                        Button("手机号登录") {
+                            guard requireAgree() else { return }
+                            sheet = .phone
+                        }
+                        Text("·").foregroundColor(LoginTheme.disabledGray)
+                        Button("账号密码登录") {
+                            guard requireAgree() else { return }
+                            sheet = .password
+                        }
+                        Text("·").foregroundColor(LoginTheme.disabledGray)
+                        Button {
+                            guard requireAgree() else { return }
+                            faceLogin()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "faceid")
+                                Text("人脸")
+                            }
+                        }
                     }
                     .font(.system(size: 14))
-                    .foregroundColor(LoginTheme.sub ?? Color(hexString: "#636366"))
-                    .padding(.top, 24)
-
-                    /* 人脸识别登录：走系统 Face ID（人脸数据只在手机安全芯片里，App 拿不到）。
-                       通过以后直接用这台设备上存着的登录态进去；没登录过就先密码登一次。 */
-                    Button {
-                        faceLogin()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "faceid")
-                            Text("人脸识别登录")
-                        }
-                        .font(.system(size: 14))
-                        .foregroundColor(LoginTheme.accent)
-                    }
-                    .padding(.top, 12)
+                    .foregroundColor(LoginTheme.accent)
+                    .padding(.top, 20)
 
                     if let e = error {
                         Text(e)
                             .font(.system(size: 13))
                             .foregroundColor(C.red)
                             .multilineTextAlignment(.center)
-                            .padding(.top, 14)
+                            .padding(.top, 12)
                     }
 
-                    Spacer(minLength: 32)
+                    Spacer(minLength: 26)
 
                     // 协议勾选
                     HStack(alignment: .top, spacing: 8) {
@@ -881,6 +885,16 @@ struct LoginView: View {
                                 return .handled
                             })
                     }
+
+                    /* 安全提示：和网页版登录页保持一致 */
+                    HStack(spacing: 5) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                        Text("全程 HTTPS 加密传输，密码只以加密哈希保存")
+                            .font(.system(size: 11.5))
+                    }
+                    .foregroundColor(LoginTheme.sub ?? Color(hexString: "#8A8F99"))
+                    .padding(.top, 14)
 
                     Spacer()
 
@@ -984,9 +998,6 @@ struct LoginView: View {
                     Text(quickBusy ? "正在登录…" : "点一下头像，快捷登录")
                         .font(.system(size: 12))
                         .foregroundColor(LoginTheme.accent)
-                    Text("（再登录一个账号，这里就能左右滑动切换）")
-                        .font(.system(size: 10.5))
-                        .foregroundColor(LoginTheme.sub ?? .secondary)
                 }
                 Text(app.accounts[min(avatarIndex, app.accounts.count - 1)].nickname)
                     .font(.system(size: 13))
@@ -1017,6 +1028,14 @@ struct LoginView: View {
     func loginWithWechat() {
         // 按最新要求：点「微信登录」直接进入账号密码登录页
         sheet = .password
+    }
+
+    /// 没勾协议一律不让登：主按钮、手机号登录、账号密码登录、人脸、点头像快捷登录都走这里
+    @discardableResult
+    private func requireAgree() -> Bool {
+        if isAgree { return true }
+        error = "请先勾选并同意《用户协议》和《隐私政策》"
+        return false
     }
 
     /// 这台设备上有没有可以「一键登录」的登录态
@@ -1053,6 +1072,7 @@ struct LoginView: View {
     }
 
     private func quickLogin(account: SavedAccount? = nil) {
+        guard requireAgree() else { return }
         guard !quickBusy else { return }
         quickBusy = true
         error = nil

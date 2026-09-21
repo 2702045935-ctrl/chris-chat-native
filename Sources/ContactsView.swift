@@ -22,13 +22,13 @@ struct ContactsView: View {
    文案走 L()：切成英文时显示英文，中文时显示中文（所以这里是计算属性，不是常量） */
 private var funcs: [(String, String, Color, String)] {
     [
-        (Tr("新的朋友"), I.newFriends, Color(hex: 0xD9822B), "newFriends"),
-        (Tr("群聊"), I.groups, Color(hex: 0x1F8A70), "groups"),
-        (Tr("仅聊天的朋友"), I.chatOnly, Color(hex: 0x6F6F78), "chatOnly"),
-        (Tr("标签"), I.tag, Color(hex: 0x3E7BC4), "tags"),
-        (Tr("服务号"), I.service, Color(hex: 0x3E7BC4), "service"),
-        (Tr("企业微信联系人"), I.workMate, Color(hex: 0x2E8A66), "work"),
-        (Tr("我的企业"), I.myWork, Color(hex: 0x2E8A66), "myWork")
+        (Tr("新的朋友"), I.newFriends, Color(hex: 0xF5A23D), "newFriends"),
+        (Tr("群聊"), I.groups, Color(hex: 0x22AC8B), "groups"),
+        (Tr("仅聊天的朋友"), I.chatOnly, Color(hex: 0x8E8E99), "chatOnly"),
+        (Tr("标签"), I.tag, Color(hex: 0x4C93DD), "tags"),
+        (Tr("服务号"), I.service, Color(hex: 0x4C93DD), "service"),
+        (Tr("企业微信联系人"), I.workMate, Color(hex: 0x35A87E), "work"),
+        (Tr("我的企业"), I.myWork, Color(hex: 0x35A87E), "myWork")
     ]
 }
 

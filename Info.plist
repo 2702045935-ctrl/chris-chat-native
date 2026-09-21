@@ -6,8 +6,8 @@
   <key>CFBundleExecutable</key><string>CHRIS</string>
   <key>CFBundleIdentifier</key><string>com.chris.chatnative</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-  <key>CFBundleName</key><string>CHRIS聊天</string>
-  <key>CFBundleDisplayName</key><string>CHRIS聊天</string>
+  <key>CFBundleName</key><string>Luchat</string>
+  <key>CFBundleDisplayName</key><string>Luchat</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>

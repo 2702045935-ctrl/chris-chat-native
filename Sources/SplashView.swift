@@ -10,7 +10,9 @@ struct SplashView: View {
             if let img = UIImage(named: "splash") {
                 Image(uiImage: img)
                     .resizable()
-                    .scaledToFill()          // 铺满，不留黑边
+                    .scaledToFill()          // 铺满整屏（不留黑边；深色图，左右裁一点看不出来）
+                    .frame(width: UIScreen.main.bounds.width,
+                           height: UIScreen.main.bounds.height)
             } else {
                 /* 图没打进包时的兜底：黑底 + 名字 */
                 VStack(spacing: 10) {

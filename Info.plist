@@ -18,6 +18,7 @@
   <key>UILaunchScreen</key>
   <dict>
     <key>UIColorName</key><string></string>
+    <key>UIImageName</key><string>splash</string>
   </dict>
   <key>UISupportedInterfaceOrientations</key>
   <array><string>UIInterfaceOrientationPortrait</string></array>

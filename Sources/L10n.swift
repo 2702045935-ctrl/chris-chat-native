@@ -363,5 +363,8 @@ enum L10n {
         "免打扰": "Do not disturb",
         "免打扰时段里收到消息不响不震，进 App 还是能看到小红点。":
             "During these hours messages arrive silently; you still see the badge in the app.",
+        "通用": "General",
+        "帮助与反馈": "Help & feedback",
+        "自定义": "Custom",
     ]
 }

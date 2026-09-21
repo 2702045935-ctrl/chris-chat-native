@@ -168,6 +168,101 @@ struct NotifyView: View {
     }
 }
 
+/* ---------------- 通用（外观 / 界面语言 / 聊天背景）---------------- */
+
+struct GeneralView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showTheme = false
+    @State private var showLang = false
+    @State private var showBg = false
+    @State private var showBgPick = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("通用"), back: { dismiss() })
+            ScrollView {
+                VStack(spacing: 0) {
+                    GroupCard {
+                        row(Tr("外观"),
+                            app.appearance == "dark" ? Tr("深色")
+                                : (app.appearance == "light" ? Tr("浅色") : Tr("跟随系统"))) { showTheme = true }
+                        HairLine(inset: 16)
+                        row(Tr("界面语言"), Lang.name) { showLang = true }
+                        HairLine(inset: 16)
+                        row(Tr("聊天背景"),
+                            (app.me?.chatBackground ?? "auto") == "auto" ? Tr("恢复默认") : Tr("自定义")) { showBg = true }
+                    }
+                    .padding(.top, 8)
+                    Spacer().frame(height: 30)
+                }
+            }
+            .background(C.pageBg)
+        }
+        .background(C.pageBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .confirmationDialog(Tr("外观"), isPresented: $showTheme, titleVisibility: .visible) {
+            Button(Tr("跟随系统")) { app.setAppearance("auto") }
+            Button(Tr("浅色")) { app.setAppearance("light") }
+            Button(Tr("深色")) { app.setAppearance("dark") }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
+            Button("简体中文") { setLang("zh") }
+            Button("English") { setLang("en") }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .confirmationDialog(Tr("聊天背景"), isPresented: $showBg, titleVisibility: .visible) {
+            Button(Tr("从相册选一张")) { showBgPick = true }
+            Button(Tr("恢复默认")) {
+                Task {
+                    await API.shared.changeBackground("auto")
+                    app.me = try? await API.shared.me()
+                    app.show(Tr("已恢复默认背景"))
+                }
+            }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showBgPick) {
+            PhotoPicker { image in changeBg(image) }
+        }
+    }
+
+    private func row(_ title: String, _ value: String, _ tap: @escaping () -> Void) -> some View {
+        Button(action: tap) {
+            HStack(spacing: 12) {
+                Text(title).font(pf(17)).foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Text(value).font(pf(15)).foregroundColor(C.subLabel)
+                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func setLang(_ code: String) {
+        Lang.code = code
+        app.langVersion += 1
+        app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
+    }
+
+    private func changeBg(_ image: UIImage) {
+        Task {
+            if let url = try? await API.shared.upload(image: image) {
+                await API.shared.changeBackground(url)
+                app.me = try? await API.shared.me()
+                app.show(Tr("聊天背景换好了"))
+            }
+        }
+    }
+}
+
 /* ---------------- 设置数据的模型 + 接口 ---------------- */
 
 struct PrivacySettings {

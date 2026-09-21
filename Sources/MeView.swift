@@ -2,8 +2,6 @@ import SwiftUI
 
 struct MeView: View {
     @State private var showMyQR = false
-    @State private var showPrivacy = false
-    @State private var showNotify = false
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
     /// 后台配的我页下面那几行（加一行、删一行，切回本页就变）
@@ -259,6 +257,10 @@ struct SettingsView: View {
     @State private var showLang = false
     @State private var showPairApprove = false
     @State private var showMyQR = false
+    @State private var showPrivacy = false
+    @State private var showNotify = false
+    @State private var showGeneral = false
+    @State private var showProfileEdit = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -266,13 +268,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     GroupCard {
-                        settingRow(Tr("外观"), app.appearance == "dark" ? "深色" : (app.appearance == "light" ? "浅色" : "跟随系统")) {
-                            showTheme = true
-                        }
-                        HairLine(inset: 16)
-                        settingRow(Tr("个人信息"), app.me?.name ?? "") { app.show(Tr("个人信息排在下一批")) }
-                        HairLine(inset: 16)
-                        settingRow(Tr("聊天背景"), (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
+                        /* 按微信「设置」的顺序排：账号与安全 → 新消息通知 → 隐私 → 通用 → 帮助与反馈 → 关于 → 退出登录 */
+                        settingRow(Tr("个人信息"), app.me?.name ?? "") { showProfileEdit = true }
                         HairLine(inset: 16)
                         settingRow(Tr("账号与安全"), "") { app.show(Tr("账号与安全排在下一批")) }
                         HairLine(inset: 16)
@@ -285,14 +282,15 @@ struct SettingsView: View {
                         settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)
                         settingRow(Tr("隐私"), "") { showPrivacy = true }
+                        HairLine(inset: 16)
+                        /* 通用：外观 / 界面语言 / 聊天背景（微信也把这几项收在「通用」里） */
+                        settingRow(Tr("通用"), "") { showGeneral = true }
                     }
 
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
-                        settingRow(Tr("界面语言"), Lang.name) { showLang = true }
-                        HairLine(inset: 16)
-                        settingRow(Tr("意见反馈"), "") { showFeedback = true }
+                        settingRow(Tr("帮助与反馈"), "") { showFeedback = true }
                         HairLine(inset: 16)
                         settingRow(Tr("关于我们 · 版本更新"), "1.0 · " + AppInfo.build) { showAbout = true }
                     }
@@ -346,6 +344,8 @@ struct SettingsView: View {
         .sheet(isPresented: $showMyQR) { MyQRView() }
         .sheet(isPresented: $showPrivacy) { PrivacyView() }
         .sheet(isPresented: $showNotify) { NotifyView() }
+        .sheet(isPresented: $showGeneral) { GeneralView() }
+        .sheet(isPresented: $showProfileEdit) { ProfileEditView() }
         .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
             Button(Tr("简体中文")) { setLang("zh") }
             Button("English") { setLang("en") }

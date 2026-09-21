@@ -370,9 +370,14 @@ struct ChatDetailView: View {
                 Text(unreadHere > 99 ? "99+" : "\(unreadHere)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .frame(minWidth: 20, minHeight: 20)
-                    .background(Capsule().fill(C.red))
+                    .padding(.horizontal, 7)
+                    .frame(minWidth: 22, minHeight: 20)
+                    /* 数字外面那个「药丸框」：里面填色，外面再描一圈白边 */
+                    .background(
+                        Capsule()
+                            .fill(C.red)
+                            .overlay(Capsule().stroke(Color.white.opacity(0.9), lineWidth: 1))
+                    )
             }
             .buttonStyle(.plain)
             .padding(.trailing, 2)

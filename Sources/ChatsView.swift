@@ -215,7 +215,8 @@ struct ChatsView: View {
                 VStack(spacing: 0) {
                     /* 顶栏固定不动 —— 对着桌面 s 文件夹那两张参考图量的：
                        微信在两张图里都在同一行（y 224~252），动的是搜索框和列表。 */
-                    NavBar(title: navTitle) {
+                    /* 顶栏最左边：贾维斯的两只小眼睛（会眨、会左右瞟） */
+                    NavBar(title: navTitle, leftExtra: AnyView(JarvisEyesAvatar(size: 26))) {
                         Button {
                             plusMenu = true
                         } label: {

@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct DiscoverView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct DiscoverView: View {
+    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
     /// 后台配的发现页（加一行、改个名，重开 App 或切回本页就变）
@@ -215,7 +216,8 @@ private struct OffsetKey2: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
-struct MomentsView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct MomentsView: View {
+    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 

@@ -1,6 +1,7 @@
 import SwiftUI
 
-struct MeView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct MeView: View {
+    @ObservedObject private var lang = LangStore.shared
     @State private var showMyQR = false
     @EnvironmentObject var app: AppState
     @State private var path = NavigationPath()
@@ -241,7 +242,8 @@ struct MeView: View {\n    @ObservedObject private var lang = LangStore.shared
 
 /* ============================================================ 设置 */
 
-struct SettingsView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct SettingsView: View {
+    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 

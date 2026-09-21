@@ -50,7 +50,8 @@ struct MainTabView: View {
     }
 }
 
-struct TabBar: View {\n    @ObservedObject private var lang = LangStore.shared
+struct TabBar: View {
+    @ObservedObject private var lang = LangStore.shared
     @Binding var selection: Int
     var badge: Int
     /// 「通讯录」上那个小红点（有人加你为好友就亮，微信也是这样）

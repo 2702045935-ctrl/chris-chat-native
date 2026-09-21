@@ -28,7 +28,8 @@ struct BubbleShape: Shape {
 
 enum PanelKind { case none, emoji, plus, gift }
 
-struct ChatDetailView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct ChatDetailView: View {
+    @ObservedObject private var lang = LangStore.shared
     let chat: Chat
 
     @EnvironmentObject var app: AppState

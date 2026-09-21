@@ -6,7 +6,8 @@ struct ContactSection: Identifiable {
     let users: [User]
 }
 
-struct ContactsView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct ContactsView: View {
+    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
 
     @State private var keyword = ""

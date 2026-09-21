@@ -7,7 +7,8 @@ import SwiftUI
    · 群聊名称 / 群公告 / 群主
    · 置顶聊天开关、删除该聊天
    ============================================================ */
-struct GroupInfoView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct GroupInfoView: View {
+    @ObservedObject private var lang = LangStore.shared
     let chat: Chat
 
     @EnvironmentObject var app: AppState

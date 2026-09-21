@@ -4,7 +4,8 @@ import SwiftUI
    我的二维码：每个人一张，别人扫了就能加你好友
    （「我」页面头像右上角那个二维码小图标进来的就是这一页）
    ============================================================ */
-struct MyQRView: View {\n    @ObservedObject private var lang = LangStore.shared
+struct MyQRView: View {
+    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 

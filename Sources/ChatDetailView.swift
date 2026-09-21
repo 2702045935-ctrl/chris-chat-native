@@ -68,6 +68,13 @@ struct ChatDetailView: View {
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
 
+    /// 顶栏标题：群聊和微信一样带上当前群人数「群名(9)」，单聊就是对方名字
+    private var navTitle: String {
+        guard isGroup else { return chat.name }
+        let n = chat.memberCount ?? (chat.memberIds?.count ?? 0)
+        return n > 0 ? chat.name + "(" + String(n) + ")" : chat.name
+    }
+
     /// 一对一会话里的对方 id（真人语音/视频通话要用它去呼叫）
     private var peerUserId: String? {
         guard let ids = chat.memberIds else { return nil }
@@ -158,7 +165,7 @@ struct ChatDetailView: View {
         }
         /* 顶栏：超薄毛玻璃（浅色模式下就是 iOS 那种浅浅的磨砂），背景图/消息从底下透过去 */
         .safeAreaInset(edge: .top, spacing: 0) {
-            NavBar(title: chat.name, back: { dismiss() }, leftExtra: leftUnreadBadge) {
+            NavBar(title: navTitle, back: { dismiss() }, leftExtra: leftUnreadBadge) {
                 Button {
                     showChatMenu = true
                 } label: {

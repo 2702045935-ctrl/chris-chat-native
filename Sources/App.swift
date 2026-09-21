@@ -1103,6 +1103,7 @@ struct AccountLoginSheet: View {
     @State private var error: String?
     @State private var showReg = false
     @State private var showUnban = false
+    @State private var showReset = false
 
     var body: some View {
         NavigationStack {
@@ -1158,9 +1159,14 @@ struct AccountLoginSheet: View {
                     .padding(.top, 20)
 
                     if mode == .password {
-                        Button("还没有账号？去注册") { showReg = true }
-                            .font(.system(size: 13)).foregroundColor(LoginTheme.accent2)
-                            .padding(.top, 16)
+                        HStack(spacing: 16) {
+                            /* 密码找回：手机号 + 验证码 + 新密码（功能清单里的「密码找回」） */
+                            Button("忘记密码？") { showReset = true }
+                            Text("·").foregroundColor(C.subLabel)
+                            Button("还没有账号？去注册") { showReg = true }
+                        }
+                        .font(.system(size: 13)).foregroundColor(LoginTheme.accent2)
+                        .padding(.top, 16)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1173,6 +1179,7 @@ struct AccountLoginSheet: View {
                 ToolbarItem(placement: .navigationBarLeading) { Button("取消") { dismiss() } }
             }
             .sheet(isPresented: $showReg) { RegisterSheet() }
+            .sheet(isPresented: $showReset) { ResetPasswordSheet() }
             .sheet(isPresented: $showUnban) {
                 UnbanSheet(preUser: username, prePass: password)
             }

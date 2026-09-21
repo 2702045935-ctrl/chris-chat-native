@@ -20,6 +20,7 @@ struct User: Codable, Identifiable, Hashable {
     var phone: String?
     var status: String?
     var chatBackground: String?
+    var birthday: String?
     var momentCover: String?
     var bot: Bool?
     var online: Bool?
@@ -59,6 +60,12 @@ struct Chat: Decodable, Identifiable, Hashable {
     var memberIds: [String]?
     var lastMessage: LastMessage?
     var updatedAt: String?
+    /// 消息免打扰（群屏蔽）
+    var muted: Bool?
+    /// 群主 id（群聊才有）
+    var ownerId: String?
+    /// 群公告（群聊才有）
+    var announce: String?
 
     var name: String { (title?.isEmpty == false) ? title! : "会话" }
     var unreadCount: Int { unread ?? 0 }
@@ -236,6 +243,33 @@ private struct ChatMembersPayload: Decodable {
     var avatar: String?
 }
 private struct PinPayload: Decodable { var pinned: Bool?; var forced: Bool? }
+private struct ChatInfoPayload: Decodable { var name: String?; var announce: String? }
+private struct MutePayload: Decodable { var muted: Bool? }
+private struct GroupActionPayload: Decodable { var memberCount: Int?; var left: Bool?; var dismissed: Bool? }
+private struct SearchPayload: Decodable { var messages: [FoundMessage] }
+private struct BankCardsPayload: Decodable { var cards: [BankCard]? }
+private struct SendPayload: Decodable { var sent: Bool?; var id: String? }
+
+/// 银行卡（卡号只回后四位）
+struct BankCard: Decodable, Identifiable, Hashable {
+    var id: String
+    var bank: String?
+    var holder: String?
+    var tail: String?
+
+    var title: String { (bank ?? "银行卡") + " 尾号" + (tail ?? "****") }
+}
+
+/// 「查找聊天记录」搜出来的那一条
+struct FoundMessage: Decodable, Identifiable, Hashable {
+    var id: String
+    var seq: Int?
+    var kind: String?
+    var content: String?
+    var createdAt: String?
+    var senderId: String?
+    var senderName: String?
+}
 private struct UsersPayload: Decodable { var users: [User] }
 private struct MessagesPayload: Decodable {
     var chat: Chat?
@@ -904,11 +938,23 @@ final class API {
         return try decode(any, as: T.self)
     }
 
+    private func patch<T: Decodable>(_ path: String, _ body: [String: Any], as type: T.Type) async throws -> T {
+        let any = try await request("PATCH", path, body: body)
+        return try decode(any, as: T.self)
+    }
+
     /* ---------------------------------------------------------- 业务接口 */
 
     func branding() async -> BrandInfo? {
         guard let payload: BrandingPayload = try? await get("/api/branding", as: BrandingPayload.self) else { return nil }
         return payload.branding
+    }
+
+    /* 服务器版本（「设置 → 版本更新」用）：拿不到就返回 nil */
+    func serverVersion() async -> String? {
+        struct VersionPayload: Decodable { var version: String? }
+        guard let p: VersionPayload = try? await get("/api/version", as: VersionPayload.self) else { return nil }
+        return p.version ?? ""
     }
 
     /// 后台配的「红点提醒」：某个位置 auto（按真实数据）/ on（一直亮）/ off（不显示）
@@ -1188,6 +1234,118 @@ final class API {
         let p: PinPayload? = try? await post("/api/chats/\(chatId)/pin",
                                              ["pinned": pinned], as: PinPayload.self)
         return p?.pinned ?? pinned
+    }
+
+    /* ---------------- 群管理（对应功能清单里的群名称/群公告/群屏蔽/踢人/解散）---------------- */
+
+    /// 改群名称 / 群公告（只有群主）。返回错误文案，nil = 成功
+    @discardableResult
+    func updateChatInfo(chatId: String, name: String, announce: String) async -> String? {
+        do {
+            let _: ChatInfoPayload = try await patch("/api/chats/\(chatId)/info",
+                                                     ["name": name, "announce": announce], as: ChatInfoPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "保存失败" }
+    }
+
+    /// 消息免打扰（群屏蔽）：每个人自己设
+    @discardableResult
+    func setMuted(chatId: String, muted: Bool) async -> Bool {
+        let p: MutePayload? = try? await post("/api/chats/\(chatId)/mute", ["muted": muted], as: MutePayload.self)
+        return p?.muted ?? muted
+    }
+
+    /// 群主把某个成员移出群聊
+    @discardableResult
+    func kickMember(chatId: String, userId: String) async -> String? {
+        do {
+            let _: GroupActionPayload = try await post("/api/chats/\(chatId)/kick",
+                                                       ["userId": userId], as: GroupActionPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "移出失败" }
+    }
+
+    /// 退出群聊（群主退群会自动把群主交给下一个人）
+    @discardableResult
+    func leaveGroup(chatId: String) async -> String? {
+        do {
+            let _: GroupActionPayload = try await post("/api/chats/\(chatId)/leave", [:], as: GroupActionPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "退群失败" }
+    }
+
+    /// 解散群聊（只有群主）
+    @discardableResult
+    func dismissGroup(chatId: String) async -> String? {
+        do {
+            let _: GroupActionPayload = try await post("/api/chats/\(chatId)/dismiss", [:], as: GroupActionPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "解散失败" }
+    }
+
+    /// 清空聊天记录（只清自己这边）
+    @discardableResult
+    func clearChat(chatId: String) async -> String? {
+        do {
+            let _: GroupActionPayload = try await post("/api/chats/\(chatId)/clear", [:], as: GroupActionPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "清空失败" }
+    }
+
+    /// 查找聊天记录：在服务器上翻整个会话的历史
+    func searchMessages(chatId: String, query: String) async -> [FoundMessage] {
+        guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let p: SearchPayload = try? await get("/api/chats/\(chatId)/search?q=\(q)", as: SearchPayload.self)
+        else { return [] }
+        return p.messages
+    }
+
+    /* ---------------- 银行卡 ---------------- */
+
+    func bankCards() async -> [BankCard] {
+        let p: BankCardsPayload? = try? await get("/api/me/bankcards", as: BankCardsPayload.self)
+        return p?.cards ?? []
+    }
+
+    @discardableResult
+    func addBankCard(bank: String, number: String, holder: String) async -> String? {
+        do {
+            let _: BankCardsPayload = try await post("/api/me/bankcards",
+                                                     ["bank": bank, "number": number, "holder": holder],
+                                                     as: BankCardsPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "绑定失败" }
+    }
+
+    @discardableResult
+    func deleteBankCard(id: String) async -> String? {
+        do {
+            _ = try await request("DELETE", "/api/me/bankcards/\(id)")
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "解绑失败" }
+    }
+
+    /* ---------------- 意见反馈 / 密码找回 ---------------- */
+
+    @discardableResult
+    func sendFeedback(content: String, contact: String) async -> String? {
+        do {
+            let _: SendPayload = try await post("/api/feedback",
+                                                ["content": content, "contact": contact, "platform": "iOS"],
+                                                as: SendPayload.self)
+            return nil
+        } catch { return (error as? APIError)?.errorDescription ?? "提交失败" }
+    }
+
+    /// 密码找回：手机号 + 验证码 + 新密码。
+    /// 成功后返回这个账号的用户名（App 用用户名+新密码再登一次，就进 App 了）
+    func resetPassword(phone: String, code: String, newPassword: String) async -> (username: String, error: String?) {
+        do {
+            let p: LoginPayload = try await post("/api/login/reset",
+                                                 ["phone": phone, "code": code, "newPassword": newPassword],
+                                                 as: LoginPayload.self)
+            return (p.user?.username ?? "", nil)
+        } catch { return ("", (error as? APIError)?.errorDescription ?? "重置失败") }
     }
 
     func markRead(chatId: String) async {

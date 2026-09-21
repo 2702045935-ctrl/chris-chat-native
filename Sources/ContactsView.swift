@@ -20,6 +20,7 @@ private let funcs: [(String, String, Color, String)] = [
     /* 6 个图标底色统一加深一档（原来偏粉嫩，深色更有质感）：
        琥珀 / 石板灰 / 靛蓝 / 靛蓝 / 松绿 / 松绿 */
     ("新的朋友", I.newFriends, Color(hex: 0xD9822B), "newFriends"),
+    ("群聊", I.groups, Color(hex: 0x1F8A70), "groups"),
     ("仅聊天的朋友", I.chatOnly, Color(hex: 0x6F6F78), "chatOnly"),
     ("标签", I.tag, Color(hex: 0x3E7BC4), "tags"),
     ("服务号", I.service, Color(hex: 0x3E7BC4), "service"),
@@ -161,6 +162,8 @@ private let funcs: [(String, String, Color, String)] = [
                     NewFriendsView()
                 } else if key == "addFriend" {
                     AddFriendView()
+                } else if key == "groupList" {
+                    GroupListView(onOpenChat: { chat in path.append(chat) })
                 } else {
                     ComingSoonView(title: key)
                 }
@@ -190,6 +193,7 @@ private let funcs: [(String, String, Color, String)] = [
         Button {
             switch item.3 {
             case "newFriends": path.append("newFriends")
+            case "groups": path.append("groupList")
             case "chatOnly": app.show("仅聊天的朋友：只有聊天记录、没加好友的人会出现在这里")
             case "tags": app.show("标签：还没建过标签")
             case "service": app.show("服务号：暂时没有关注的服务号")

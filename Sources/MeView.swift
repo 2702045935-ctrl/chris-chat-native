@@ -251,6 +251,8 @@ struct SettingsView: View {
     @State private var showTheme = false
     /// 有没有设过支付密码（设置页那一行显示「已设置 / 未设置」）
     @State private var hasPay = false
+    @State private var showFeedback = false
+    @State private var showAbout = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -279,7 +281,9 @@ struct SettingsView: View {
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
-                        settingRow("关于 CHRIS聊天", "原生版 1.0 · 打包 " + AppInfo.build) { }
+                        settingRow("意见反馈", "") { showFeedback = true }
+                        HairLine(inset: 16)
+                        settingRow("关于我们 · 版本更新", "1.0 · " + AppInfo.build) { showAbout = true }
                     }
 
                     Button {
@@ -325,6 +329,8 @@ struct SettingsView: View {
         .sheet(isPresented: $showBgPick) {
             PhotoPicker { image in changeBg(image) }
         }
+        .sheet(isPresented: $showFeedback) { FeedbackView() }
+        .sheet(isPresented: $showAbout) { AboutView() }
         .task { hasPay = await API.shared.hasPayPassword() }
         .confirmationDialog("确定退出登录？", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("退出登录", role: .destructive) {

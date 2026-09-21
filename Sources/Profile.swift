@@ -13,6 +13,8 @@ struct ProfileEditView: View {
     @State private var region = ""
     @State private var gender = "male"
     @State private var phone = ""
+    @State private var birthday = ""
+    @State private var showBirthday = false
     @State private var showPhoto = false
     @State private var busy = false
 
@@ -70,6 +72,24 @@ struct ProfileEditView: View {
                         HairLine(inset: 16)
                         field("地区", $region)
                         HairLine(inset: 16)
+                        /* 生日（对应功能清单里的「生日」）：点一下弹出日期选择 */
+                        Button {
+                            showBirthday = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text("生日").font(pf(17)).foregroundColor(C.label)
+                                Spacer()
+                                Text(birthday.isEmpty ? "未设置" : birthday)
+                                    .font(pf(15))
+                                    .foregroundColor(C.subLabel)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        HairLine(inset: 16)
                         field("个性签名", $bio)
                     }
 
@@ -120,12 +140,16 @@ struct ProfileEditView: View {
             region = app.me?.region ?? ""
             gender = app.me?.gender == "female" ? "female" : "male"
             phone = app.me?.phone ?? ""
+            birthday = app.me?.birthday ?? ""
         }
         .sheet(isPresented: $showPhoto) {
             PhotoPicker { image in changeAvatar(image) }
         }
         .sheet(isPresented: $showRingtone) {
             RingtonePicker()
+        }
+        .sheet(isPresented: $showBirthday) {
+            BirthdayPickerSheet(birthday: $birthday)
         }
     }
 
@@ -160,7 +184,8 @@ struct ProfileEditView: View {
                 "nickname": nickname,
                 "bio": bio,
                 "region": region,
-                "gender": gender
+                "gender": gender,
+                "birthday": birthday
             ]
             if !phone.isEmpty && phone != (app.me?.phone ?? "") { fields["phone"] = phone }
             await API.shared.updateMe(fields)

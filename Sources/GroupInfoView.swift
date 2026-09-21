@@ -19,6 +19,19 @@ struct GroupInfoView: View {
     @State private var loading = true
     @State private var pinned = false
     @State private var saving = false
+    /* 补齐的那几项：群公告、群名称（群主可改）、群屏蔽、清空记录、退群/解散 */
+    @State private var muted = false
+    @State private var announce = ""
+    @State private var showAnnounce = false
+    @State private var announceDraft = ""
+    @State private var showRename = false
+    @State private var nameDraft = ""
+    @State private var showSearch = false
+    @State private var confirmClear = false
+    @State private var confirmQuit = false
+    @State private var kickTarget: User?
+
+    private var isOwner: Bool { !ownerId.isEmpty && ownerId == app.me?.id }
 
     private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 5)
 
@@ -46,6 +59,7 @@ struct GroupInfoView: View {
                     memberCard
                     infoCard
                     switchCard
+                    recordCard
                     dangerCard
                 }
                 .padding(.horizontal, 12)
@@ -59,12 +73,154 @@ struct GroupInfoView: View {
         .hidesTabBar()
         .task {
             pinned = chat.pinned == true
+            muted = chat.muted == true
             if let r = try? await API.shared.chatMembers(chatId: chat.id) {
                 members = r.members
                 ownerId = r.ownerId
                 createdAt = r.createdAt
             }
+            announce = chatAnnounceFromList()
             loading = false
+        }
+        .sheet(isPresented: $showAnnounce) { announceEditor }
+        .sheet(isPresented: $showRename) { renameEditor }
+        .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
+        .confirmationDialog("清空聊天记录？", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("清空", role: .destructive) { clearHistory() }
+            Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog(isOwner ? "解散并退出群聊？" : "退出群聊？",
+                            isPresented: $confirmQuit, titleVisibility: .visible) {
+            Button(isOwner ? "解散并退出" : "退出", role: .destructive) { quitGroup() }
+            Button("取消", role: .cancel) { }
+        }
+        .confirmationDialog("把 TA 移出群聊？",
+                            isPresented: Binding(get: { kickTarget != nil }, set: { if !$0 { kickTarget = nil } }),
+                            titleVisibility: .visible) {
+            Button("移出群聊", role: .destructive) { kick() }
+            Button("取消", role: .cancel) { kickTarget = nil }
+        }
+    }
+
+    /// 群公告从会话列表数据里取（chat.announce），不用再发一次请求
+    private func chatAnnounceFromList() -> String { chat.announce ?? "" }
+
+    private var announceEditor: some View {
+        editorSheet(title: isOwner ? "编辑群公告" : "群公告",
+                    placeholder: "群公告内容（最多 500 字）",
+                    text: $announceDraft, editable: isOwner) {
+            saveAnnounce()
+        }
+    }
+
+    private var renameEditor: some View {
+        editorSheet(title: "修改群名称", placeholder: "群名称（最多 30 字）",
+                    text: $nameDraft, editable: true) {
+            saveName()
+        }
+    }
+
+    private func editorSheet(title: String, placeholder: String,
+                             text: Binding<String>, editable: Bool,
+                             onSave: @escaping () -> Void) -> some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ZStack(alignment: .topLeading) {
+                    if text.wrappedValue.isEmpty {
+                        Text(placeholder)
+                            .font(pf(15))
+                            .foregroundColor(C.subLabel)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 14)
+                    }
+                    TextEditor(text: text)
+                        .font(pf(15))
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 11)
+                        .padding(.top, 6)
+                        .disabled(!editable)
+                }
+                .frame(height: 170)
+                .background(C.cardBg)
+                Spacer()
+            }
+            .background(C.pageBg.ignoresSafeArea())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") { showAnnounce = false; showRename = false }
+                }
+                if editable {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("保存") { onSave() }.font(pf(16, .medium))
+                    }
+                }
+            }
+        }
+    }
+
+    private func saveAnnounce() {
+        Task {
+            if let err = await API.shared.updateChatInfo(chatId: chat.id, name: chat.name, announce: announceDraft) {
+                app.show(err)
+            } else {
+                announce = announceDraft
+                showAnnounce = false
+                app.show("群公告已更新")
+            }
+        }
+    }
+
+    private func saveName() {
+        let n = nameDraft.trimmingCharacters(in: .whitespaces)
+        if n.isEmpty { app.show("群名称不能为空"); return }
+        Task {
+            if let err = await API.shared.updateChatInfo(chatId: chat.id, name: n, announce: announce) {
+                app.show(err)
+            } else {
+                showRename = false
+                await app.loadChats()
+                app.show("群名称已修改")
+            }
+        }
+    }
+
+    private func clearHistory() {
+        Task {
+            if let err = await API.shared.clearChat(chatId: chat.id) {
+                app.show(err)
+            } else {
+                app.show("聊天记录已清空")
+            }
+        }
+    }
+
+    private func quitGroup() {
+        Task {
+            let err = isOwner ? await API.shared.dismissGroup(chatId: chat.id)
+                              : await API.shared.leaveGroup(chatId: chat.id)
+            if let err = err {
+                app.show(err)
+            } else {
+                await app.loadChats()
+                dismiss()
+                app.show(isOwner ? "群已解散" : "已退出群聊")
+            }
+        }
+    }
+
+    private func kick() {
+        guard let target = kickTarget else { return }
+        Task {
+            if let err = await API.shared.kickMember(chatId: chat.id, userId: target.id) {
+                app.show(err)
+            } else {
+                app.show("已把 \(target.name) 移出群聊")
+                kickTarget = nil
+                if let r = try? await API.shared.chatMembers(chatId: chat.id) { members = r.members }
+                await app.loadChats()
+            }
         }
     }
 
@@ -113,6 +269,12 @@ struct GroupInfoView: View {
                                 .lineLimit(1)
                                 .frame(width: 54)
                         }
+                        /* 群主长按成员 → 移出群聊（对应清单里的「群踢人」） */
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            if isOwner && u.id != app.me?.id { kickTarget = u }
+                            else if !isOwner { app.show("只有群主能移出成员") }
+                        }
                     }
                 }
                 .padding(.horizontal, 14)
@@ -127,16 +289,29 @@ struct GroupInfoView: View {
 
     private var infoCard: some View {
         VStack(spacing: 0) {
-            infoRow("群聊名称", chat.name)
+            Button {
+                nameDraft = chat.name
+                if isOwner { showRename = true }
+                else { app.show("只有群主能改群名称") }
+            } label: {
+                infoRow("群聊名称", chat.name, chevron: true)
+            }
+            .buttonStyle(.plain)
             divider
-            infoRow("群公告", "未设置")
+            Button {
+                announceDraft = announce
+                showAnnounce = true
+            } label: {
+                infoRow("群公告", announce.isEmpty ? "未设置" : announce, chevron: true)
+            }
+            .buttonStyle(.plain)
             divider
             infoRow("群主", ownerName)
         }
         .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
     }
 
-    private func infoRow(_ title: String, _ value: String) -> some View {
+    private func infoRow(_ title: String, _ value: String, chevron: Bool = false) -> some View {
         HStack(spacing: 10) {
             Text(title)
                 .font(pf(16))
@@ -147,64 +322,136 @@ struct GroupInfoView: View {
                 .foregroundColor(C.subLabel)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if chevron { Chevron(size: 9, line: 1.6) }
         }
         .padding(.horizontal, 14)
         .frame(height: 50)
+        .contentShape(Rectangle())
     }
 
     /* ---------------------------------------------------------- 置顶聊天 */
 
     private var switchCard: some View {
-        HStack(spacing: 10) {
-            Text("置顶聊天")
-                .font(pf(16))
-                .foregroundColor(C.label)
-            Spacer(minLength: 8)
-            Toggle("", isOn: Binding(
-                get: { pinned },
-                set: { v in
-                    pinned = v
-                    Task {
-                        let now = await API.shared.setPinned(chatId: chat.id, pinned: v)
-                        pinned = now
-                        await app.loadChats()
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("置顶聊天")
+                    .font(pf(16))
+                    .foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { pinned },
+                    set: { v in
+                        pinned = v
+                        Task {
+                            let now = await API.shared.setPinned(chatId: chat.id, pinned: v)
+                            pinned = now
+                            await app.loadChats()
+                        }
                     }
-                }
-            ))
-            .labelsHidden()
-            .tint(C.green)
-            .disabled(saving)
+                ))
+                .labelsHidden()
+                .tint(C.green)
+                .disabled(saving)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
+            divider
+            /* 群屏蔽：消息免打扰（每个人自己设） */
+            HStack(spacing: 10) {
+                Text("消息免打扰")
+                    .font(pf(16))
+                    .foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { muted },
+                    set: { v in
+                        muted = v
+                        Task {
+                            let now = await API.shared.setMuted(chatId: chat.id, muted: v)
+                            muted = now
+                            await app.loadChats()
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(C.green)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
         }
-        .padding(.horizontal, 14)
-        .frame(height: 50)
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+    }
+
+    /* ---------------------------------------------------------- 记录 / 退群 */
+
+    private var recordCard: some View {
+        VStack(spacing: 0) {
+            Button { showSearch = true } label: {
+                HStack(spacing: 10) {
+                    Text("查找聊天记录").font(pf(16)).foregroundColor(C.label)
+                    Spacer(minLength: 8)
+                    Chevron(size: 9, line: 1.6)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 50)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            divider
+            Button { confirmClear = true } label: {
+                HStack(spacing: 10) {
+                    Text("清空聊天记录").font(pf(16)).foregroundColor(C.label)
+                    Spacer(minLength: 8)
+                    Chevron(size: 9, line: 1.6)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 50)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
         .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
     }
 
     /* ---------------------------------------------------------- 删除该聊天 */
 
     private var dangerCard: some View {
-        Button {
-            Task {
-                saving = true
-                if let err = await API.shared.hideChat(chatId: chat.id) {
-                    app.show(err)
+        VStack(spacing: 0) {
+            Button {
+                Task {
+                    saving = true
+                    if let err = await API.shared.hideChat(chatId: chat.id) {
+                        app.show(err)
+                        saving = false
+                        return
+                    }
+                    await app.loadChats()
                     saving = false
-                    return
+                    dismiss()
+                    app.show("已删除该聊天")
                 }
-                await app.loadChats()
-                saving = false
-                dismiss()
-                app.show("已删除该聊天")
+            } label: {
+                Text("删除该聊天")
+                    .font(pf(16))
+                    .foregroundColor(C.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .contentShape(Rectangle())
             }
-        } label: {
-            Text("删除该聊天")
-                .font(pf(16))
-                .foregroundColor(C.red)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+            .buttonStyle(.plain)
+            divider
+            /* 群主 = 解散并退出；普通成员 = 退出群聊 */
+            Button { confirmQuit = true } label: {
+                Text(isOwner ? "解散并退出群聊" : "退出群聊")
+                    .font(pf(16))
+                    .foregroundColor(C.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
     }
 
     private var divider: some View {

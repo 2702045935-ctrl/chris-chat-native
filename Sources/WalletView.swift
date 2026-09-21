@@ -18,6 +18,7 @@ struct WalletView: View {
     @State private var cfg: WalletConfig?
     @State private var showBills = false
     @State private var showCoin = false
+    @State private var showCards = false
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
     @State private var revealed: Set<String> = []
 
@@ -67,6 +68,7 @@ struct WalletView: View {
         .hidesTabBar()
         .navigationDestination(isPresented: $showBills) { BillsView() }
         .navigationDestination(isPresented: $showCoin) { BalancePageView() }
+        .navigationDestination(isPresented: $showCards) { BankCardsView() }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" || ev.type == "ui" { Task { await load() } }
@@ -168,6 +170,8 @@ struct WalletView: View {
             showCoin = true               // 进「零钱」页（照参考图做的那一页）
         case "bills":
             showBills = true            // 进「账单」页（真实转账记录）
+        case "card":
+            showCards = true            // 进「银行卡」页（绑定 / 解绑，对应功能清单里的「银行卡」）
         case "settings":
             app.show("支付设置：还没接后端，先把页面做出来")
         case "service":

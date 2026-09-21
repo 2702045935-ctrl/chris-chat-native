@@ -69,6 +69,9 @@ enum I {
     static let myWork = """
     <svg data-key="i.myWork" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.4" y="8.4" width="15.2" height="10.4" rx="2.2"/><path d="M9.4 8.4V6.6h5.2v1.8M12 11.6v3.6M10.2 13.4h3.6"/></svg>
     """
+    static let groups = """
+    <svg data-key="i.groups" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8.2" r="3.2"/><path d="M3.4 19c0-3 2.6-5.2 5.8-5.2s5.8 2.2 5.8 5.2"/><path d="M15.6 5.5a3.2 3.2 0 0 1 0 5.5"/><path d="M17.2 14c2.2.6 3.6 2.3 3.6 4.5"/></svg>
+    """
 
     // ---------------- 发现页 ----------------
     static let moments = """

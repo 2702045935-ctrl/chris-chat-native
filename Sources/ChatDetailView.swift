@@ -47,6 +47,7 @@ struct ChatDetailView: View {
     @State private var showTransfer = false
     @State private var showChatMenu = false
     @State private var showGroupInfo = false
+    @State private var showSearch = false
     @State private var showFile = false
     @State private var showCall = false
     @State private var billInfo: TransferInfo?
@@ -216,6 +217,7 @@ struct ChatDetailView: View {
         .confirmationDialog("聊天", isPresented: $showChatMenu, titleVisibility: .hidden) {
             if isGroup {
                 Button("聊天信息") { showGroupInfo = true }
+                Button("查找聊天记录") { showSearch = true }
             }
             if (chat.botRank ?? 9) < 9 {
                 Button("语音通话") { showCall = true }
@@ -254,6 +256,7 @@ struct ChatDetailView: View {
         }
         .modifier(TapAvatarCard(cardUser: $cardUser))
         .sheet(isPresented: $showGroupInfo) { GroupInfoView(chat: chat) }
+        .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
         .hidesTabBar()
         .sheet(isPresented: Binding(
             get: { billInfo != nil },

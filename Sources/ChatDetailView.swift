@@ -59,6 +59,10 @@ struct ChatDetailView: View {
     @ObservedObject private var realtime = Realtime.shared
     @ObservedObject private var recorder = VoiceRecorder.shared
     @State private var pushTask: Task<Void, Never>?
+    /// 左上角返回箭头旁边那个未读数字（微信同位置）
+    @State private var unreadHere = 0
+    /// 点一下那个数字 = 滚回最新消息
+    @State private var scrollTick = 0
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -153,7 +157,7 @@ struct ChatDetailView: View {
         }
         /* 顶栏：超薄毛玻璃（浅色模式下就是 iOS 那种浅浅的磨砂），背景图/消息从底下透过去 */
         .safeAreaInset(edge: .top, spacing: 0) {
-            NavBar(title: chat.name, back: { dismiss() }) {
+            NavBar(title: chat.name, back: { dismiss() }, leftExtra: leftUnreadBadge) {
                 Button {
                     showChatMenu = true
                 } label: {
@@ -339,6 +343,7 @@ struct ChatDetailView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _ in scrollToEnd(proxy, animated: true) }
+            .onChange(of: scrollTick) { _ in scrollToEnd(proxy, animated: true) }
             .onAppear { scrollToEnd(proxy, animated: false) }
         }
     }
@@ -350,6 +355,28 @@ struct ChatDetailView: View {
         } else {
             proxy.scrollTo(last.id, anchor: .bottom)
         }
+    }
+
+    /* 左上角「返回箭头」旁边那个未读数字：和微信一样的位置。
+       进聊天页先带上会话原来的未读数，之后每多收到一条别人的消息就 +1；
+       点一下这个数字 = 当作看完，数字清零并滚回最新一条。 */
+    private var leftUnreadBadge: AnyView? {
+        guard unreadHere > 0 else { return nil }
+        return AnyView(
+            Button {
+                unreadHere = 0
+                scrollTick += 1
+            } label: {
+                Text(unreadHere > 99 ? "99+" : "\(unreadHere)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20, minHeight: 20)
+                    .background(Capsule().fill(C.red))
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 2)
+        )
     }
 
     private func showTime(for message: Message) -> Bool {
@@ -689,6 +716,14 @@ struct ChatDetailView: View {
                 && result.messages.last?.id == messages.last?.id
                 && zip(result.messages, messages).allSatisfy { $0.id == $1.id && $0.body == $1.body }
             if initial || !same {
+                /* 左上角未读数字：首次进来带上列表里的未读；之后只要多出别人的新消息就往上加 */
+                if initial {
+                    unreadHere = chat.unreadCount
+                } else if result.messages.count > messages.count, !messages.isEmpty {
+                    let fresh = result.messages.suffix(result.messages.count - messages.count)
+                    let incoming = fresh.filter { $0.senderId != myId && $0.kindName != "system" }.count
+                    if incoming > 0 { unreadHere += incoming }
+                }
                 messages = result.messages
             }
         } catch {

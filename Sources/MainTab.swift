@@ -172,15 +172,19 @@ struct NavBar<Right: View>: View {
     let title: String
     let back: (() -> Void)?
     let onLongPressTitle: (() -> Void)?
+    /// 返回箭头右边可以插一小块内容（聊天页那个未读数字就放这儿）
+    let leftExtra: AnyView?
     private let right: Right
 
     init(title: String,
          back: (() -> Void)? = nil,
          onLongPressTitle: (() -> Void)? = nil,
+         leftExtra: AnyView? = nil,
          @ViewBuilder right: () -> Right) {
         self.title = title
         self.back = back
         self.onLongPressTitle = onLongPressTitle
+        self.leftExtra = leftExtra
         self.right = right()
     }
 
@@ -201,6 +205,10 @@ struct NavBar<Right: View>: View {
                             .frame(width: 44, height: L.navH)
                     }
                     .buttonStyle(.plain)
+                }
+                if let leftExtra = leftExtra {
+                    leftExtra
+                        .frame(height: L.navH)
                 }
                 Spacer(minLength: 0)
                 right
@@ -229,8 +237,12 @@ struct NavBar<Right: View>: View {
 }
 
 extension NavBar where Right == EmptyView {
-    init(title: String, back: (() -> Void)? = nil, onLongPressTitle: (() -> Void)? = nil) {
-        self.init(title: title, back: back, onLongPressTitle: onLongPressTitle) { EmptyView() }
+    init(title: String,
+         back: (() -> Void)? = nil,
+         onLongPressTitle: (() -> Void)? = nil,
+         leftExtra: AnyView? = nil) {
+        self.init(title: title, back: back, onLongPressTitle: onLongPressTitle,
+                  leftExtra: leftExtra) { EmptyView() }
     }
 }
 

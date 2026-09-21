@@ -367,8 +367,12 @@ struct SettingsView: View {
     /// 切换界面语言：存下来 + 让标签栏那些文案立刻重绘
     private func setLang(_ code: String) {
         Lang.code = code
-        app.langVersion += 1          // 整棵树重建，所有页面立刻换成对应语言
         app.show(code == "en" ? "Language switched to English" : "界面语言已切成中文")
+        /* 先关页面，再重建（边弹着 sheet 边重建会闪退） */
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            app.langVersion += 1
+        }
     }
 
     private func changeBg(_ image: UIImage) {

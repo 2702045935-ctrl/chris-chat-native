@@ -679,7 +679,7 @@ struct ServerSheet: View {
         NavigationView {
             Form {
                 Section(header: Text(Tr("电脑的局域网地址（IP:端口）"))) {
-                    TextField("192.168.2.7:5443（加密）", text: $server)
+            TextField("aa.x8iu.com（加密）", text: $server)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.numbersAndPunctuation)

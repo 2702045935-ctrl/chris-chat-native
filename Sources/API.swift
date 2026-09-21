@@ -791,7 +791,7 @@ final class API {
     private let trustDelegate = TrustAllDelegate()
 
     private(set) var token: String = ""
-    private(set) var server: String = "192.168.2.7:5443"
+    private(set) var server: String = "aa.x8iu.com"
 
     private init() {
         let cfg = URLSessionConfiguration.default
@@ -801,8 +801,13 @@ final class API {
         cfg.httpCookieAcceptPolicy = .never
         session = URLSession(configuration: cfg, delegate: trustDelegate, delegateQueue: nil)
 
-        if let saved = UserDefaults.standard.string(forKey: "chris.server"), !saved.isEmpty {
+        /* 老版本存过局域网地址（192.168.2.7:5443）的机器，自动升级到云端域名，
+           否则装了新包也还在连电脑那台。用户手动改过别的地址就不动。 */
+        if let saved = UserDefaults.standard.string(forKey: "chris.server"),
+           !saved.isEmpty, saved != "192.168.2.7:5443", saved != "192.168.2.7" {
             server = API.normalizeServer(saved)
+        } else {
+            UserDefaults.standard.set(server, forKey: "chris.server")
         }
         // 令牌优先从钥匙串读（重装 App 也不掉），读不到再看老地方
         if let saved = Keychain.get("token") {

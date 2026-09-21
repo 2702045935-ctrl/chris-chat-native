@@ -181,7 +181,7 @@ struct SwipeChatRow: View {
 
 /* ============================================================ 微信（会话列表） */
 
-struct ChatsView: View {
+struct ChatsView: View {\n    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
 
     @State private var keyword = ""

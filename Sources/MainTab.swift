@@ -6,6 +6,8 @@ import UIKit
 struct MainTabView: View {
     @EnvironmentObject var app: AppState
     @State private var tab = 0
+    /* 读一下语言状态：切语言时这一层会重画（不重建整棵树，避免闪退） */
+    @ObservedObject private var lang = LangStore.shared
 
     private var unreadTotal: Int {
         app.chats.reduce(0) { $0 + ($1.unread ?? 0) }
@@ -38,8 +40,6 @@ struct MainTabView: View {
         /* 整块内容区的底色跟页面一致（深色下 navBg 是炭黑 #18181A，比页面 #0B0B0D 浅一档，
            状态栏那一条会看出「顶部是炭黑」）。底栏自己用 tabBg，比页面浅一点是对的。 */
         .background(C.pageBg.ignoresSafeArea())
-        /* 切界面语言时整棵树重建一次，保证每一页都立刻变英文/中文 */
-        .id(app.langVersion)
         /* 注意：这里以前有一句 .animation(…, value: app.tabBarHidden)。
            它会让「整块内容区」在标签栏显隐时一起做动画 —— 打开聊天页（藏标签栏）那一下
            「上下缩放」就是这么来的。改成不给容器加动画：标签栏直接让位，页面照常推进来。 */
@@ -50,7 +50,7 @@ struct MainTabView: View {
     }
 }
 
-struct TabBar: View {
+struct TabBar: View {\n    @ObservedObject private var lang = LangStore.shared
     @Binding var selection: Int
     var badge: Int
     /// 「通讯录」上那个小红点（有人加你为好友就亮，微信也是这样）

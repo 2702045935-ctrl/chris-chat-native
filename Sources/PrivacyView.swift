@@ -6,7 +6,7 @@ import SwiftUI
    · 消息通知：新消息通知、声音、振动、显示消息详情、免打扰时段
    ============================================================ */
 
-struct PrivacyView: View {
+struct PrivacyView: View {\n    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var p = PrivacySettings()
@@ -69,7 +69,7 @@ struct PrivacyView: View {
     }
 }
 
-struct NotifyView: View {
+struct NotifyView: View {\n    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var n = NotifySettings()
@@ -170,7 +170,7 @@ struct NotifyView: View {
 
 /* ---------------- 通用（外观 / 界面语言 / 聊天背景）---------------- */
 
-struct GeneralView: View {
+struct GeneralView: View {\n    @ObservedObject private var lang = LangStore.shared
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 

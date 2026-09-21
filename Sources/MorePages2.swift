@@ -10,19 +10,33 @@ import SwiftUI
 /* ---------------------------------------------------------- 界面语言 */
 
 /// 极简多语言：只覆盖最显眼的那些文案（标签栏、设置、常用按钮）
-enum Lang {
+/// 语言状态：做成可观察对象，切语言时只让"读了它的页面"重画，
+/// 不重建整棵视图树（之前用 .id() 重建会闪退）
+final class LangStore: ObservableObject {
+    static let shared = LangStore()
     static let key = "chris.lang"
 
-    static var code: String {
-        /* 没手动选过就跟随系统语言：系统是英文就用英文（选过就一直按选的来） */
-        get {
-            if let saved = UserDefaults.standard.string(forKey: key) { return saved }
-            let sys = Locale.preferredLanguages.first?.lowercased() ?? "zh"
-            return sys.hasPrefix("en") ? "en" : "zh"
-        }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
+    @Published var code: String {
+        didSet { UserDefaults.standard.set(code, forKey: LangStore.key) }
     }
-    static var isEnglish: Bool { code == "en" }
+
+    private init() {
+        if let saved = UserDefaults.standard.string(forKey: LangStore.key) {
+            code = saved
+        } else {
+            /* 没手动选过就跟随系统语言 */
+            let sys = Locale.preferredLanguages.first?.lowercased() ?? "zh"
+            code = sys.hasPrefix("en") ? "en" : "zh"
+        }
+    }
+}
+
+enum Lang {
+    static var code: String {
+        get { LangStore.shared.code }
+        set { LangStore.shared.code = newValue }
+    }
+    static var isEnglish: Bool { LangStore.shared.code == "en" }
     static func t(_ zh: String, _ en: String) -> String { isEnglish ? en : zh }
 
     static var name: String {

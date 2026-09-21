@@ -49,7 +49,7 @@ struct MainTabView: View {
         /* 上次崩过的话，进来就把崩溃信息弹出来（截图给我就能定位） */
         .sheet(isPresented: Binding(
             get: { !(UserDefaults.standard.string(forKey: "chris.lastCrash") ?? "").isEmpty && !shownCrash },
-            set: { shownCrash = true })) {
+            set: { v in shownCrash = true })) {
                 CrashLogView()
         }
         /* 接通 / 挂断弹的对话框（颜色圆角和聊天那个框一样），等用户点「确定」或超时自己关 */

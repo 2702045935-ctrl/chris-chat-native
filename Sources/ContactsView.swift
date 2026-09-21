@@ -16,14 +16,16 @@ struct ContactsView: View {
     @FocusState private var searchFocused: Bool
     @ObservedObject private var realtime = Realtime.shared
 
-    private let funcs: [(String, String, Color, String)] = [
-        ("新的朋友", I.newFriends, Color(hex: 0xF0A75C), "newFriends"),
-        ("仅聊天的朋友", I.chatOnly, Color(hex: 0x9A9AA0), "chatOnly"),
-        ("标签", I.tag, Color(hex: 0x6D9ED6), "tags"),
-        ("服务号", I.service, Color(hex: 0x6D9ED6), "service"),
-        ("企业微信联系人", I.workMate, Color(hex: 0x4FA383), "work"),
-        ("我的企业", I.myWork, Color(hex: 0x4FA383), "myWork")
-    ]
+private let funcs: [(String, String, Color, String)] = [
+    /* 6 个图标底色统一加深一档（原来偏粉嫩，深色更有质感）：
+       琥珀 / 石板灰 / 靛蓝 / 靛蓝 / 松绿 / 松绿 */
+    ("新的朋友", I.newFriends, Color(hex: 0xD9822B), "newFriends"),
+    ("仅聊天的朋友", I.chatOnly, Color(hex: 0x6F6F78), "chatOnly"),
+    ("标签", I.tag, Color(hex: 0x3E7BC4), "tags"),
+    ("服务号", I.service, Color(hex: 0x3E7BC4), "service"),
+    ("企业微信联系人", I.workMate, Color(hex: 0x2E8A66), "work"),
+    ("我的企业", I.myWork, Color(hex: 0x2E8A66), "myWork")
+]
 
     private var filtered: [User] {
         let sorted = app.contacts.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }

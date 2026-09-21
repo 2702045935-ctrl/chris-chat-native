@@ -69,10 +69,17 @@ jobs:
           otool -L "$APP/CHRIS" | head -12
           zip -qry CHRISChat-unsigned.ipa Payload
           ls -lh CHRISChat-unsigned.ipa
+          # 安装包加密：仓库是私有的，产物再加一层 AES-256，光有链接也装不了
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in CHRISChat-unsigned.ipa -out Luchat.ipa.enc \
+            -pass pass:"$IPA_PASSWORD"
+          ls -lh Luchat.ipa.enc
+        env:
+          IPA_PASSWORD: ${{ secrets.IPA_PASSWORD || 'Luchat@2026' }}
 
       - name: 上传安装包
         uses: actions/upload-artifact@v4
         with:
           name: CHRISChat-unsigned-ipa
-          path: CHRISChat-unsigned.ipa
+          path: Luchat.ipa.enc
           if-no-files-found: error

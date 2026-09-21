@@ -46,6 +46,7 @@ struct ChatDetailView: View {
     @State private var showLocation = false
     @State private var showTransfer = false
     @State private var showChatMenu = false
+    @State private var showGroupInfo = false
     @State private var showFile = false
     @State private var showCall = false
     @State private var billInfo: TransferInfo?
@@ -206,6 +207,9 @@ struct ChatDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */
         .confirmationDialog("聊天", isPresented: $showChatMenu, titleVisibility: .hidden) {
+            if isGroup {
+                Button("聊天信息") { showGroupInfo = true }
+            }
             if (chat.botRank ?? 9) < 9 {
                 Button("语音通话") { showCall = true }
                 Button("视频通话") { showCall = true }
@@ -242,6 +246,7 @@ struct ChatDetailView: View {
             PhotoPager(paths: item.paths, startIndex: item.index) { viewer = nil }
         }
         .modifier(TapAvatarCard(cardUser: $cardUser))
+        .sheet(isPresented: $showGroupInfo) { GroupInfoView(chat: chat) }
         .hidesTabBar()
         .sheet(isPresented: Binding(
             get: { billInfo != nil },

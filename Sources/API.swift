@@ -229,6 +229,13 @@ struct Moment: Decodable, Identifiable, Hashable {
 
 private struct ChatsPayload: Decodable { var chats: [Chat] }
 private struct ChatPayload: Decodable { var chat: Chat? }
+private struct ChatMembersPayload: Decodable {
+    var members: [User]?
+    var ownerId: String?
+    var createdAt: String?
+    var avatar: String?
+}
+private struct PinPayload: Decodable { var pinned: Bool?; var forced: Bool? }
 private struct UsersPayload: Decodable { var users: [User] }
 private struct MessagesPayload: Decodable {
     var chat: Chat?
@@ -1167,6 +1174,20 @@ final class API {
                                                      ["kind": "text", "content": text],
                                                      as: MessagePayload.self)
         return payload.message
+    }
+
+    /* 群聊信息页：群成员资料（顺序和九宫格群头像一致，群主排第一） */
+    func chatMembers(chatId: String) async throws -> (members: [User], ownerId: String, createdAt: String) {
+        let p: ChatMembersPayload = try await get("/api/chats/\(chatId)/members", as: ChatMembersPayload.self)
+        return (p.members ?? [], p.ownerId ?? "", p.createdAt ?? "")
+    }
+
+    /* 置顶聊天 / 取消置顶（群聊信息页那一行） */
+    @discardableResult
+    func setPinned(chatId: String, pinned: Bool) async -> Bool {
+        let p: PinPayload? = try? await post("/api/chats/\(chatId)/pin",
+                                             ["pinned": pinned], as: PinPayload.self)
+        return p?.pinned ?? pinned
     }
 
     func markRead(chatId: String) async {

@@ -377,7 +377,7 @@ struct SettingsView: View {
     private func changeBg(_ image: UIImage) {
         busy = true
         Task {
-            if let url = try? await API.shared.upload(image: image) {
+            if let url = try? await API.shared.uploadOriginal(image: image) {   // 聊天背景用原图
                 await API.shared.changeBackground(url)
                 app.me = try? await API.shared.me()
                 app.show(Tr("聊天背景换好了"))

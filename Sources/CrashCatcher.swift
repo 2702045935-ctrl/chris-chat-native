@@ -1,6 +1,15 @@
 import SwiftUI
 import Foundation
 
+/* C 回调必须是全局函数（闭包会捕获上下文，编译不过） */
+private func chrisExceptionHandler(_ ex: NSException) {
+    CrashCatcher.report("NSException", "\(ex.name.rawValue): \(ex.reason ?? "")")
+}
+private func chrisSignalHandler(_ s: Int32) {
+    CrashCatcher.report("Signal", "signal \(s)\n" + Thread.callStackSymbols.joined(separator: "\n"))
+    signal(s, SIG_DFL)
+}
+
 /* 崩溃上报：App 一旦崩，把原因和调用栈发到服务器（data/client-errors.jsonl），
    这样在电脑上就能看到崩在哪一行，不用把手机连电脑抓日志。 */
 enum CrashCatcher {
@@ -10,14 +19,9 @@ enum CrashCatcher {
         guard !installed else { return }
         installed = true
 
-        NSSetUncaughtExceptionHandler { ex in
-            report("NSException", "\(ex.name.rawValue): \(ex.reason ?? "")")
-        }
+        NSSetUncaughtExceptionHandler(chrisExceptionHandler)
         for sig in [SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP] {
-            signal(sig) { s in
-                report("Signal", "signal \(s)\n" + Thread.callStackSymbols.joined(separator: "\n"))
-                signal(s, SIG_DFL)
-            }
+            signal(sig, chrisSignalHandler)
         }
     }
 

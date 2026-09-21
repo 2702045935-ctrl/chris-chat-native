@@ -1657,7 +1657,18 @@ final class API {
 
     /// 图片压完再传：返回服务器上的 /uploads/xxx.jpg
     func upload(image: UIImage) async throws -> String {
-        guard let data = image.resizedJPEG(maxSide: 1600, quality: 0.82) else {
+        let data = image.resizedJPEG(maxSide: 1600, quality: 0.82)
+        return try await uploadData(data)
+    }
+
+    /// 聊天背景用原图上传：尺寸不动、画质几乎无损（只有超过 4096 才缩，省内存）
+    func uploadOriginal(image: UIImage) async throws -> String {
+        let data = image.resizedJPEG(maxSide: 4096, quality: 1.0)
+        return try await uploadData(data)
+    }
+
+    private func uploadData(_ data: Data?) async throws -> String {
+        guard let data = data else {
             throw APIError.message("图片处理失败")
         }
         let b64 = data.base64EncodedString()

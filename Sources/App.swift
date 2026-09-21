@@ -343,9 +343,18 @@ struct CHRISApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(app)
-                .preferredColorScheme(app.preferredScheme)   // 跟随系统 / 强制浅色 / 强制深色
+            /* 启动页挂在窗口最外层：这样它是**整块屏幕**铺满（含状态栏那一条），
+               以前挂在页面里只覆盖安全区，顶部会露出一条。 */
+            ZStack {
+                RootView()
+                    .environmentObject(app)
+                    .preferredColorScheme(app.preferredScheme)   // 跟随系统 / 强制浅色 / 强制深色
+                if !app.splashDone {
+                    SplashView()
+                        .transition(.opacity)
+                        .zIndex(9)
+                }
+            }
         }
     }
 }
@@ -383,14 +392,6 @@ struct RootView: View {
             .id(app.uiVersion)
             // 根视图也铺一层底色：万一哪个页面没铺满，顶上也不会露出系统窗口的白色
             .background(C.pageBg.ignoresSafeArea())
-            /* 自己的启动页：进来先盖 1 秒，再淡出 */
-            .overlay {
-                if !app.splashDone {
-                    SplashView()
-                        .transition(.opacity)
-                        .zIndex(999)
-                }
-            }
             .onAppear { L.width = geo.size.width }
             .onChange(of: geo.size.width) { w in L.width = w }
         }

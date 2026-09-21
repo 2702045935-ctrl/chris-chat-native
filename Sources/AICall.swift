@@ -239,7 +239,7 @@ struct AICallView: View {
 
     private func ask(_ text: String) {
         busy = true
-        phase = "贾维斯在想…"
+        phase = "AI助手在想…"
         reply = ""
         denyReason = ""
         Task {
@@ -260,7 +260,7 @@ struct AICallView: View {
                 if answer.body.contains("余额") || answer.body.contains("额度不足") {
                     denyReason = answer.body
                 }
-                phase = "贾维斯在说话…"
+                phase = "AI助手在说话…"
                 voice.speak(answer.body) {
                     phase = "已接通"
                     startListening()

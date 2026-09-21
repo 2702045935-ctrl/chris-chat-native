@@ -179,7 +179,7 @@ struct BotCardView: View {
                     .font(pf(20, .medium))
                     .foregroundColor(ink)
                     .lineLimit(1)
-                Text("账号：" + (chat.id.isEmpty ? "—" : "bot"))
+                Text(isEyesBot ? "官方 AI 助理" : "官方账号")
                     .font(pf(14))
                     .foregroundColor(gray)
                     .lineLimit(1)

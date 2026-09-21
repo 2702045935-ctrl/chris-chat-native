@@ -552,11 +552,26 @@ struct Avatar: View {
     var circle = false
 
     var body: some View {
-        RemoteImage(path: path, icon: "person.fill")
-            .id(path)                 // 换了头像立刻生效（不然会一直显示旧图）
-            .frame(width: size, height: size)
-            .clipShape(shape)
-            .overlay(shape.stroke(Color.black.opacity(0.05), lineWidth: 0.5))
+        Group {
+            if Avatar.isEyesBot(path) {
+                /* AI 助手（原贾维斯）的头像：不是图片，是一只**真的会动**的小脸
+                   —— 眨眼、左右瞟、呼吸。会话列表 / 通讯录 / 聊天里 / 名片 / 通话页都是它。 */
+                JarvisEyesAvatar(size: size * 0.86)
+                    .frame(width: size, height: size)
+                    .background(shape.fill(Color.white))
+            } else {
+                RemoteImage(path: path, icon: "person.fill")
+                    .id(path)                 // 换了头像立刻生效（不然会一直显示旧图）
+                    .frame(width: size, height: size)
+                    .clipShape(shape)
+            }
+        }
+        .overlay(shape.stroke(Color.black.opacity(0.05), lineWidth: 0.5))
+    }
+
+    /// 服务器给 AI 助手用的那张会动的眼睛头像（bot-ai-eyes.png）→ 换成真的动画
+    static func isEyesBot(_ p: String) -> Bool {
+        p.contains("bot-ai-eyes")
     }
 
     private var shape: AnyShape {

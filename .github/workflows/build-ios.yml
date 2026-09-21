@@ -46,6 +46,8 @@ jobs:
           cp Info.plist "$APP/Info.plist"
           cp AppIcon60x60@2x.png "$APP/"
           cp AppIcon60x60@3x.png "$APP/"
+          # 自己的启动页图片（代码里 UIImage(named: "splash") 取它）
+          cp splash.png "$APP/"
           # 把 WebRTC 打进 App 里（动态库，运行时从 @executable_path/Frameworks 加载）
           mkdir -p "$APP/Frameworks"
           cp -R WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework "$APP/Frameworks/WebRTC.framework"

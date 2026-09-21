@@ -350,6 +350,8 @@ struct CHRISApp: App {
 
 struct RootView: View {
     @EnvironmentObject var app: AppState
+    /// 自己的启动页：进来先显示 1 秒，再淡出（图片打包在 App 里，名字 splash.png）
+    @State private var showSplash = true
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var realtime = Realtime.shared
 
@@ -381,10 +383,24 @@ struct RootView: View {
             .id(app.uiVersion)
             // 根视图也铺一层底色：万一哪个页面没铺满，顶上也不会露出系统窗口的白色
             .background(C.pageBg.ignoresSafeArea())
+            /* 自己的启动页：进来先盖 1 秒，再淡出 */
+            .overlay {
+                if showSplash {
+                    SplashView()
+                        .transition(.opacity)
+                        .zIndex(999)
+                }
+            }
             .onAppear { L.width = geo.size.width }
             .onChange(of: geo.size.width) { w in L.width = w }
         }
         .task { await app.boot() }
+        .onAppear {
+            /* 启动页显示 1 秒（用户要求 1s），然后 0.35 秒淡出 */
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeOut(duration: 0.35)) { showSplash = false }
+            }
+        }
         .onChange(of: scenePhase) { phase in
             if phase == .active && app.me != nil {
                 Task {

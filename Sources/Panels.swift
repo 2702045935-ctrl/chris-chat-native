@@ -80,7 +80,7 @@ struct EmojiPanel: View {
                 }
                 .buttonStyle(.plain)
                 Button(action: onSend) {
-                    Text(L("发送"))
+                    Text(Tr("发送"))
                         .font(pf(15))
                         .foregroundColor(draft.isEmpty ? C.subLabel : Color(hex: 0x0D0D0D))
                         .padding(.horizontal, 14)
@@ -181,7 +181,7 @@ struct GiftPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             if gifts.isEmpty {
-                Text(L("礼物还没配"))
+                Text(Tr("礼物还没配"))
                     .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -248,16 +248,16 @@ struct LocationSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text(L("位置名称"))) {
+                Section(header: Text(Tr("位置名称"))) {
                     TextField("我的位置", text: $name)
                 }
-                Section(header: Text(L("经纬度（北纬 / 东经）"))) {
+                Section(header: Text(Tr("经纬度（北纬 / 东经）"))) {
                     HStack {
-                        Text(L("纬度")).foregroundColor(.secondary)
+                        Text(Tr("纬度")).foregroundColor(.secondary)
                         TextField("31.4912", text: $lat).keyboardType(.numbersAndPunctuation)
                     }
                     HStack {
-                        Text(L("经度")).foregroundColor(.secondary)
+                        Text(Tr("经度")).foregroundColor(.secondary)
                         TextField("120.3119", text: $lng).keyboardType(.numbersAndPunctuation)
                     }
                     if !addr.isEmpty {
@@ -265,12 +265,12 @@ struct LocationSheet: View {
                     }
                 }
             }
-            .navigationTitle(L("发送位置"))
+            .navigationTitle(Tr("发送位置"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L("发送")) {
+                    Button(Tr("发送")) {
                         let payload = "{\"lat\":\(Double(lat) ?? 0),\"lng\":\(Double(lng) ?? 0),\"name\":\"\(name)\",\"addr\":\"\(addr)\"}"
                         onSend(payload)
                         dismiss()

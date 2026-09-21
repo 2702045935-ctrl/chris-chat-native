@@ -279,10 +279,10 @@ struct ChatsView: View {
             }
         }
         .confirmationDialog("", isPresented: $plusMenu, titleVisibility: .hidden) {
-            Button(L("发起群聊")) { path.append("newGroup") }
-            Button(L("加好友")) { path.append("addFriend") }
-            Button(L("扫一扫")) { showScan = true }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("发起群聊")) { path.append("newGroup") }
+            Button(Tr("加好友")) { path.append("addFriend") }
+            Button(Tr("扫一扫")) { showScan = true }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .fullScreenCover(isPresented: $showScan) {
             ScannerView { text in handleScanned(text, app: app) }
@@ -303,7 +303,7 @@ struct ChatsView: View {
                 .font(pf(14))
                 .foregroundColor(C.subLabel)
             if app.loadError != nil {
-                Button(L("重试")) { Task { await app.loadChats() } }
+                Button(Tr("重试")) { Task { await app.loadChats() } }
                     .font(pf(15))
                     .foregroundColor(C.green)
             }
@@ -317,7 +317,7 @@ struct ChatsView: View {
         Task {
             await API.shared.markUnread(chatId: chat.id)
             await app.loadChats()
-            app.show(L("已标为未读"))
+            app.show(Tr("已标为未读"))
         }
     }
 

@@ -146,7 +146,7 @@ struct MeView: View {
                 Spacer(minLength: 0)
 
                 Button {
-                    app.show(L("我的二维码排在下一批"))
+                    app.show(Tr("我的二维码排在下一批"))
                 } label: {
                     SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: C.arrow)
                         .frame(width: L.v(26, 7.4, 30), height: L.v(26, 7.4, 30))
@@ -168,13 +168,13 @@ struct MeView: View {
                         Text(mood)
                     } else {
                         Text("＋").foregroundColor(C.subLabel)
-                        Text(L("状态"))
+                        Text(Tr("状态"))
                     }
                 } action: {
                     path.append("status")
                 }
                 chip {
-                    Text(L("朋友圈"))
+                    Text(Tr("朋友圈"))
                     Text("\(friendCount) 个朋友")
                         .font(pf(L.v(11.5, 3.2, 12.5)))
                         .foregroundColor(C.subLabel)
@@ -209,18 +209,18 @@ struct MeView: View {
 
     private var promoRow: some View {
         Button {
-            app.show(L("推荐位排在下一批"))
+            app.show(Tr("推荐位排在下一批"))
         } label: {
             HStack(spacing: L.v(10, 3.2, 13)) {
                 SVGIcon(markup: I.coke, size: L.v(38, 11, 46), color: .white)
                     .frame(width: L.v(26, 7.6, 32), height: L.v(38, 11, 46))
                 VStack(alignment: .leading, spacing: L.v(3, 1.2, 5)) {
-                    Text(L("热卖 5000+"))
+                    Text(Tr("热卖 5000+"))
                         .font(pf(L.v(10.5, 2.9, 11.5)))
                         .foregroundColor(Color.dyn(0xE0393B, 0xFF8A8D))
                         .padding(.horizontal, L.v(5, 1.6, 7))
                         .background(RoundedRectangle(cornerRadius: 4).fill(Color.dyn(0xFFECEB, 0x4A1F20)))
-                    Text(L("添加第1个作品"))
+                    Text(Tr("添加第1个作品"))
                         .font(pf(L.v(14, 3.9, 15.5)))
                         .foregroundColor(C.label)
                         .lineLimit(1)
@@ -258,39 +258,39 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("设置"), back: { dismiss() })
+            NavBar(title: Tr("设置"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
                     GroupCard {
-                        settingRow(L("外观"), app.appearance == "dark" ? "深色" : (app.appearance == "light" ? "浅色" : "跟随系统")) {
+                        settingRow(Tr("外观"), app.appearance == "dark" ? "深色" : (app.appearance == "light" ? "浅色" : "跟随系统")) {
                             showTheme = true
                         }
                         HairLine(inset: 16)
-                        settingRow(L("个人信息"), app.me?.name ?? "") { app.show(L("个人信息排在下一批")) }
+                        settingRow(Tr("个人信息"), app.me?.name ?? "") { app.show(Tr("个人信息排在下一批")) }
                         HairLine(inset: 16)
-                        settingRow(L("聊天背景"), (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
+                        settingRow(Tr("聊天背景"), (app.me?.chatBackground ?? "auto") == "auto" ? "默认" : "自定义") { showBg = true }
                         HairLine(inset: 16)
-                        settingRow(L("账号与安全"), "") { app.show(L("账号与安全排在下一批")) }
+                        settingRow(Tr("账号与安全"), "") { app.show(Tr("账号与安全排在下一批")) }
                         HairLine(inset: 16)
                         /* 网页版「微信授权登录 / QQ 授权登录」出的 6 位数字在这里确认 */
-                        settingRow(L("设备确认登录"), "") { showPairApprove = true }
+                        settingRow(Tr("设备确认登录"), "") { showPairApprove = true }
                         HairLine(inset: 16)
                         /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
-                        settingLink(L("支付密码"), hasPay ? "已设置" : "未设置", key: "paypwd")
+                        settingLink(Tr("支付密码"), hasPay ? "已设置" : "未设置", key: "paypwd")
                         HairLine(inset: 16)
-                        settingRow(L("新消息通知"), "") { app.show(L("通知设置排在下一批")) }
+                        settingRow(Tr("新消息通知"), "") { app.show(Tr("通知设置排在下一批")) }
                         HairLine(inset: 16)
-                        settingRow(L("隐私"), "") { app.show(L("隐私设置排在下一批")) }
+                        settingRow(Tr("隐私"), "") { app.show(Tr("隐私设置排在下一批")) }
                     }
 
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
-                        settingRow(L("界面语言"), Lang.name) { showLang = true }
+                        settingRow(Tr("界面语言"), Lang.name) { showLang = true }
                         HairLine(inset: 16)
-                        settingRow(L("意见反馈"), "") { showFeedback = true }
+                        settingRow(Tr("意见反馈"), "") { showFeedback = true }
                         HairLine(inset: 16)
-                        settingRow(L("关于我们 · 版本更新"), "1.0 · " + AppInfo.build) { showAbout = true }
+                        settingRow(Tr("关于我们 · 版本更新"), "1.0 · " + AppInfo.build) { showAbout = true }
                     }
 
                     Button {
@@ -316,22 +316,22 @@ struct SettingsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
-        .confirmationDialog(L("聊天背景"), isPresented: $showBg, titleVisibility: .visible) {
-            Button(L("从相册选一张")) { showBgPick = true }
-            Button(L("恢复默认")) {
+        .confirmationDialog(Tr("聊天背景"), isPresented: $showBg, titleVisibility: .visible) {
+            Button(Tr("从相册选一张")) { showBgPick = true }
+            Button(Tr("恢复默认")) {
                 Task {
                     await API.shared.changeBackground("auto")
                     app.me = try? await API.shared.me()
-                    app.show(L("已恢复默认背景"))
+                    app.show(Tr("已恢复默认背景"))
                 }
             }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("取消"), role: .cancel) { }
         }
-        .confirmationDialog(L("外观"), isPresented: $showTheme, titleVisibility: .visible) {
-            Button(L("跟随系统")) { app.setAppearance("auto") }
-            Button(L("浅色")) { app.setAppearance("light") }
-            Button(L("深色")) { app.setAppearance("dark") }
-            Button(L("取消"), role: .cancel) { }
+        .confirmationDialog(Tr("外观"), isPresented: $showTheme, titleVisibility: .visible) {
+            Button(Tr("跟随系统")) { app.setAppearance("auto") }
+            Button(Tr("浅色")) { app.setAppearance("light") }
+            Button(Tr("深色")) { app.setAppearance("dark") }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .sheet(isPresented: $showBgPick) {
             PhotoPicker { image in changeBg(image) }
@@ -339,21 +339,21 @@ struct SettingsView: View {
         .sheet(isPresented: $showFeedback) { FeedbackView() }
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPairApprove) { PairApproveView() }
-        .confirmationDialog(L("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
-            Button(L("简体中文")) { setLang("zh") }
+        .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
+            Button(Tr("简体中文")) { setLang("zh") }
             Button("English") { setLang("en") }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .task { hasPay = await API.shared.hasPayPassword() }
-        .confirmationDialog(L("确定退出登录？"), isPresented: $confirmLogout, titleVisibility: .visible) {
-            Button(L("退出登录"), role: .destructive) {
+        .confirmationDialog(Tr("确定退出登录？"), isPresented: $confirmLogout, titleVisibility: .visible) {
+            Button(Tr("退出登录"), role: .destructive) {
                 busy = true
                 Task {
                     await app.logout()
                     busy = false
                 }
             }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("取消"), role: .cancel) { }
         }
     }
 
@@ -369,7 +369,7 @@ struct SettingsView: View {
             if let url = try? await API.shared.upload(image: image) {
                 await API.shared.changeBackground(url)
                 app.me = try? await API.shared.me()
-                app.show(L("聊天背景换好了"))
+                app.show(Tr("聊天背景换好了"))
             }
             busy = false
         }

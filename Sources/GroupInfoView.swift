@@ -54,7 +54,7 @@ struct GroupInfoView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("聊天信息"), back: { dismiss() })
+            NavBar(title: Tr("聊天信息"), back: { dismiss() })
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 8) {
@@ -90,24 +90,24 @@ struct GroupInfoView: View {
         .sheet(isPresented: $showRename) { renameEditor }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
         .sheet(isPresented: $showQR) { GroupQRView(chat: chat) }
-        .confirmationDialog(L("清空聊天记录？"), isPresented: $confirmClear, titleVisibility: .visible) {
-            Button(L("清空"), role: .destructive) { clearHistory() }
-            Button(L("取消"), role: .cancel) { }
+        .confirmationDialog(Tr("清空聊天记录？"), isPresented: $confirmClear, titleVisibility: .visible) {
+            Button(Tr("清空"), role: .destructive) { clearHistory() }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .confirmationDialog(isOwner ? "解散并退出群聊？" : "退出群聊？",
                             isPresented: $confirmQuit, titleVisibility: .visible) {
             Button(isOwner ? "解散并退出" : "退出", role: .destructive) { quitGroup() }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .confirmationDialog(kickMode == "kick" ? "把 TA 移出群聊？" : "禁言 TA？",
                             isPresented: Binding(get: { kickTarget != nil }, set: { if !$0 { kickTarget = nil } }),
                             titleVisibility: .visible) {
             if kickMode == "kick" {
-                Button(L("移出群聊"), role: .destructive) { kick() }
+                Button(Tr("移出群聊"), role: .destructive) { kick() }
             } else {
-                Button(L("禁言"), role: .destructive) { muteMember() }
+                Button(Tr("禁言"), role: .destructive) { muteMember() }
             }
-            Button(L("取消"), role: .cancel) { kickTarget = nil }
+            Button(Tr("取消"), role: .cancel) { kickTarget = nil }
         }
     }
 
@@ -170,11 +170,11 @@ struct GroupInfoView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(L("取消")) { showAnnounce = false; showRename = false }
+                    Button(Tr("取消")) { showAnnounce = false; showRename = false }
                 }
                 if editable {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(L("保存")) { onSave() }.font(pf(16, .medium))
+                        Button(Tr("保存")) { onSave() }.font(pf(16, .medium))
                     }
                 }
             }
@@ -188,21 +188,21 @@ struct GroupInfoView: View {
             } else {
                 announce = announceDraft
                 showAnnounce = false
-                app.show(L("群公告已更新"))
+                app.show(Tr("群公告已更新"))
             }
         }
     }
 
     private func saveName() {
         let n = nameDraft.trimmingCharacters(in: .whitespaces)
-        if n.isEmpty { app.show(L("群名称不能为空")); return }
+        if n.isEmpty { app.show(Tr("群名称不能为空")); return }
         Task {
             if let err = await API.shared.updateChatInfo(chatId: chat.id, name: n, announce: announce) {
                 app.show(err)
             } else {
                 showRename = false
                 await app.loadChats()
-                app.show(L("群名称已修改"))
+                app.show(Tr("群名称已修改"))
             }
         }
     }
@@ -212,7 +212,7 @@ struct GroupInfoView: View {
             if let err = await API.shared.clearChat(chatId: chat.id) {
                 app.show(err)
             } else {
-                app.show(L("聊天记录已清空"))
+                app.show(Tr("聊天记录已清空"))
             }
         }
     }
@@ -297,16 +297,16 @@ struct GroupInfoView: View {
                                 Button {
                                     kickMode = "kick"
                                     kickTarget = u
-                                } label: { Label(L("移出群聊"), systemImage: "person.badge.minus") }
+                                } label: { Label(Tr("移出群聊"), systemImage: "person.badge.minus") }
                                 Button {
                                     kickMode = "mute"
                                     kickTarget = u
-                                } label: { Label(L("禁言"), systemImage: "speaker.slash") }
+                                } label: { Label(Tr("禁言"), systemImage: "speaker.slash") }
                                 Button {
                                     Task { _ = await API.shared.setMemberMuted(chatId: chat.id, userId: u.id, muted: false) }
-                                } label: { Label(L("取消禁言"), systemImage: "speaker.wave.2") }
+                                } label: { Label(Tr("取消禁言"), systemImage: "speaker.wave.2") }
                             } else {
-                                Button { } label: { Label(L("只有群主能管理成员"), systemImage: "info.circle") }
+                                Button { } label: { Label(Tr("只有群主能管理成员"), systemImage: "info.circle") }
                             }
                         }
                     }
@@ -326,7 +326,7 @@ struct GroupInfoView: View {
             Button {
                 nameDraft = chat.name
                 if isOwner { showRename = true }
-                else { app.show(L("只有群主能改群名称")) }
+                else { app.show(Tr("只有群主能改群名称")) }
             } label: {
                 infoRow("群聊名称", chat.name, chevron: true)
             }
@@ -368,7 +368,7 @@ struct GroupInfoView: View {
     private var switchCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Text(L("置顶聊天"))
+                Text(Tr("置顶聊天"))
                     .font(pf(16))
                     .foregroundColor(C.label)
                 Spacer(minLength: 8)
@@ -393,7 +393,7 @@ struct GroupInfoView: View {
             if isOwner {
                 /* 群禁言：开了以后只有群主能说话（对应清单里的「群禁言」） */
                 HStack(spacing: 10) {
-                    Text(L("全员禁言"))
+                    Text(Tr("全员禁言"))
                         .font(pf(16))
                         .foregroundColor(C.label)
                     Spacer(minLength: 8)
@@ -418,7 +418,7 @@ struct GroupInfoView: View {
             }
             /* 群屏蔽：消息免打扰（每个人自己设） */
             HStack(spacing: 10) {
-                Text(L("消息免打扰"))
+                Text(Tr("消息免打扰"))
                     .font(pf(16))
                     .foregroundColor(C.label)
                 Spacer(minLength: 8)
@@ -448,7 +448,7 @@ struct GroupInfoView: View {
         VStack(spacing: 0) {
             Button { showSearch = true } label: {
                 HStack(spacing: 10) {
-                    Text(L("查找聊天记录")).font(pf(16)).foregroundColor(C.label)
+                    Text(Tr("查找聊天记录")).font(pf(16)).foregroundColor(C.label)
                     Spacer(minLength: 8)
                     Chevron(size: 9, line: 1.6)
                 }
@@ -460,7 +460,7 @@ struct GroupInfoView: View {
             divider
             Button { showQR = true } label: {
                 HStack(spacing: 10) {
-                    Text(L("群二维码")).font(pf(16)).foregroundColor(C.label)
+                    Text(Tr("群二维码")).font(pf(16)).foregroundColor(C.label)
                     Spacer(minLength: 8)
                     Chevron(size: 9, line: 1.6)
                 }
@@ -472,7 +472,7 @@ struct GroupInfoView: View {
             divider
             Button { confirmClear = true } label: {
                 HStack(spacing: 10) {
-                    Text(L("清空聊天记录")).font(pf(16)).foregroundColor(C.label)
+                    Text(Tr("清空聊天记录")).font(pf(16)).foregroundColor(C.label)
                     Spacer(minLength: 8)
                     Chevron(size: 9, line: 1.6)
                 }
@@ -500,10 +500,10 @@ struct GroupInfoView: View {
                     await app.loadChats()
                     saving = false
                     dismiss()
-                    app.show(L("已删除该聊天"))
+                    app.show(Tr("已删除该聊天"))
                 }
             } label: {
-                Text(L("删除该聊天"))
+                Text(Tr("删除该聊天"))
                     .font(pf(16))
                     .foregroundColor(C.red)
                     .frame(maxWidth: .infinity)

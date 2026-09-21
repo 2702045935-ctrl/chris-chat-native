@@ -206,7 +206,7 @@ struct CallView: View {
             if call.remoteVideo == nil {
                 VStack(spacing: 10) {
                     ProgressView().tint(.white)
-                    Text(L("正在连接画面…"))
+                    Text(Tr("正在连接画面…"))
                         .font(pfExact(14))
                         .foregroundColor(.white.opacity(0.75))
                 }
@@ -459,7 +459,7 @@ struct CallView: View {
             Button {
                 call.restore()
             } label: {
-                Text(L("回到通话")).font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
+                Text(Tr("回到通话")).font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
             }
             .buttonStyle(.plain)
             Button {
@@ -504,12 +504,12 @@ struct CallView: View {
                         .buttonStyle(.plain)
                     }
                 } header: {
-                    Text(L("邀请好友加入通话"))
+                    Text(Tr("邀请好友加入通话"))
                 } footer: {
-                    Text(L("对方会收到一条邀请消息；多人同时在同一个通话里（会议模式）还在做，先保证人能叫到。"))
+                    Text(Tr("对方会收到一条邀请消息；多人同时在同一个通话里（会议模式）还在做，先保证人能叫到。"))
                 }
             }
-            .navigationTitle(L("添加通话"))
+            .navigationTitle(Tr("添加通话"))
             .navigationBarTitleDisplayMode(.inline)
         }
     }

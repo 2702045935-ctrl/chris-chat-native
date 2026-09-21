@@ -102,9 +102,9 @@ struct ChatDetailView: View {
 
     /// 打给真人（WebRTC）：语音或视频
     private func startRealCall(video: Bool) {
-        guard !isGroup else { app.show(L("群聊通话还没做，先在单聊里打")); return }
-        guard let peer = peerUserId else { app.show(L("找不到对方账号，先刷新一下会话")); return }
-        if CallCenter.shared.phase != .idle { app.show(L("正在通话中")); return }
+        guard !isGroup else { app.show(Tr("群聊通话还没做，先在单聊里打")); return }
+        guard let peer = peerUserId else { app.show(Tr("找不到对方账号，先刷新一下会话")); return }
+        if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
         CallCenter.shared.start(peerId: peer, name: chat.name, avatar: chat.avatar ?? "", video: video)
     }
 
@@ -200,7 +200,7 @@ struct ChatDetailView: View {
                             .font(pf(13.5))
                             .foregroundColor(.white)
                         Spacer(minLength: 0)
-                        Text(L("回到通话 ›"))
+                        Text(Tr("回到通话 ›"))
                             .font(pf(13.5))
                             .foregroundColor(.white.opacity(0.9))
                     }
@@ -214,21 +214,21 @@ struct ChatDetailView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { composer }
         /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */
-        .confirmationDialog(L("聊天"), isPresented: $showChatMenu, titleVisibility: .hidden) {
+        .confirmationDialog(Tr("聊天"), isPresented: $showChatMenu, titleVisibility: .hidden) {
             if isGroup {
-                Button(L("聊天信息")) { showGroupInfo = true }
-                Button(L("查找聊天记录")) { showSearch = true }
+                Button(Tr("聊天信息")) { showGroupInfo = true }
+                Button(Tr("查找聊天记录")) { showSearch = true }
             }
             if (chat.botRank ?? 9) < 9 {
-                Button(L("语音通话")) { showCall = true }
-                Button(L("视频通话")) { showCall = true }
+                Button(Tr("语音通话")) { showCall = true }
+                Button(Tr("视频通话")) { showCall = true }
             } else {
-                Button(L("语音通话")) { startRealCall(video: false) }
-                Button(L("视频通话")) { startRealCall(video: true) }
+                Button(Tr("语音通话")) { startRealCall(video: false) }
+                Button(Tr("视频通话")) { startRealCall(video: true) }
             }
-            Button(L("聊天背景")) { app.show(L("换聊天背景：点「我 → 设置 → 聊天背景」")) }
-            Button(L("刷新消息")) { Task { await load(initial: true) } }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("聊天背景")) { app.show(Tr("换聊天背景：点「我 → 设置 → 聊天背景」")) }
+            Button(Tr("刷新消息")) { Task { await load(initial: true) } }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .swipeBack { dismiss() }
         .hidesTabBar()
@@ -331,19 +331,19 @@ struct ChatDetailView: View {
                                         Button(role: .destructive) {
                                             recall(message)
                                         } label: {
-                                            Label(L("撤回"), systemImage: "arrow.uturn.backward")
+                                            Label(Tr("撤回"), systemImage: "arrow.uturn.backward")
                                         }
                                     }
                                     Button {
                                         UIPasteboard.general.string = message.body
-                                        app.show(L("已复制"))
+                                        app.show(Tr("已复制"))
                                     } label: {
-                                        Label(L("复制"), systemImage: "doc.on.doc")
+                                        Label(Tr("复制"), systemImage: "doc.on.doc")
                                     }
                                     Button(role: .destructive) {
                                         report(message)
                                     } label: {
-                                        Label(L("举报"), systemImage: "exclamationmark.bubble")
+                                        Label(Tr("举报"), systemImage: "exclamationmark.bubble")
                                     }
                                 }
                             }
@@ -412,7 +412,7 @@ struct ChatDetailView: View {
             HStack(spacing: 6) {
                 Button {
                     /* 点一下：提示"按住说话"（真正的录音在下面的长按手势里） */
-                    app.show(L("按住左边的麦克风说话，松开发送，上滑取消"))
+                    app.show(Tr("按住左边的麦克风说话，松开发送，上滑取消"))
                 } label: {
                     SVGIcon(markup: I.voice, size: L.composerIcon,
                             color: recorder.recording ? C.green : C.chatBarIcon)
@@ -475,7 +475,7 @@ struct ChatDetailView: View {
                     Button {
                         sendText()
                     } label: {
-                        Text(L("发送"))
+                        Text(Tr("发送"))
                             .font(pf(16, .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 13)
@@ -558,16 +558,16 @@ struct ChatDetailView: View {
             }
         case "voice":
             panel = .none
-            app.show(L("按住输入框左边的麦克风说话：松开发送，上滑取消"))
+            app.show(Tr("按住输入框左边的麦克风说话：松开发送，上滑取消"))
         case "redpacket":
             panel = .none
             send(kind: "text", content: "🧧 恭喜发财，大吉大利")
         case "favorite":
             panel = .none
-            app.show(L("收藏夹还是空的"))
+            app.show(Tr("收藏夹还是空的"))
         case "card":
             panel = .none
-            app.show(L("名片：去「通讯录」点头像即可发送"))
+            app.show(Tr("名片：去「通讯录」点头像即可发送"))
         default:
             app.show("\(item.label ?? "")排在下一批")
         }
@@ -601,7 +601,7 @@ struct ChatDetailView: View {
         if let u = app.contact(for: id) { cardUser = u; return }
         Task {
             if let u = try? await API.shared.user(id: id) { cardUser = u }
-            else { app.show(L("打不开这个人的名片")) }
+            else { app.show(Tr("打不开这个人的名片")) }
         }
     }
 
@@ -647,7 +647,7 @@ struct ChatDetailView: View {
             uploading = true
             defer { uploading = false }
             guard let data = try? Data(contentsOf: url), !data.isEmpty else {
-                app.show(L("录音读不到，再录一次"))
+                app.show(Tr("录音读不到，再录一次"))
                 return
             }
             let payload: [String: Any] = [
@@ -673,7 +673,7 @@ struct ChatDetailView: View {
             let ok = url.startAccessingSecurityScopedResource()
             defer { if ok { url.stopAccessingSecurityScopedResource() } }
             guard let data = try? Data(contentsOf: url), !data.isEmpty else {
-                app.show(L("读不到这个文件"))
+                app.show(Tr("读不到这个文件"))
                 return
             }
             let b64 = data.base64EncodedString()
@@ -720,7 +720,7 @@ struct ChatDetailView: View {
             await API.shared.report(userId: target, chatId: chat.id,
                                     reason: "聊天内容举报",
                                     content: String(message.body.prefix(200)))
-            app.show(L("已举报，管理员会处理"))
+            app.show(Tr("已举报，管理员会处理"))
         }
     }
 
@@ -747,7 +747,7 @@ struct ChatDetailView: View {
                 messages = result.messages
             }
         } catch {
-            if initial { app.show(L("聊天记录加载失败")) }
+            if initial { app.show(Tr("聊天记录加载失败")) }
         }
         loading = false
     }
@@ -987,7 +987,7 @@ struct MessageRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             guard let url = API.shared.assetURL(path) else {
-                app.show(L("这条语音找不到了"))
+                app.show(Tr("这条语音找不到了"))
                 return
             }
             voicePlayer.toggle(id: message.id, url: url)

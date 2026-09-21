@@ -1,8 +1,8 @@
 import SwiftUI
 
 /* 英文版：所有界面文案的中英对照表。
-   Lang.code == "en" 时 L("中文") 返回英文；没收录的串原样返回中文。 */
-func L(_ zh: String) -> String {
+   Lang.code == "en" 时 Tr("中文") 返回英文；没收录的串原样返回中文。 */
+func Tr(_ zh: String) -> String {
     guard Lang.isEnglish else { return zh }
     return L10n.dict[zh] ?? zh
 }

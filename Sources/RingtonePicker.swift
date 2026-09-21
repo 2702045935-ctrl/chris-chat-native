@@ -32,16 +32,16 @@ struct RingtonePicker: View {
                         .buttonStyle(.plain)
                     }
                 } header: {
-                    Text(L("来电铃声"))
+                    Text(Tr("来电铃声"))
                 } footer: {
-                    Text(L("点一下切换并试听；铃声是 App 里合成的，声音走外放，手机静音键也听得见。"))
+                    Text(Tr("点一下切换并试听；铃声是 App 里合成的，声音走外放，手机静音键也听得见。"))
                 }
             }
-            .navigationTitle(L("来电铃声"))
+            .navigationTitle(Tr("来电铃声"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(L("完成")) {
+                    Button(Tr("完成")) {
                         ring.stop()
                         dismiss()
                     }

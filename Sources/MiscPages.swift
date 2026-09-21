@@ -13,13 +13,13 @@ struct FavoritesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("收藏"), back: { dismiss() })
+            NavBar(title: Tr("收藏"), back: { dismiss() })
             List {
                 if loading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 30)
                         .listRowBackground(C.cardBg)
                 } else if items.isEmpty {
-                    Text(L("还没有收藏。聊天里长按消息「收藏」就会出现在这里。"))
+                    Text(Tr("还没有收藏。聊天里长按消息「收藏」就会出现在这里。"))
                         .font(pf(14))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity)
@@ -110,7 +110,7 @@ struct StickerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("表情"), back: { dismiss() })
+            NavBar(title: Tr("表情"), back: { dismiss() })
 
             // 表情包分类（网页版：全部 + 后台配的每个包）
             ScrollView(.horizontal, showsIndicators: false) {
@@ -164,13 +164,13 @@ struct StickerView: View {
         .task {
             packs = (try? await API.shared.stickerPacks()) ?? []
         }
-        .confirmationDialog(L("发给谁？"), isPresented: $picking, titleVisibility: .visible) {
+        .confirmationDialog(Tr("发给谁？"), isPresented: $picking, titleVisibility: .visible) {
             ForEach(app.chats.prefix(12)) { chat in
                 Button("发给 \(chat.name)") {
                     send(to: chat.id)
                 }
             }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("取消"), role: .cancel) { }
         }
     }
 
@@ -185,7 +185,7 @@ struct StickerView: View {
                                            kind: img.isEmpty ? "text" : "image",
                                            content: img.isEmpty ? text : img)
             await app.loadChats()
-            app.show(L("表情已发出"))
+            app.show(Tr("表情已发出"))
         }
     }
 
@@ -225,7 +225,7 @@ struct StatusView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("状态"), back: { dismiss() })
+            NavBar(title: Tr("状态"), back: { dismiss() })
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -280,7 +280,7 @@ struct StatusView: View {
                 Button {
                     clear()
                 } label: {
-                    Text(L("取消当前状态"))
+                    Text(Tr("取消当前状态"))
                         .font(pf(15))
                         .foregroundColor(C.red)
                         .frame(maxWidth: .infinity)
@@ -306,7 +306,7 @@ struct StatusView: View {
         Task {
             await API.shared.setMood(item)
             app.me = try? await API.shared.me()
-            app.show(L("状态更新了"))
+            app.show(Tr("状态更新了"))
             dismiss()
         }
     }
@@ -315,7 +315,7 @@ struct StatusView: View {
         Task {
             await API.shared.setMood(nil)
             app.me = try? await API.shared.me()
-            app.show(L("状态已取消"))
+            app.show(Tr("状态已取消"))
             dismiss()
         }
     }
@@ -329,7 +329,7 @@ struct WalletCardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("卡包"), back: { dismiss() })
+            NavBar(title: Tr("卡包"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
                     GroupCard {
@@ -372,14 +372,14 @@ struct WorksView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("作品"), back: { dismiss() })
+            NavBar(title: Tr("作品"), back: { dismiss() })
             if loading && works.isEmpty {
                 Spacer(); ProgressView(); Spacer()
             } else if works.isEmpty {
                 VStack(spacing: 10) {
                     Spacer()
                     Image(systemName: "rectangle.stack").font(pf(34)).foregroundColor(C.subLabel)
-                    Text(L("还没有作品")).font(pf(15)).foregroundColor(C.subLabel)
+                    Text(Tr("还没有作品")).font(pf(15)).foregroundColor(C.subLabel)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
@@ -433,7 +433,7 @@ struct WorksView: View {
                     Text("\(w.likes ?? 0)").font(pf(11.5, .medium))
                     Spacer(minLength: 0)
                     if w.mine == true {
-                        Text(L("我的")).font(pf(10.5)).padding(.horizontal, 5).padding(.vertical, 1)
+                        Text(Tr("我的")).font(pf(10.5)).padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Capsule().fill(C.green))
                     }
                 }

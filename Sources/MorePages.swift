@@ -23,11 +23,11 @@ struct GroupListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("群聊"), back: { dismiss() })
+            NavBar(title: Tr("群聊"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
                     if groups.isEmpty {
-                        Text(L("还没有群聊，在「＋ → 发起群聊」里建一个"))
+                        Text(Tr("还没有群聊，在「＋ → 发起群聊」里建一个"))
                             .font(pf(13.5))
                             .foregroundColor(C.subLabel)
                             .frame(maxWidth: .infinity)
@@ -90,7 +90,7 @@ struct ChatSearchView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("查找聊天记录"), back: { dismiss() })
+            NavBar(title: Tr("查找聊天记录"), back: { dismiss() })
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -193,11 +193,11 @@ struct BankCardsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("银行卡"), back: { dismiss() }) {
+            NavBar(title: Tr("银行卡"), back: { dismiss() }) {
                 Button {
                     showAdd = true
                 } label: {
-                    Text(L("绑定"))
+                    Text(Tr("绑定"))
                         .font(pf(16, .medium))
                         .foregroundColor(C.green)
                         .frame(height: L.navH)
@@ -238,7 +238,7 @@ struct BankCardsView: View {
                                     Button {
                                         unbind(c.id)
                                     } label: {
-                                        Text(L("解绑"))
+                                        Text(Tr("解绑"))
                                             .font(pf(13.5))
                                             .foregroundColor(C.red)
                                     }
@@ -251,7 +251,7 @@ struct BankCardsView: View {
                         }
                         .padding(.top, 8)
                     }
-                    Text(L("只保存银行、尾号和持卡人，完整卡号不会留在手机上。"))
+                    Text(Tr("只保存银行、尾号和持卡人，完整卡号不会留在手机上。"))
                         .font(pf(12))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -307,9 +307,9 @@ struct BankCardsView: View {
                 .padding(.top, 10)
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("绑定银行卡"))
+            .navigationTitle(Tr("绑定银行卡"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { showAdd = false } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { showAdd = false } } }
         }
     }
 
@@ -333,14 +333,14 @@ struct BankCardsView: View {
     private func add() {
         let n = number.trimmingCharacters(in: .whitespaces)
         let h = holder.trimmingCharacters(in: .whitespaces)
-        if n.count < 16 { app.show(L("卡号要 16~19 位")); return }
-        if h.isEmpty { app.show(L("请填持卡人姓名")); return }
+        if n.count < 16 { app.show(Tr("卡号要 16~19 位")); return }
+        if h.isEmpty { app.show(Tr("请填持卡人姓名")); return }
         busy = true
         Task {
             if let err = await API.shared.addBankCard(bank: bank, number: n, holder: h) {
                 app.show(err)
             } else {
-                app.show(L("绑定成功"))
+                app.show(Tr("绑定成功"))
                 showAdd = false
                 number = ""
                 holder = ""
@@ -355,7 +355,7 @@ struct BankCardsView: View {
             if let err = await API.shared.deleteBankCard(id: id) {
                 app.show(err)
             } else {
-                app.show(L("已解绑"))
+                app.show(Tr("已解绑"))
                 await reload()
             }
         }
@@ -374,7 +374,7 @@ struct FeedbackView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("意见反馈"), back: { dismiss() }) {
+            NavBar(title: Tr("意见反馈"), back: { dismiss() }) {
                 Button {
                     send()
                 } label: {
@@ -391,7 +391,7 @@ struct FeedbackView: View {
                 VStack(spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         if content.isEmpty {
-                            Text(L("说说遇到的问题，或者你希望加什么功能…"))
+                            Text(Tr("说说遇到的问题，或者你希望加什么功能…"))
                                 .font(pf(15))
                                 .foregroundColor(C.subLabel)
                                 .padding(.horizontal, 16)
@@ -408,7 +408,7 @@ struct FeedbackView: View {
 
                     GroupCard {
                         HStack(spacing: 10) {
-                            Text(L("联系方式")).font(pf(16)).foregroundColor(C.label)
+                            Text(Tr("联系方式")).font(pf(16)).foregroundColor(C.label)
                             Spacer(minLength: 8)
                             TextField("手机号 / 微信号（可不填）", text: $contact)
                                 .font(pf(15))
@@ -419,7 +419,7 @@ struct FeedbackView: View {
                     }
                     .padding(.top, 8)
 
-                    Text(L("提交后会存到服务器 data/feedback.jsonl，后台「用户反馈」里能看。"))
+                    Text(Tr("提交后会存到服务器 data/feedback.jsonl，后台「用户反馈」里能看。"))
                         .font(pf(12))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -438,7 +438,7 @@ struct FeedbackView: View {
 
     private func send() {
         let text = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty { app.show(L("先写点内容")); return }
+        if text.isEmpty { app.show(Tr("先写点内容")); return }
         busy = true
         Task {
             if let err = await API.shared.sendFeedback(content: text, contact: contact) {
@@ -446,7 +446,7 @@ struct FeedbackView: View {
             } else {
                 content = ""
                 contact = ""
-                app.show(L("感谢反馈，已经收到"))
+                app.show(Tr("感谢反馈，已经收到"))
                 dismiss()
             }
             busy = false
@@ -465,7 +465,7 @@ struct AboutView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("关于我们"), back: { dismiss() })
+            NavBar(title: Tr("关于我们"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 10) {
@@ -493,7 +493,7 @@ struct AboutView: View {
                             checkVersion()
                         } label: {
                             HStack {
-                                Text(L("版本更新")).font(pf(16)).foregroundColor(C.label)
+                                Text(Tr("版本更新")).font(pf(16)).foregroundColor(C.label)
                                 Spacer()
                                 Text(checking ? "检查中…" : (latest.isEmpty ? "检查更新" : latest))
                                     .font(pf(14))
@@ -507,7 +507,7 @@ struct AboutView: View {
                         .buttonStyle(.plain)
                         HairLine(inset: 16)
                         HStack {
-                            Text(L("服务器")).font(pf(16)).foregroundColor(C.label)
+                            Text(Tr("服务器")).font(pf(16)).foregroundColor(C.label)
                             Spacer()
                             Text(API.shared.base)
                                 .font(pf(13))
@@ -519,7 +519,7 @@ struct AboutView: View {
                         .frame(height: 52)
                     }
 
-                    Text(L("自建即时通讯：账号、聊天记录、朋友圈都存在你自己的服务器上，不上传第三方。"))
+                    Text(Tr("自建即时通讯：账号、聊天记录、朋友圈都存在你自己的服务器上，不上传第三方。"))
                         .font(pf(12.5))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -572,12 +572,12 @@ struct BirthdayPickerSheet: View {
                 Spacer()
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("选择生日"))
+            .navigationTitle(Tr("选择生日"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L("确定")) {
+                    Button(Tr("确定")) {
                         let f = DateFormatter()
                         f.dateFormat = "yyyy-MM-dd"
                         birthday = f.string(from: date)
@@ -620,7 +620,7 @@ struct ResetPasswordSheet: View {
                     HairLine(color: C.navLine)
                     field {
                         TextField("验证码", text: $code).keyboardType(.numberPad)
-                        Button(L("获取验证码")) { sendCode() }
+                        Button(Tr("获取验证码")) { sendCode() }
                             .font(.system(size: 14))
                             .foregroundColor(C.loginGreen)
                     }
@@ -646,7 +646,7 @@ struct ResetPasswordSheet: View {
                     .disabled(busy)
                     .padding(.top, 20)
 
-                    Text(L("验证码和「手机号登录」共用，5 分钟内有效。重置后其他设备会自动退出登录。"))
+                    Text(Tr("验证码和「手机号登录」共用，5 分钟内有效。重置后其他设备会自动退出登录。"))
                         .font(.system(size: 12.5))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -656,9 +656,9 @@ struct ResetPasswordSheet: View {
                 .padding(.top, 24)
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("密码找回"))
+            .navigationTitle(Tr("密码找回"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } } }
         }
     }
 
@@ -679,7 +679,7 @@ struct ResetPasswordSheet: View {
                 if let dev = try await API.shared.phoneCode(phone: p) {
                     code = dev
                     app.show("验证码：\(dev)")
-                } else { app.show(L("验证码已发送")) }
+                } else { app.show(Tr("验证码已发送")) }
             } catch { self.error = (error as? APIError)?.errorDescription ?? "发送失败" }
         }
     }

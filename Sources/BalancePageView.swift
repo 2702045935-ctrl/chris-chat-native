@@ -47,17 +47,17 @@ struct BalancePageView: View {
         .navigationDestination(isPresented: $showBills) { BillsView() }
         .alert("充值", isPresented: $showRecharge) {
             TextField("金额", text: $rechargeAmount).keyboardType(.decimalPad)
-            Button(L("充值")) { doRecharge() }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("充值")) { doRecharge() }
+            Button(Tr("取消"), role: .cancel) { }
         }
-        .confirmationDialog(L("常见问题"), isPresented: $showFaq, titleVisibility: .visible) {
+        .confirmationDialog(Tr("常见问题"), isPresented: $showFaq, titleVisibility: .visible) {
             ForEach((cfg?.faq ?? []).indices, id: \.self) { i in
                 Button(cfg!.faq![i].q) { faqAnswer = cfg!.faq![i].a }
             }
-            Button(L("关闭"), role: .cancel) { }
+            Button(Tr("关闭"), role: .cancel) { }
         }
         .alert("常见问题", isPresented: Binding(get: { faqAnswer != nil }, set: { if !$0 { faqAnswer = nil } })) {
-            Button(L("知道了"), role: .cancel) { faqAnswer = nil }
+            Button(Tr("知道了"), role: .cancel) { faqAnswer = nil }
         } message: {
             Text(faqAnswer ?? "")
         }
@@ -157,7 +157,7 @@ struct BalancePageView: View {
         switch action {
         case "recharge": rechargeAmount = ""; showRecharge = true
         case "bills": showBills = true
-        case "withdraw": app.show(L("提现：还没接后端，先把页面做出来"))
+        case "withdraw": app.show(Tr("提现：还没接后端，先把页面做出来"))
         case "faq": showFaq = true
         default: app.show("「\(label)」还没接后端，先把页面做出来")
         }
@@ -165,7 +165,7 @@ struct BalancePageView: View {
 
     private func doRecharge() {
         guard let amount = Double(rechargeAmount), amount > 0 else {
-            app.show(L("金额不对"))
+            app.show(Tr("金额不对"))
             return
         }
         Task {
@@ -174,7 +174,7 @@ struct BalancePageView: View {
                 app.show("充值成功，余额 ¥\(String(format: "%.2f", balance))")
                 await load()
             } else {
-                app.show(L("充值失败"))
+                app.show(Tr("充值失败"))
             }
         }
     }

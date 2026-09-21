@@ -21,7 +21,7 @@ struct ProfileEditView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("个人信息"), back: { dismiss() }) {
+            NavBar(title: Tr("个人信息"), back: { dismiss() }) {
                 Button {
                     save()
                 } label: {
@@ -41,7 +41,7 @@ struct ProfileEditView: View {
                             showPhoto = true
                         } label: {
                             HStack(spacing: 12) {
-                                Text(L("头像")).font(pf(17)).foregroundColor(C.label)
+                                Text(Tr("头像")).font(pf(17)).foregroundColor(C.label)
                                 Spacer()
                                 Avatar(path: app.me?.avatarPath ?? "", size: 56, radius: 6)
                                 Chevron(size: 9, line: 1.6).padding(.trailing, 3)
@@ -59,11 +59,11 @@ struct ProfileEditView: View {
 
                     GroupCard {
                         HStack(spacing: 12) {
-                            Text(L("性别")).font(pf(17)).foregroundColor(C.label)
+                            Text(Tr("性别")).font(pf(17)).foregroundColor(C.label)
                             Spacer()
                             Picker("", selection: $gender) {
-                                Text(L("男")).tag("male")
-                                Text(L("女")).tag("female")
+                                Text(Tr("男")).tag("male")
+                                Text(Tr("女")).tag("female")
                             }
                             .pickerStyle(.segmented)
                             .frame(width: 140)
@@ -78,7 +78,7 @@ struct ProfileEditView: View {
                             showBirthday = true
                         } label: {
                             HStack(spacing: 12) {
-                                Text(L("生日")).font(pf(17)).foregroundColor(C.label)
+                                Text(Tr("生日")).font(pf(17)).foregroundColor(C.label)
                                 Spacer()
                                 Text(birthday.isEmpty ? "未设置" : birthday)
                                     .font(pf(15))
@@ -105,7 +105,7 @@ struct ProfileEditView: View {
                             showRingtone = true
                         } label: {
                             HStack(spacing: 12) {
-                                Text(L("来电铃声")).font(pf(17)).foregroundColor(C.label)
+                                Text(Tr("来电铃声")).font(pf(17)).foregroundColor(C.label)
                                 Spacer()
                                 Text(ring.currentName)
                                     .font(pf(15))
@@ -119,7 +119,7 @@ struct ProfileEditView: View {
                         .buttonStyle(.plain)
                     }
 
-                    Text(L("手机号一年只能改一次；头像、昵称、地区、签名想改就改。"))
+                    Text(Tr("手机号一年只能改一次；头像、昵称、地区、签名想改就改。"))
                         .font(pf(12.5))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,7 +182,7 @@ struct ProfileEditView: View {
             if let url = try? await API.shared.upload(image: image) {
                 await API.shared.updateMe(["avatar": url])
                 app.me = try? await API.shared.me()
-                app.show(L("头像换好了"))
+                app.show(Tr("头像换好了"))
             }
             busy = false
         }
@@ -203,7 +203,7 @@ struct ProfileEditView: View {
             app.me = try? await API.shared.me()
             await app.loadContacts()
             busy = false
-            app.show(L("已保存"))
+            app.show(Tr("已保存"))
             dismiss()
         }
     }
@@ -221,14 +221,14 @@ struct NewFriendsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("新的朋友"), back: { dismiss() })
+            NavBar(title: Tr("新的朋友"), back: { dismiss() })
             List {
                 if loading && incoming.isEmpty && outgoing.isEmpty {
                     HStack { Spacer(); ProgressView(); Spacer() }
                         .listRowBackground(C.cardBg)
                 }
                 if incoming.isEmpty && outgoing.isEmpty && !loading {
-                    Text(L("还没有好友申请"))
+                    Text(Tr("还没有好友申请"))
                         .font(pf(15))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity)
@@ -240,16 +240,16 @@ struct NewFriendsView: View {
                         Avatar(path: user.avatarPath, size: 48, radius: 8)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(user.name).font(pf(17)).foregroundColor(C.label)
-                            Text(L("请求加你为好友")).font(pf(13)).foregroundColor(C.subLabel)
+                            Text(Tr("请求加你为好友")).font(pf(13)).foregroundColor(C.subLabel)
                         }
                         Spacer()
-                        Button(L("同意")) { respond(user, true) }
+                        Button(Tr("同意")) { respond(user, true) }
                             .font(pf(15))
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .frame(height: 30)
                             .background(RoundedRectangle(cornerRadius: 6).fill(C.green))
-                        Button(L("拒绝")) { respond(user, false) }
+                        Button(Tr("拒绝")) { respond(user, false) }
                             .font(pf(15))
                             .foregroundColor(C.subLabel)
                     }
@@ -264,7 +264,7 @@ struct NewFriendsView: View {
                         Avatar(path: user.avatarPath, size: 48, radius: 8)
                         Text(user.name).font(pf(17)).foregroundColor(C.label)
                         Spacer()
-                        Text(L("等待验证")).font(pf(14)).foregroundColor(C.subLabel)
+                        Text(Tr("等待验证")).font(pf(14)).foregroundColor(C.subLabel)
                     }
                     .padding(.horizontal, 16)
                     .frame(height: 72)
@@ -317,7 +317,7 @@ struct AddFriendView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("加好友"), back: { dismiss() })
+            NavBar(title: Tr("加好友"), back: { dismiss() })
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(C.subLabel)
@@ -346,7 +346,7 @@ struct AddFriendView: View {
                 if let message = message {
                     Text(message).font(pf(14)).foregroundColor(C.subLabel)
                 }
-                Text(L("对方用户名可以在他的名片里看到。"))
+                Text(Tr("对方用户名可以在他的名片里看到。"))
                     .font(pf(12.5))
                     .foregroundColor(C.subLabel)
                 Spacer()
@@ -390,7 +390,7 @@ struct GroupCreateView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("发起群聊"), back: { dismiss() }) {
+            NavBar(title: Tr("发起群聊"), back: { dismiss() }) {
                 Button {
                     create()
                 } label: {
@@ -450,8 +450,8 @@ struct GroupCreateView: View {
 
     private func create() {
         let groupName = name.trimmingCharacters(in: .whitespaces)
-        if groupName.isEmpty { app.show(L("先填个群名称")); return }
-        if picked.isEmpty { app.show(L("至少选一个好友")); return }
+        if groupName.isEmpty { app.show(Tr("先填个群名称")); return }
+        if picked.isEmpty { app.show(Tr("至少选一个好友")); return }
         busy = true
         Task {
             do {
@@ -459,7 +459,7 @@ struct GroupCreateView: View {
                     await app.loadChats()
                     onCreated(chat)
                     dismiss()
-                    app.show(L("群建好了"))
+                    app.show(Tr("群建好了"))
                 }
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "创建失败")
@@ -583,10 +583,10 @@ struct ServiceView: View {
         .hidesTabBar()
         .navigationDestination(isPresented: $showWallet) { WalletView() }
         .navigationDestination(isPresented: $showBillsPage) { BillsView() }
-        .confirmationDialog(L("服务"), isPresented: $showMore, titleVisibility: .hidden) {
-            Button(L("刷新账单")) { Task { await loadBills() } }
-            Button(L("充值")) { rechargeAmount = ""; showRecharge = true }
-            Button(L("取消"), role: .cancel) { }
+        .confirmationDialog(Tr("服务"), isPresented: $showMore, titleVisibility: .hidden) {
+            Button(Tr("刷新账单")) { Task { await loadBills() } }
+            Button(Tr("充值")) { rechargeAmount = ""; showRecharge = true }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .sheet(isPresented: Binding(
             get: { detailInfo != nil },
@@ -598,8 +598,8 @@ struct ServiceView: View {
         }
         .alert("充值", isPresented: $showRecharge) {
             TextField("金额", text: $rechargeAmount).keyboardType(.decimalPad)
-            Button(L("充值")) { doRecharge() }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("充值")) { doRecharge() }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .task {
             await loadConfig()
@@ -721,7 +721,7 @@ struct ServiceView: View {
     private var billsCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                Text(L("账单"))
+                Text(Tr("账单"))
                     .font(pf(14))
                     .foregroundColor(Color.dyn(0x7A7A7A, 0x8A8A8A))
                 Spacer(minLength: 0)
@@ -731,7 +731,7 @@ struct ServiceView: View {
                 Button {
                     showBillsPage = true
                 } label: {
-                    Text(L("全部账单"))
+                    Text(Tr("全部账单"))
                         .font(pf(13))
                         .foregroundColor(C.green)
                         .padding(.leading, 14)
@@ -741,7 +741,7 @@ struct ServiceView: View {
                     rechargeAmount = ""
                     showRecharge = true
                 } label: {
-                    Text(L("充值"))
+                    Text(Tr("充值"))
                         .font(pf(13))
                         .foregroundColor(C.green)
                         .padding(.leading, 14)
@@ -754,7 +754,7 @@ struct ServiceView: View {
             if loading {
                 ProgressView().padding(.vertical, 26)
             } else if bills.isEmpty {
-                Text(L("还没有账单项"))
+                Text(Tr("还没有账单项"))
                     .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 26)
@@ -803,7 +803,7 @@ struct ServiceView: View {
         case "wallet":
             showWallet = true          // 进「钱包」页（照参考图做的那一页）
         case "pay":
-            app.show(L("收付款：还没接后端，先把页面做出来"))
+            app.show(Tr("收付款：还没接后端，先把页面做出来"))
         default:
             app.show("「\(label)」还没接后端，先把页面做出来")
         }
@@ -817,7 +817,7 @@ struct ServiceView: View {
 
     private func doRecharge() {
         guard let amount = Double(rechargeAmount), amount > 0 else {
-            app.show(L("金额不对"))
+            app.show(Tr("金额不对"))
             return
         }
         Task {
@@ -825,7 +825,7 @@ struct ServiceView: View {
                 app.me = try? await API.shared.me()
                 app.show("充值成功，余额 ¥\(String(format: "%.2f", balance))")
             } else {
-                app.show(L("充值失败"))
+                app.show(Tr("充值失败"))
             }
         }
     }

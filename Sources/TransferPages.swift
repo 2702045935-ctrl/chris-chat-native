@@ -66,7 +66,7 @@ struct TransferHomeView: View {
 
                 // 转账金额
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(L("转账金额"))
+                    Text(Tr("转账金额"))
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
 
@@ -107,7 +107,7 @@ struct TransferHomeView: View {
                         onClose: onClose
                     )
                 } label: {
-                    Text(L("下一步"))
+                    Text(Tr("下一步"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -120,7 +120,7 @@ struct TransferHomeView: View {
             .padding(.horizontal, 20)
         }
         .background(Color(.systemBackground).ignoresSafeArea())
-        .navigationTitle(L("转账"))
+        .navigationTitle(Tr("转账"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -178,32 +178,32 @@ struct TransferConfirmView: View {
 
                 // 收款信息卡片
                 VStack(spacing: 16) {
-                    Text(L("确认转账信息"))
+                    Text(Tr("确认转账信息"))
                         .font(.system(size: 18, weight: .semibold))
 
                     HStack {
-                        Text(L("收款人")).foregroundColor(.secondary)
+                        Text(Tr("收款人")).foregroundColor(.secondary)
                         Spacer()
                         Text(receiverName)
                     }
                     HStack {
-                        Text(L("收款账号")).foregroundColor(.secondary)
+                        Text(Tr("收款账号")).foregroundColor(.secondary)
                         Spacer()
                         Text(receiverAccount)
                     }
                     HStack {
-                        Text(L("转账金额")).foregroundColor(.secondary)
+                        Text(Tr("转账金额")).foregroundColor(.secondary)
                         Spacer()
                         Text("¥\(amount)").font(pfMoney(16))
                     }
                     HStack {
-                        Text(L("手续费")).foregroundColor(.secondary)
+                        Text(Tr("手续费")).foregroundColor(.secondary)
                         Spacer()
                         Text("¥\(fee)")
                     }
                     if !remark.isEmpty {
                         HStack {
-                            Text(L("备注")).foregroundColor(.secondary)
+                            Text(Tr("备注")).foregroundColor(.secondary)
                             Spacer()
                             Text(remark)
                         }
@@ -212,7 +212,7 @@ struct TransferConfirmView: View {
                     Divider()
 
                     HStack {
-                        Text(L("合计")).font(.system(size: 16, weight: .semibold))
+                        Text(Tr("合计")).font(.system(size: 16, weight: .semibold))
                         Spacer()
                         Text("¥\(amount)")
                             .font(pfMoney(18))
@@ -228,7 +228,7 @@ struct TransferConfirmView: View {
                 NavigationLink {
                     TransferPasswordView(chatId: chatId, amount: amount, remark: remark, onClose: onClose)
                 } label: {
-                    Text(L("确认转账"))
+                    Text(Tr("确认转账"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -239,7 +239,7 @@ struct TransferConfirmView: View {
             .padding(.horizontal, 20)
         }
         .background(Color(.systemBackground).ignoresSafeArea())
-        .navigationTitle(L("确认转账"))
+        .navigationTitle(Tr("确认转账"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -269,7 +269,7 @@ struct TransferPasswordView: View {
     var body: some View {
         VStack(spacing: 30) {
             Spacer(minLength: 30)
-            Text(L("请输入支付密码"))
+            Text(Tr("请输入支付密码"))
                 .font(.system(size: 18, weight: .semibold))
             Text("转账金额 ¥\(amount)")
                 .font(pfMoney(14))
@@ -312,14 +312,14 @@ struct TransferPasswordView: View {
             Button {
                 showForgot = true
             } label: {
-                Text(L("忘记密码？"))
+                Text(Tr("忘记密码？"))
                     .font(.system(size: 14))
                     .foregroundColor(TransferTheme.accent)
             }
         }
         .padding(.horizontal, 20)
         .background(Color(.systemBackground).ignoresSafeArea())
-        .navigationTitle(L("验证支付密码"))
+        .navigationTitle(Tr("验证支付密码"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -328,9 +328,9 @@ struct TransferPasswordView: View {
         }
         .onAppear { focused = true }
         .alert("忘记支付密码", isPresented: $showForgot) {
-            Button(L("知道了"), role: .cancel) { }
+            Button(Tr("知道了"), role: .cancel) { }
         } message: {
-            Text(L("支付密码在「我 → 设置 → 安全中心 → 支付密码」里可以重设；重设后回来继续转账。"))
+            Text(Tr("支付密码在「我 → 设置 → 安全中心 → 支付密码」里可以重设；重设后回来继续转账。"))
         }
         .navigationDestination(isPresented: $done) {
             TransferSuccessView(amount: amount, onClose: onClose)
@@ -374,11 +374,11 @@ struct TransferSuccessView: View {
                 .frame(width: 72, height: 72)
                 .foregroundColor(Color(hexString: "#34C759"))
 
-            Text(L("转账成功"))
+            Text(Tr("转账成功"))
                 .font(.system(size: 22, weight: .semibold))
             Text("¥\(amount)")
                 .font(pfMoney(28))
-            Text(L("预计实时到账"))
+            Text(Tr("预计实时到账"))
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
 
@@ -388,7 +388,7 @@ struct TransferSuccessView: View {
                 Button {
                     onClose()          // 关掉转账流程，去看账单
                 } label: {
-                    Text(L("查看账单"))
+                    Text(Tr("查看账单"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(TransferTheme.accent)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -399,7 +399,7 @@ struct TransferSuccessView: View {
                 Button {
                     onClose()          // 返回首页
                 } label: {
-                    Text(L("返回首页"))
+                    Text(Tr("返回首页"))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, minHeight: 52)
@@ -410,7 +410,7 @@ struct TransferSuccessView: View {
         }
         .padding(.horizontal, 20)
         .background(Color(.systemBackground).ignoresSafeArea())
-        .navigationTitle(L("转账结果"))
+        .navigationTitle(Tr("转账结果"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden)
     }

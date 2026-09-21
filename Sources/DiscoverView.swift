@@ -181,7 +181,7 @@ struct ComingSoonView: View {
     var body: some View {
         VStack(spacing: 12) {
             Text(title).font(pf(17)).foregroundColor(C.label)
-            Text(L("这一页排在下一批")).font(pf(14)).foregroundColor(C.subLabel)
+            Text(Tr("这一页排在下一批")).font(pf(14)).foregroundColor(C.subLabel)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(C.pageBg)
@@ -396,11 +396,11 @@ struct MomentsView: View {
                 await pollNewMoments()
             }
         }
-        .confirmationDialog(L("发表"), isPresented: $cameraMenu, titleVisibility: .visible) {
-            Button(L("拍摄")) { showCamera = true }
-            Button(L("从相册选择")) { showPhoto = true }
-            if target == nil { Button(L("换封面")) { showCoverPhoto = true } }
-            Button(L("取消"), role: .cancel) { }
+        .confirmationDialog(Tr("发表"), isPresented: $cameraMenu, titleVisibility: .visible) {
+            Button(Tr("拍摄")) { showCamera = true }
+            Button(Tr("从相册选择")) { showPhoto = true }
+            if target == nil { Button(Tr("换封面")) { showCoverPhoto = true } }
+            Button(Tr("取消"), role: .cancel) { }
         }
         .sheet(isPresented: $showPhoto) {
             PhotosPicker(limit: 9) { images in
@@ -423,28 +423,28 @@ struct MomentsView: View {
             set: { if !$0 { commenting = nil } }
         )) {
             TextField("说点什么", text: $commentText)
-            Button(L("发送")) { submitComment() }
-            Button(L("取消"), role: .cancel) { commenting = nil }
+            Button(Tr("发送")) { submitComment() }
+            Button(Tr("取消"), role: .cancel) { commenting = nil }
         }
-        .confirmationDialog(L("这条动态"), isPresented: Binding(
+        .confirmationDialog(Tr("这条动态"), isPresented: Binding(
             get: { actionMoment != nil },
             set: { if !$0 { actionMoment = nil } }
         ), titleVisibility: .visible) {
             if let m = actionMoment {
                 if m.likedByMe == true {
-                    Button(L("取消赞")) { like(m) }
+                    Button(Tr("取消赞")) { like(m) }
                 } else {
-                    Button(L("赞")) { like(m) }
+                    Button(Tr("赞")) { like(m) }
                 }
-                Button(L("评论")) {
+                Button(Tr("评论")) {
                     commentText = ""
                     commenting = m
                 }
                 if m.mine == true {
-                    Button(L("删除"), role: .destructive) { remove(m) }
+                    Button(Tr("删除"), role: .destructive) { remove(m) }
                 }
             }
-            Button(L("取消"), role: .cancel) { actionMoment = nil }
+            Button(Tr("取消"), role: .cancel) { actionMoment = nil }
         }
     }
 
@@ -494,7 +494,7 @@ struct MomentsView: View {
                 .onAppear { sentinelGone = false }
                 .onDisappear { sentinelGone = true }
             if moments.isEmpty {
-                Text(L("正在加载朋友圈…"))
+                Text(Tr("正在加载朋友圈…"))
                     .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 40)
@@ -516,7 +516,7 @@ struct MomentsView: View {
                         Task { await loadMoreMoments() }
                     }
             } else if momentTotal > 0 {
-                Text(L("没有更多了"))
+                Text(Tr("没有更多了"))
                     .font(pf(13))
                     .foregroundColor(C.subLabel)
                     .frame(maxWidth: .infinity)
@@ -538,7 +538,7 @@ struct MomentsView: View {
         ZStack {
             // 滚过封面后回到中间出现「朋友圈」（网页版就是这样）
             if solid {
-                Text(L("朋友圈"))
+                Text(Tr("朋友圈"))
                     .font(pf(UIConfig.num("navTitle", 17)))
                     .foregroundColor(C.label)
             }
@@ -605,14 +605,14 @@ struct MomentsView: View {
                     PickedGrid(images: picked) { i in
                         picked.remove(at: i)                  // 点一下＝删掉这张，顺序不变
                     }
-                    Text(L("最多 9 张 · 顺序就是你选图的先后顺序 · 点缩略图可以删掉"))
+                    Text(Tr("最多 9 张 · 顺序就是你选图的先后顺序 · 点缩略图可以删掉"))
                         .font(pf(12))
                         .foregroundColor(C.subLabel)
                 }
                 Button {
                     composerPick = true
                 } label: {
-                    Label(L("添加图片"), systemImage: "photo.on.rectangle")
+                    Label(Tr("添加图片"), systemImage: "photo.on.rectangle")
                         .font(pf(15))
                 }
                 /* 谁可以看（对应功能清单里的「好友公开 / 私密 / 部分可见 / 不给谁看」） */
@@ -641,7 +641,7 @@ struct MomentsView: View {
                 Spacer()
             }
             .padding(16)
-            .navigationTitle(L("发表"))
+            .navigationTitle(Tr("发表"))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $composerPick) {
                 PhotosPicker(limit: max(1, 9 - picked.count)) { images in
@@ -654,20 +654,20 @@ struct MomentsView: View {
                     }
                 }
             }
-            .confirmationDialog(L("谁可以看"), isPresented: $showVisibility, titleVisibility: .visible) {
-                Button(L("公开（所有好友可见）")) { visibility = "public" }
-                Button(L("私密（仅自己可见）")) { visibility = "private" }
-                Button(L("部分可见…")) { visibility = "partial"; pickMode = "partial"; showPick = true }
-                Button(L("不给谁看…")) { visibility = "exclude"; pickMode = "exclude"; showPick = true }
-                Button(L("取消"), role: .cancel) { }
+            .confirmationDialog(Tr("谁可以看"), isPresented: $showVisibility, titleVisibility: .visible) {
+                Button(Tr("公开（所有好友可见）")) { visibility = "public" }
+                Button(Tr("私密（仅自己可见）")) { visibility = "private" }
+                Button(Tr("部分可见…")) { visibility = "partial"; pickMode = "partial"; showPick = true }
+                Button(Tr("不给谁看…")) { visibility = "exclude"; pickMode = "exclude"; showPick = true }
+                Button(Tr("取消"), role: .cancel) { }
             }
             .sheet(isPresented: $showPick) { friendPickSheet }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(L("取消")) { posting = false }
+                    Button(Tr("取消")) { posting = false }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(L("发表")) { publish() }
+                    Button(Tr("发表")) { publish() }
                         .disabled(uploading || (draft.isEmpty && picked.isEmpty))
                 }
             }
@@ -708,7 +708,7 @@ struct MomentsView: View {
             }
             .navigationTitle(pickMode == "partial" ? "选择可见的好友" : "选择不看的好友")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button(L("好了")) { showPick = false } } }
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button(Tr("好了")) { showPick = false } } }
         }
     }
 
@@ -786,7 +786,7 @@ struct MomentsView: View {
                                                 visibility: visibility,
                                                 visibleTo: Array(visibleTo),
                                                 hiddenFrom: Array(hiddenFrom))
-                app.show(L("已发表"))
+                app.show(Tr("已发表"))
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发表失败")
             }
@@ -810,7 +810,7 @@ struct MomentsView: View {
                 if let me = try? await API.shared.me() {
                     app.me = me
                 }
-                app.show(L("封面换好了"))
+                app.show(Tr("封面换好了"))
             }
             uploading = false
         }
@@ -839,7 +839,7 @@ struct MomentsView: View {
             await API.shared.deleteMoment(id: moment.id)
             await reload()
             await app.loadMoments()
-            app.show(L("已删除"))
+            app.show(Tr("已删除"))
         }
     }
 }

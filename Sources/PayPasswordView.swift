@@ -37,7 +37,7 @@ struct PayPasswordView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("支付密码"), back: { dismiss() })
+            NavBar(title: Tr("支付密码"), back: { dismiss() })
 
             VStack(spacing: 0) {
                 Text(title)
@@ -56,7 +56,7 @@ struct PayPasswordView: View {
                         .padding(.horizontal, 30)
                         .padding(.top, 14)
                 } else {
-                    Text(L("支付密码是 6 位数字，转账付款时要输它确认"))
+                    Text(Tr("支付密码是 6 位数字，转账付款时要输它确认"))
                         .font(pf(13))
                         .foregroundColor(C.subLabel)
                         .multilineTextAlignment(.center)

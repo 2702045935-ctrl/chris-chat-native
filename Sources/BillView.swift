@@ -178,7 +178,7 @@ struct BillDetailView: View {
             Button {
                 showMore = true
             } label: {
-                Text(L("账单详情"))
+                Text(Tr("账单详情"))
                     .font(pfExact(14.5))
                     .foregroundColor(C.link)
                     .frame(maxWidth: .infinity)
@@ -194,22 +194,22 @@ struct BillDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
-        .confirmationDialog(L("账单详情"), isPresented: $showMore, titleVisibility: .visible) {
-            Button(L("刷新状态")) {
+        .confirmationDialog(Tr("账单详情"), isPresented: $showMore, titleVisibility: .visible) {
+            Button(Tr("刷新状态")) {
                 Task {
                     if let list = try? await API.shared.messages(chatId: chat.id, limit: 30),
                        let msg = list.messages.last(where: { $0.kindName == "transfer" }),
                        let updated = TransferInfo(json: msg.body) {
                         live = updated
                     }
-                    app.show(L("已经是最新状态"))
+                    app.show(Tr("已经是最新状态"))
                 }
             }
-            Button(L("对订单有疑惑")) {
-                app.show(L("有疑问可以先联系对方，或让管理员在后台查这笔单号"))
+            Button(Tr("对订单有疑惑")) {
+                app.show(Tr("有疑问可以先联系对方，或让管理员在后台查这笔单号"))
             }
-            Button(L("定位到聊天位置")) { dismiss() }
-            Button(L("取消"), role: .cancel) { }
+            Button(Tr("定位到聊天位置")) { dismiss() }
+            Button(Tr("取消"), role: .cancel) { }
         }
     }
 
@@ -231,7 +231,7 @@ struct BillDetailView: View {
 
     private func billAction() {
         if mine {
-            app.show(L("已提醒对方收款"))
+            app.show(Tr("已提醒对方收款"))
             return
         }
         Task {
@@ -242,7 +242,7 @@ struct BillDetailView: View {
                 live = updated
             }
             app.me = try? await API.shared.me()
-            app.show(L("已收款"))
+            app.show(Tr("已收款"))
         }
     }
 }

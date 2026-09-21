@@ -206,7 +206,7 @@ struct AICallView: View {
                     voice.stop()
                     dismiss()
                 } label: {
-                    Text(L("挂断"))
+                    Text(Tr("挂断"))
                         .font(pf(17))
                         .foregroundColor(.white)
                         .frame(width: 150, height: 48)

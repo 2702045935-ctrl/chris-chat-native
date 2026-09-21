@@ -14,10 +14,10 @@ struct PairApproveView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: L("设备确认登录"), back: { dismiss() })
+            NavBar(title: Tr("设备确认登录"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
-                    Text(L("在另一台设备（网页版 / 新手机）上点「微信授权登录」，会显示一个 6 位数字，输在下面，那台设备就能进这台账号。"))
+                    Text(Tr("在另一台设备（网页版 / 新手机）上点「微信授权登录」，会显示一个 6 位数字，输在下面，那台设备就能进这台账号。"))
                         .font(pf(13))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,7 +78,7 @@ struct PairApproveView: View {
             if let err = await API.shared.pairApprove(code: code) {
                 error = err
             } else {
-                app.show(L("已确认，那台设备登录成功"))
+                app.show(Tr("已确认，那台设备登录成功"))
                 dismiss()
             }
             busy = false

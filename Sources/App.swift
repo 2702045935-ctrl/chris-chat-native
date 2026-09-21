@@ -397,7 +397,7 @@ struct LaunchView: View {
                         .frame(width: 66, height: 66)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                Text(L("正在连接…")).font(pf(13)).foregroundColor(C.loginGray)
+                Text(Tr("正在连接…")).font(pf(13)).foregroundColor(C.loginGray)
             }
         }
     }
@@ -442,7 +442,7 @@ struct LoginViewOld: View {
                                 .padding(.top, 12)
                         }
                         if !usePassword {
-                            Text(L("仅上述手机号用于登录验证"))
+                            Text(Tr("仅上述手机号用于登录验证"))
                                 .font(pf(13.5))
                                 .foregroundColor(C.loginGray)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -576,7 +576,7 @@ struct LoginViewOld: View {
                     Image(systemName: syncHistory ? "checkmark.circle.fill" : "circle")
                         .font(pf(15))
                         .foregroundColor(syncHistory ? C.loginGreen : C.loginGray)
-                    Text(L("登录后同步最近的聊天记录"))
+                    Text(Tr("登录后同步最近的聊天记录"))
                         .font(pf(13.5))
                         .foregroundColor(C.loginGray)
                 }
@@ -619,7 +619,7 @@ struct LoginViewOld: View {
             do {
                 let dev = try await API.shared.phoneCode(phone: p)
                 codeSent = true
-                if let c = dev { code = c; app.show("验证码：\(c)") } else { app.show(L("验证码已发送")) }
+                if let c = dev { code = c; app.show("验证码：\(c)") } else { app.show(Tr("验证码已发送")) }
             } catch {
                 self.error = (error as? APIError)?.errorDescription ?? "发送失败"
             }
@@ -656,21 +656,21 @@ struct ServerSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text(L("电脑的局域网地址（IP:端口）"))) {
+                Section(header: Text(Tr("电脑的局域网地址（IP:端口）"))) {
                     TextField("192.168.2.7:5443（加密）", text: $server)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.numbersAndPunctuation)
                 }
-                Section(footer: Text(L("电脑上运行 CHRIS聊天，手机连同一个 Wi-Fi，用电脑的 IP 填这里。"))) {
+                Section(footer: Text(Tr("电脑上运行 CHRIS聊天，手机连同一个 Wi-Fi，用电脑的 IP 填这里。"))) {
                     EmptyView()
                 }
             }
-            .navigationTitle(L("服务器"))
+            .navigationTitle(Tr("服务器"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
-                ToolbarItem(placement: .navigationBarTrailing) { Button(L("保存")) { onSave() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
+                ToolbarItem(placement: .navigationBarTrailing) { Button(Tr("保存")) { onSave() } }
             }
         }
     }
@@ -786,7 +786,7 @@ struct LoginView: View {
                把后面的登录页背景图整个盖掉，所以后台换了背景图手机上永远看不到。
                换成 App 自己的 NavBar（透明背景），背景图就能透出来了。 */
             VStack(spacing: 0) {
-                NavBar(title: L("账号登录"))
+                NavBar(title: Tr("账号登录"))
                     // 头像区：登录过的账号最多 3 个，可以左右滑；点一下就用那个账号一键登录
                     // （放在滚动区外面，横向滑动才不会被上下滚动抢走手势）
                     avatarPager
@@ -797,7 +797,7 @@ struct LoginView: View {
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
                         .padding(.top, 16)
-                    Text(L("登录后同步最近的聊天记录"))
+                    Text(Tr("登录后同步最近的聊天记录"))
                         .font(.system(size: 13))
                         .foregroundColor(LoginTheme.sub ?? .secondary)
                         .padding(.top, 18)
@@ -813,7 +813,7 @@ struct LoginView: View {
                             Image(systemName: "message.fill")
                                 .resizable()
                                 .frame(width: 22, height: 22)
-                            Text(L("微信登录"))
+                            Text(Tr("微信登录"))
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundColor(.white)
@@ -826,12 +826,12 @@ struct LoginView: View {
                     /* 其他三种登录方式并成一行，不再堆两行：
                        手机号登录 · 账号密码登录 · 人脸（没勾协议一样进不去） */
                     HStack(spacing: 9) {
-                        Button(L("手机号登录")) {
+                        Button(Tr("手机号登录")) {
                             guard requireAgree() else { return }
                             sheet = .phone
                         }
                         Text("·").foregroundColor(LoginTheme.disabledGray)
-                        Button(L("账号密码登录")) {
+                        Button(Tr("账号密码登录")) {
                             guard requireAgree() else { return }
                             sheet = .password
                         }
@@ -842,7 +842,7 @@ struct LoginView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "faceid")
-                                Text(L("人脸"))
+                                Text(Tr("人脸"))
                             }
                         }
                     }
@@ -890,7 +890,7 @@ struct LoginView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 10))
-                        Text(L("全程 HTTPS 加密传输，密码只以加密哈希保存"))
+                        Text(Tr("全程 HTTPS 加密传输，密码只以加密哈希保存"))
                             .font(.system(size: 11.5))
                     }
                     .foregroundColor(LoginTheme.sub ?? Color(hexString: "#8A8F99"))
@@ -991,7 +991,7 @@ struct LoginView: View {
                 }
 
                 if app.accounts.count > 1 {
-                    Text(L("← 左右滑动切换账号，点头像直接登录 →"))
+                    Text(Tr("← 左右滑动切换账号，点头像直接登录 →"))
                         .font(.system(size: 11))
                         .foregroundColor(LoginTheme.sub ?? .secondary)
                 } else {
@@ -1114,7 +1114,7 @@ struct AccountLoginSheet: View {
                         HairLine(color: C.navLine)
                         row {
                             TextField("验证码", text: $code).keyboardType(.numberPad).focused($focus, equals: .code)
-                            Button(L("获取验证码")) { sendCode() }
+                            Button(Tr("获取验证码")) { sendCode() }
                                 .font(.system(size: 14)).foregroundColor(C.loginGreen)
                         }
                     } else {
@@ -1135,7 +1135,7 @@ struct AccountLoginSheet: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "person.text.rectangle")
-                                Text(L("账号被禁用了？用身份证自助解封"))
+                                Text(Tr("账号被禁用了？用身份证自助解封"))
                             }
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white)
@@ -1161,9 +1161,9 @@ struct AccountLoginSheet: View {
                     if mode == .password {
                         HStack(spacing: 16) {
                             /* 密码找回：手机号 + 验证码 + 新密码（功能清单里的「密码找回」） */
-                            Button(L("忘记密码？")) { showReset = true }
+                            Button(Tr("忘记密码？")) { showReset = true }
                             Text("·").foregroundColor(C.subLabel)
-                            Button(L("还没有账号？去注册")) { showReg = true }
+                            Button(Tr("还没有账号？去注册")) { showReg = true }
                         }
                         .font(.system(size: 13)).foregroundColor(LoginTheme.accent2)
                         .padding(.top, 16)
@@ -1176,7 +1176,7 @@ struct AccountLoginSheet: View {
             .navigationTitle(mode == .phone ? "手机号登录" : "账号密码登录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
             }
             .sheet(isPresented: $showReg) { RegisterSheet() }
             .sheet(isPresented: $showReset) { ResetPasswordSheet() }
@@ -1206,7 +1206,7 @@ struct AccountLoginSheet: View {
             do {
                 if let dev = try await API.shared.phoneCode(phone: p) {
                     code = dev; app.show("验证码：\(dev)")
-                } else { app.show(L("验证码已发送")) }
+                } else { app.show(Tr("验证码已发送")) }
             } catch { self.error = (error as? APIError)?.errorDescription ?? "发送失败" }
         }
     }
@@ -1250,7 +1250,7 @@ struct UnbanSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(L("账号被管理员禁用后，可以在这里用身份证号自己解开。号码要真实合法（18 位，最后一位可能是 X）。同一张身份证只能绑定一个账号，解封动作会写进后台审计日志。"))
+                    Text(Tr("账号被管理员禁用后，可以在这里用身份证号自己解开。号码要真实合法（18 位，最后一位可能是 X）。同一张身份证只能绑定一个账号，解封动作会写进后台审计日志。"))
                         .font(.system(size: 12.5))
                         .foregroundColor(.secondary)
                         .padding(.bottom, 14)
@@ -1285,10 +1285,10 @@ struct UnbanSheet: View {
                 .padding(.top, 20)
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("身份证自助解封"))
+            .navigationTitle(Tr("身份证自助解封"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } }
+                ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
             }
         }
         .onAppear {
@@ -1315,7 +1315,7 @@ struct UnbanSheet: View {
             do {
                 let user = try await API.shared.unban(username: u, password: password, idCard: idc)
                 await app.finishLogin(user)
-                app.show(L("解封成功，已登录"))
+                app.show(Tr("解封成功，已登录"))
                 dismiss()
             } catch { self.error = (error as? APIError)?.errorDescription ?? "解封失败" }
             busy = false
@@ -1376,9 +1376,9 @@ struct RegisterSheet: View {
                 Spacer()
             }
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("注册"))
+            .navigationTitle(Tr("注册"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } } }
         }
         .onAppear { loadCaptcha() }
     }
@@ -1398,7 +1398,7 @@ struct RegisterSheet: View {
                 _ = try await API.shared.register(username: username, nickname: nickname.isEmpty ? username : nickname,
                                                  password: password, captchaId: capId, captcha: cap)
                 try await app.login(username: username, password: password)
-                app.show(L("注册成功"))
+                app.show(Tr("注册成功"))
                 dismiss()
             } catch {
                 self.error = (error as? APIError)?.errorDescription ?? "注册失败"
@@ -1422,7 +1422,7 @@ struct PairSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
-                Text(L("在已登录的设备上确认，这台设备就能进入"))
+                Text(Tr("在已登录的设备上确认，这台设备就能进入"))
                     .font(.system(size: 14)).foregroundColor(.secondary)
                     .multilineTextAlignment(.center).padding(.top, 24)
 
@@ -1437,7 +1437,7 @@ struct PairSheet: View {
                     .multilineTextAlignment(.center).padding(.horizontal, 24)
 
                 if fail {
-                    Button(L("重新生成")) { start() }
+                    Button(Tr("重新生成")) { start() }
                         .font(.system(size: 15, weight: .semibold)).foregroundColor(C.loginGreen)
                 } else {
                     ProgressView()
@@ -1447,9 +1447,9 @@ struct PairSheet: View {
             }
             .frame(maxWidth: .infinity)
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(L("微信登录"))
+            .navigationTitle(Tr("微信登录"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(L("取消")) { stop(); dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { stop(); dismiss() } } }
         }
         .onAppear { start() }
         .onDisappear { stop() }
@@ -1506,7 +1506,7 @@ struct TermsSheet: View {
             }
             .background(Color(.systemBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button(L("好")) { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button(Tr("好")) { dismiss() } } }
         }
     }
 }
@@ -1538,7 +1538,7 @@ struct PhoneLoginView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     Spacer(minLength: 30)
-                    Text(L("手机号登录"))
+                    Text(Tr("手机号登录"))
                         .font(.system(size: 24, weight: .semibold))
 
                     // 手机号输入框
@@ -1578,7 +1578,7 @@ struct PhoneLoginView: View {
                     } label: {
                         HStack(spacing: 8) {
                             if busy { ProgressView().progressViewStyle(.circular).tint(.white) }
-                            Text(L("登录"))
+                            Text(Tr("登录"))
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundColor(.white)
@@ -1648,7 +1648,7 @@ struct PhoneLoginView: View {
                     code = dev
                     app.show("验证码：\(dev)")
                 } else {
-                    app.show(L("验证码已发送"))
+                    app.show(Tr("验证码已发送"))
                 }
             } catch {
                 self.error = (error as? APIError)?.errorDescription ?? "发送失败"

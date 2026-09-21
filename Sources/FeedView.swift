@@ -151,7 +151,7 @@ struct ChannelsView: View {
                         .frame(width: 44, height: L.navH)
                 }
                 .buttonStyle(.plain)
-                Text(L("视频号")).font(pf(17, .semibold)).foregroundColor(.white)
+                Text(Tr("视频号")).font(pf(17, .semibold)).foregroundColor(.white)
                 Spacer()
                 /* 后台把关了「允许前台发视频」就不显示这个 ＋ */
                 if flags.allowPublish != false {
@@ -202,7 +202,7 @@ struct ChannelsView: View {
 
     private func share(_ item: FeedItem) {
         UIPasteboard.general.string = (item.video ?? "") 
-        app.show(L("链接已复制，可以去聊天里粘贴"))
+        app.show(Tr("链接已复制，可以去聊天里粘贴"))
     }
 
     private func follow(_ item: FeedItem) {
@@ -210,9 +210,9 @@ struct ChannelsView: View {
         Task {
             do {
                 try await API.shared.addFriend(username: uid)
-                app.show(L("已发送关注（好友申请）"))
+                app.show(Tr("已发送关注（好友申请）"))
             } catch {
-                app.show(L("关注失败，可能已经是好友了"))
+                app.show(Tr("关注失败，可能已经是好友了"))
             }
         }
     }
@@ -234,19 +234,19 @@ struct ChannelsView: View {
                let i = items.firstIndex(where: { $0.id == item.id }) {
                 items[i].comments = n
             }
-            app.show(L("评论成功"))
+            app.show(Tr("评论成功"))
         }
     }
 
     private func commentSheet(_ item: FeedItem) -> some View {
         VStack(spacing: 14) {
-            Text(L("评论")).font(pf(16, .medium)).padding(.top, 16)
+            Text(Tr("评论")).font(pf(16, .medium)).padding(.top, 16)
             Text(item.desc ?? "").font(pf(13)).foregroundColor(.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 20)
             TextField("说点什么…", text: $commentText)
                 .textFieldStyle(.roundedBorder).padding(.horizontal, 20)
             Button { sendComment(item) } label: {
-                Text(L("发送")).font(pf(16, .medium)).foregroundColor(.white)
+                Text(Tr("发送")).font(pf(16, .medium)).foregroundColor(.white)
                     .frame(maxWidth: .infinity).frame(height: 46)
                     .background(RoundedRectangle(cornerRadius: 23).fill(C.green))
             }
@@ -262,7 +262,7 @@ struct ChannelsView: View {
     /// 发表前的小页面：文案、音乐、以及「剪掉水印」
     private var publishSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(L("发表视频")).font(pf(17, .semibold))
+            Text(Tr("发表视频")).font(pf(17, .semibold))
             if uploadMB > 0 {
                 Text(String(format: "视频已传好（压缩后 %.1f MB）", uploadMB))
                     .font(pf(12.5)).foregroundColor(.secondary)
@@ -273,30 +273,30 @@ struct ChannelsView: View {
                 .textFieldStyle(.roundedBorder)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(L("剪掉水印")).font(pf(14, .medium))
+                Text(Tr("剪掉水印")).font(pf(14, .medium))
                 /* 后台关了「允许剪水印」就直接不显示这一排 */
                 if flags.allowTrim != false {
                     Picker("剪掉水印", selection: $trim) {
-                        Text(L("不处理")).tag(0)
-                        Text(L("剪底部 10%")).tag(1)
-                        Text(L("剪底部 14%")).tag(2)
-                        Text(L("剪右侧 12%")).tag(3)
-                        Text(L("剪右下角")).tag(4)
+                        Text(Tr("不处理")).tag(0)
+                        Text(Tr("剪底部 10%")).tag(1)
+                        Text(Tr("剪底部 14%")).tag(2)
+                        Text(Tr("剪右侧 12%")).tag(3)
+                        Text(Tr("剪右下角")).tag(4)
                     }
                     .pickerStyle(.segmented)
                 }
-                Text(L("剪完会把画面放大回原尺寸，不会变小 —— 只是把带水印的那一条切掉。"))
+                Text(Tr("剪完会把画面放大回原尺寸，不会变小 —— 只是把带水印的那一条切掉。"))
                     .font(pf(11.5)).foregroundColor(.secondary)
             }
 
             Button { publish() } label: {
-                Text(L("发表")).font(pf(16, .medium)).foregroundColor(.white)
+                Text(Tr("发表")).font(pf(16, .medium)).foregroundColor(.white)
                     .frame(maxWidth: .infinity).frame(height: 46)
                     .background(RoundedRectangle(cornerRadius: 23).fill(C.green))
             }
             .buttonStyle(.plain)
             Button { showPublish = false } label: {
-                Text(L("取消")).font(pf(15)).foregroundColor(.secondary)
+                Text(Tr("取消")).font(pf(15)).foregroundColor(.secondary)
                     .frame(maxWidth: .infinity).frame(height: 38)
             }
             .buttonStyle(.plain)
@@ -311,7 +311,7 @@ struct ChannelsView: View {
         defer { uploading = false }
         do {
             guard let data = try await v.loadTransferable(type: Data.self), !data.isEmpty else {
-                app.show(L("读不到这个视频")); return
+                app.show(Tr("读不到这个视频")); return
             }
             /* 画质优先：
                ① ≤25MB 的视频**原样上传**（一点不重编码，画质最高）
@@ -382,11 +382,11 @@ struct ChannelsView: View {
                                                                      left: area.left, right: area.right) {
                         video = trimmed
                     } else {
-                        app.show(L("剪水印失败，就用原视频发了"))
+                        app.show(Tr("剪水印失败，就用原视频发了"))
                     }
                 }
                 _ = try await API.shared.feedPublish(video: video, desc: desc, music: music)
-                app.show(L("发表成功"))
+                app.show(Tr("发表成功"))
                 index = 0
                 await load()
             } catch {

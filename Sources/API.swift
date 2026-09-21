@@ -1157,6 +1157,11 @@ final class API {
         let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)
         return p.items
     }
+    /// 只看自己发布的作品（「我 → 作品」那一页用）
+    func myFeedItems() async throws -> [FeedItem] {
+        let p: FeedPayload = try await get("/api/feed?mine=1", as: FeedPayload.self)
+        return p.items
+    }
     /// 列表 + 后台配的样式和开关
     func feed() async throws -> (items: [FeedItem], style: FeedStyle, flags: FeedFlags) {
         let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)

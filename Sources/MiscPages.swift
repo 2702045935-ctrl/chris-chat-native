@@ -405,7 +405,9 @@ struct WorksView: View {
             FeedPlayerSheet(item: w, all: works)
         }
         .task {
-            works = (try? await API.shared.feedItems()) ?? []
+            /* 「作品」这一页只放我自己发布的（别人的作品在视频号里刷） */
+            let mine = (try? await API.shared.myFeedItems()) ?? []
+            works = mine.isEmpty ? ((try? await API.shared.feedItems()) ?? []).filter { $0.mine == true } : mine
             loading = false
         }
     }

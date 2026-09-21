@@ -164,7 +164,9 @@ struct MeView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: L.v(8, 2.6, 11)) {
-                chip {
+                chip(bg1: (app.me?.moodText ?? "").isEmpty ? "" : (app.me?.moodColor ?? ""),
+                     bg2: (app.me?.moodText ?? "").isEmpty ? "" : (app.me?.moodColor2 ?? ""),
+                     action: { path.append("status") }) {
                     if let mood = app.me?.moodText, !mood.isEmpty {
                         Text(app.me?.moodIcon ?? "")
                         Text(mood)
@@ -172,10 +174,6 @@ struct MeView: View {
                         Text("＋").foregroundColor(C.subLabel)
                         Text(Tr("状态"))
                     }
-                } bg1: app.me?.moodText?.isEmpty == false ? (app.me?.moodColor ?? "") : "",
-                   bg2: app.me?.moodText?.isEmpty == false ? (app.me?.moodColor2 ?? "") : "",
-                   action: {
-                    path.append("status")
                 }
                 chip {
                     Text(Tr("朋友圈"))

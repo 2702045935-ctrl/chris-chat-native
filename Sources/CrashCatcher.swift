@@ -33,7 +33,7 @@ enum CrashCatcher {
             "text": String(text.prefix(4000)),
             "stack": String(stack.prefix(6000)),
             "lang": Lang.code,
-            "app": "1.0",
+            "app": AppInfo.build.prefix(28).description,
             "at": ISO8601DateFormatter().string(from: Date())
         ]
         guard let url = URL(string: API.shared.base + "/api/clientlog"),

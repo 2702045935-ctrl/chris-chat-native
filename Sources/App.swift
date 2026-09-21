@@ -334,6 +334,11 @@ final class AppState: ObservableObject {
 struct CHRISApp: App {
     @StateObject private var app = AppState()
 
+    init() {
+        /* 一启动就装崩溃上报：连登录页崩都能抓到（以前放在登录之后，前面的崩抓不到） */
+        CrashCatcher.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

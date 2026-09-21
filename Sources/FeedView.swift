@@ -137,6 +137,9 @@ struct ChannelsView: View {
             try? s.setActive(true)
         }
         .onDisappear {
+            /* 退出这一页要把画面和声音一起停掉（以前只关了音频会话，声音还在响） */
+            player?.pause()
+            player = nil
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
@@ -645,6 +648,11 @@ struct FeedPlayerSheet: View {
             liked = cur.liked ?? false
             likes = cur.likes ?? 0
             load(cur)
+        }
+        /* 从作品页/视频号点开的大图播放器：关掉这一页也要停声音 */
+        .onDisappear {
+            player?.pause()
+            player = nil
         }
     }
 

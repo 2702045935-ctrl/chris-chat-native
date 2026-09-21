@@ -313,12 +313,16 @@ struct ChannelsView: View {
             guard let data = try await v.loadTransferable(type: Data.self), !data.isEmpty else {
                 app.show("读不到这个视频"); return
             }
-            /* 手机视频动辄几十上百 MB，先在本机压到 720p 再传：
-               体积小一大截，上传快、服务器也扛得住。压不动就用原文件。 */
+            /* 画质优先：
+               ① ≤25MB 的视频**原样上传**（一点不重编码，画质最高）
+               ② 更大的才压，而且压到 **1080p**（以前是 720p，所以看着糊） */
             let raw = FileManager.default.temporaryDirectory.appendingPathComponent("feed-raw-\(UUID().uuidString).mov")
             try data.write(to: raw)
             let uploadData: Data
-            if let small = await Self.compress(raw), !small.isEmpty {
+            let mb = Double(data.count) / 1024 / 1024
+            if mb <= 25 {
+                uploadData = data
+            } else if let small = await Self.compress(raw), !small.isEmpty, small.count < data.count {
                 uploadData = small
             } else {
                 uploadData = data
@@ -337,10 +341,12 @@ struct ChannelsView: View {
         }
     }
 
-    /// 把视频压成 720p（H.264），返回压缩后的数据；失败返回 nil
+    /// 把视频压成 1080p（H.264，画质优先），返回压缩后的数据；失败返回 nil
     nonisolated static func compress(_ url: URL) async -> Data? {
         let asset = AVURLAsset(url: url)
-        guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else { return nil }
+        /* 1080p 起步；如果原片本来就不大，用「最高质量」档再保险一点 */
+        let preset = AVAssetExportPreset1920x1080
+        guard let export = AVAssetExportSession(asset: asset, presetName: preset) else { return nil }
         let out = FileManager.default.temporaryDirectory.appendingPathComponent("feed-out-\(UUID().uuidString).mp4")
         export.outputURL = out
         export.outputFileType = .mp4

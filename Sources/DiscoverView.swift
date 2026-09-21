@@ -32,7 +32,7 @@ struct DiscoverView: View {
                                     if ri > 0 { rowLine }
                                     MenuRow(icon: (item.svg?.isEmpty == false) ? item.svg! : I.moments,
                                             iconColor: Color(hexString: item.color ?? "#4A90D9", fallback: 0x4A90D9),
-                                            title: item.label,
+                title: Tr(item.label),
                                             badge: item.action == "moments" && app.showDot("momentsRow", auto: !latestThumb.isEmpty),
                                             thumb: item.action == "moments" ? latestThumb : "",
                                             onTap: { open(item) })

@@ -134,7 +134,7 @@ struct BalancePageView: View {
                     Button {
                         run(l.action ?? "soon", l.label)
                     } label: {
-                        Text(l.label).font(pf(st.linkFont)).foregroundColor(st.linkColorV)
+            Text(Tr(l.label)).font(pf(st.linkFont)).foregroundColor(st.linkColorV)
                     }
                     .buttonStyle(.plain)
                 }

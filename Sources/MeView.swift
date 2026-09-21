@@ -26,7 +26,7 @@ struct MeView: View {
                                 if ri > 0 { rowLine }
                                 MenuRow(icon: (item.svg?.isEmpty == false) ? item.svg! : I.star,
                                         iconColor: Color(hexString: item.color ?? "#4A90D9", fallback: 0x4A90D9),
-                                        title: item.label,
+                title: Tr(item.label),
                                         onTap: { open(item) })
                             }
                             if UIConfig.num("showPromo", 0) > 0 && gi == grouped.count - 1 {

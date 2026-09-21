@@ -40,7 +40,7 @@ struct WalletView: View {
                 Button {
                     run((cfg?.right?.action ?? "bills"), (cfg?.right?.label ?? "账单"))
                 } label: {
-                    Text(cfg?.right?.label ?? "账单")
+                        Text(Tr(cfg?.right?.label ?? "账单"))
                         .font(pf(17))
                         .foregroundColor(C.label)
                         .frame(height: L.navH)
@@ -109,7 +109,7 @@ struct WalletView: View {
                     .frame(width: s.icon, height: s.icon)
                     .padding(.leading, s.iconX)
 
-                Text(it.label)
+            Text(Tr(it.label))
                     .font(pf(s.labelFont))
                     .foregroundColor(s.labelColorV)
                     .padding(.leading, max(0, s.textX - s.iconX - s.icon))
@@ -149,7 +149,7 @@ struct WalletView: View {
                 Button {
                     run(f.action ?? "soon", f.label)
                 } label: {
-                    Text(f.label)
+            Text(Tr(f.label))
                         .font(pf(st.footFont))
                         .foregroundColor(st.footerColorV)
                 }

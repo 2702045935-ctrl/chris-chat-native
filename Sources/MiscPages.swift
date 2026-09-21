@@ -257,7 +257,7 @@ struct StatusView: View {
                         } label: {
                             VStack(spacing: 6) {
                                 Text(it.icon ?? "🙂").font(pf(30))
-                                Text(it.label ?? "状态")
+            Text(Tr(it.label ?? "状态"))
                                     .font(pf(13))
                                     .foregroundColor(.white)
                                     .lineLimit(1)

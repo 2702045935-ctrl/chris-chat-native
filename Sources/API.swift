@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import SwiftUI          // 服务页样式里要算颜色（Color）
+import AVFoundation     // 视频边下边播要用 AVURLAsset
 
 /* ============================================================ 数据模型 */
 

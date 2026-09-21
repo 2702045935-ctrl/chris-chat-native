@@ -320,7 +320,7 @@ struct ChannelsView: View {
             try data.write(to: raw)
             let uploadData: Data
             let mb = Double(data.count) / 1024 / 1024
-            if mb <= 25 {
+            if mb <= 40 {
                 uploadData = data
             } else if let small = await Self.compress(raw), !small.isEmpty, small.count < data.count {
                 uploadData = small

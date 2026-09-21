@@ -38,6 +38,8 @@ struct ChannelsView: View {
 
     @State private var items: [FeedItem] = []
     @State private var index = 0
+    /// 视频号顶部 tab：0=关注 1=朋友 2=推荐（默认推荐）
+    @State private var tab = 2
     @State private var drag: CGFloat = 0
     @State private var loading = true
     @State private var commentFor: FeedItem?
@@ -151,7 +153,33 @@ struct ChannelsView: View {
                         .frame(width: 44, height: L.navH)
                 }
                 .buttonStyle(.plain)
-                Text(Tr("视频号")).font(pf(17, .semibold)).foregroundColor(.white)
+
+                /* 顶部三个 tab（和微信视频号一致）：关注 / 朋友 / 推荐
+                   推荐 = 抖音那套（热度+新鲜度，每次刷新顺序会变） */
+                HStack(spacing: 22) {
+                    ForEach(Array(["关注", "朋友", "推荐"].enumerated()), id: \.offset) { i, name in
+                        Button {
+                            guard tab != i else { return }
+                            tab = i
+                            index = 0
+                            items = []
+                            loading = true
+                            Task { await load() }
+                        } label: {
+                            VStack(spacing: 5) {
+                                Text(Tr(name))
+                                    .font(pf(tab == i ? 17.5 : 16.5, tab == i ? .semibold : .regular))
+                                    .foregroundColor(tab == i ? .white : Color.white.opacity(0.62))
+                                Capsule()
+                                    .fill(tab == i ? Color.white : Color.clear)
+                                    .frame(width: 18, height: 2.5)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
                 Spacer()
                 /* 后台把关了「允许前台发视频」就不显示这个 ＋ */
                 if flags.allowPublish != false {
@@ -182,7 +210,7 @@ struct ChannelsView: View {
     /* ---------------------------------------------------------- 数据 */
 
     private func load() async {
-        if let r = try? await API.shared.feed() {
+        if let r = try? await API.shared.feed(tab: ["follow", "friends", "recommend"][tab]) {
             items = r.items
             style = r.style
             flags = r.flags

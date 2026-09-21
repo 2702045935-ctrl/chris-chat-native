@@ -1169,8 +1169,9 @@ final class API {
         return p.items
     }
     /// 列表 + 后台配的样式和开关
-    func feed() async throws -> (items: [FeedItem], style: FeedStyle, flags: FeedFlags) {
-        let p: FeedPayload = try await get("/api/feed", as: FeedPayload.self)
+    /// tab: recommend 推荐（抖音那套）/ follow 关注 / friends 朋友
+    func feed(tab: String = "recommend") async throws -> (items: [FeedItem], style: FeedStyle, flags: FeedFlags) {
+        let p: FeedPayload = try await get("/api/feed?tab=\(tab)", as: FeedPayload.self)
         return (p.items, p.style ?? FeedStyle(), p.flags ?? FeedFlags())
     }
     func feedLike(_ id: String) async throws -> (liked: Bool, likes: Int) {

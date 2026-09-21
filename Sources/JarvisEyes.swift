@@ -109,3 +109,119 @@ struct JarvisEyesAvatar: View {
         }
     }
 }
+
+/* ====================================================================
+   AI 助手 / 腾讯新闻 的名片
+   在聊天里点它的头像出来的就是这一页：会动的眼睛 + 简介 + 发消息 / 语音通话。
+   ==================================================================== */
+struct BotCardView: View {
+    let chat: Chat
+
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
+
+    @State private var calling = false
+
+    /// 会话列表里排第一的（botRank 0）= 会动眼睛那个 AI 助手
+    private var isEyesBot: Bool { (chat.botRank ?? 9) == 0 }
+
+    private var sheetBg: Color { scheme == .dark ? Color(hex: 0x1C1C1E) : .white }
+    private var pageBg: Color { scheme == .dark ? Color(hex: 0x111111) : Color(hex: 0xEDEDED) }
+    private var ink: Color { scheme == .dark ? Color(hex: 0xEDEDED) : Color(hex: 0x1A1A1A) }
+    private var gray: Color { scheme == .dark ? Color(hex: 0x8E8E93) : Color(hex: 0x737373) }
+    private var link: Color { scheme == .dark ? Color(hex: 0x7D90B8) : Color(hex: 0x576B95) }
+    private var lineColor: Color { scheme == .dark ? Color(white: 1, opacity: 0.09) : Color(hex: 0xE5E5E5) }
+
+    private var bio: String {
+        if isEyesBot { return "您的私人助理：聊天、提醒、天气、记账、代发消息，随时为您效劳" }
+        if chat.name.contains("新闻") { return "热点新闻、时事资讯，想听哪条跟我说" }
+        return "有问题随时问我，还能帮你查最新资讯～"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: "", back: { dismiss() }) { EmptyView() }
+                .background(sheetBg)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    hero
+                    Rectangle().fill(pageBg).frame(height: 10)
+                    acts
+                    Spacer(minLength: 0)
+                }
+            }
+            .background(pageBg)
+        }
+        .background(pageBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .hidesTabBar()
+        .fullScreenCover(isPresented: $calling) {
+            AICallView(chat: chat).environmentObject(app)
+        }
+    }
+
+    private var hero: some View {
+        HStack(alignment: .top, spacing: 14) {
+            if isEyesBot {
+                JarvisEyesAvatar(size: 74)
+                    .frame(width: 88, height: 88)
+                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(sheetBg))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(lineColor, lineWidth: 0.6))
+            } else {
+                Avatar(path: chat.avatar ?? "", size: 88, radius: 8)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(chat.name)
+                    .font(pf(20, .medium))
+                    .foregroundColor(ink)
+                    .lineLimit(1)
+                Text("账号：" + (chat.id.isEmpty ? "—" : "bot"))
+                    .font(pf(14))
+                    .foregroundColor(gray)
+                    .lineLimit(1)
+                Text("简介：" + bio)
+                    .font(pf(14))
+                    .foregroundColor(gray)
+                    .lineLimit(3)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 20)
+        .background(sheetBg)
+    }
+
+    private var acts: some View {
+        VStack(spacing: 0) {
+            row("发消息", key: "msg")
+            Rectangle().fill(lineColor).frame(height: 0.5).padding(.leading, 18)
+            row("语音通话", key: "call")
+        }
+        .background(sheetBg)
+        .overlay(alignment: .top) { Rectangle().fill(lineColor).frame(height: 0.5) }
+        .overlay(alignment: .bottom) { Rectangle().fill(lineColor).frame(height: 0.5) }
+    }
+
+    private func row(_ title: String, key: String) -> some View {
+        Button {
+            if key == "msg" { dismiss() } else { calling = true }
+        } label: {
+            HStack(spacing: 14) {
+                SVGIcon(markup: key == "msg" ? I.cardChat : I.cardVideo, size: 20, color: link)
+                Text(Tr(title))
+                    .font(pf(16))
+                    .foregroundColor(link)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}

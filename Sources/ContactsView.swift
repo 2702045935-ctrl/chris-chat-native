@@ -292,9 +292,14 @@ struct ContactCardView: View {
     @State private var showInfo = false
     @State private var showPhone = false
     @State private var viewer: Int?
+    /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
+    @State private var aiCall: Chat?
 
     private var u: User { full ?? user }
     private var phone: String { (u.phone ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isBot: Bool { u.bot == true }
+    /// 顶栏那只小眼睛对应的 AI（管家）—— 名片上也用会动的眼睛当头像
+    private var isEyesBot: Bool { (u.username ?? "").lowercased() == "housekeeper" }
     private var relation: String {
         if let r = u.relation, !r.isEmpty { return r }
         return u.id == app.me?.id ? "self" : "none"
@@ -339,14 +344,25 @@ struct ContactCardView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .confirmationDialog("", isPresented: $showMore, titleVisibility: .hidden) {
-            Button(Tr("设置备注和标签")) { app.show(Tr("备注和标签还没开，先看下面的资料")) }
-            Button(Tr("朋友圈权限")) { app.show(Tr("默认：能看他的朋友圈")) }
+            if isBot {
+                Button(Tr("发消息")) { openChat() }
+                Button(Tr("语音通话")) { startAICall() }
+            } else {
+                Button(Tr("设置备注和标签")) { app.show(Tr("备注和标签还没开，先看下面的资料")) }
+                Button(Tr("朋友圈权限")) { app.show(Tr("默认：能看他的朋友圈")) }
+            }
             Button(Tr("取消"), role: .cancel) { }
         }
         .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
-            Button("昵称：\(u.name)") { }
-            Button("微信号：\(u.username ?? "—")") { }
-            Button("地区：\((u.region?.isEmpty == false) ? u.region! : "未知")") { }
+            if isBot {
+                Button("昵称：\(u.name)") { }
+                Button("账号：\(u.username ?? "—")") { }
+                if let b = u.bio, !b.isEmpty { Button("简介：\(b)") { } }
+            } else {
+                Button("昵称：\(u.name)") { }
+                Button("微信号：\(u.username ?? "—")") { }
+                Button("地区：\((u.region?.isEmpty == false) ? u.region! : "未知")") { }
+            }
             Button(Tr("取消"), role: .cancel) { }
         }
         .confirmationDialog("", isPresented: $showPhone, titleVisibility: .hidden) {
@@ -354,6 +370,9 @@ struct ContactCardView: View {
             Button(Tr("取消"), role: .cancel) { }
         }
         .task { await load() }
+        .fullScreenCover(item: $aiCall) { c in
+            AICallView(chat: c).environmentObject(app)
+        }
     }
 
     /* ---------------------------------------------------------- 导航 */
@@ -374,7 +393,17 @@ struct ContactCardView: View {
 
     private var hero: some View {
         HStack(alignment: .top, spacing: L.cdHeroGap) {
-            Avatar(path: u.avatarPath, size: L.cdAvatar, radius: L.cdAvatarRadius)
+            /* AI 助手（管家）名片上的头像 = 会话页顶栏那只一样的小脸，会眨眼会瞟 */
+            if isEyesBot {
+                JarvisEyesAvatar(size: L.cdAvatar * 0.84)
+                    .frame(width: L.cdAvatar, height: L.cdAvatar)
+                    .background(RoundedRectangle(cornerRadius: L.cdAvatarRadius, style: .continuous)
+                        .fill(sheetBg))
+                    .overlay(RoundedRectangle(cornerRadius: L.cdAvatarRadius, style: .continuous)
+                        .stroke(lineColor, lineWidth: 0.6))
+            } else {
+                Avatar(path: u.avatarPath, size: L.cdAvatar, radius: L.cdAvatarRadius)
+            }
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
@@ -387,10 +416,15 @@ struct ContactCardView: View {
                 }
                 .frame(height: L.cdNameRowH)
 
-                cardLine("昵称：" + u.name)
+                cardLine(isBot ? ("账号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
+                               : ("昵称：" + u.name))
                     .padding(.top, L.cdLineGap)
-                cardLine("微信号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
-                cardLine("地区：" + ((u.region?.isEmpty == false) ? u.region! : "未知"))
+                if isBot {
+                    cardLine("简介：" + ((u.bio?.isEmpty == false) ? u.bio! : "您的私人助理"))
+                } else {
+                    cardLine("微信号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
+                    cardLine("地区：" + ((u.region?.isEmpty == false) ? u.region! : "未知"))
+                }
             }
 
             Spacer(minLength: 0)
@@ -517,6 +551,11 @@ struct ContactCardView: View {
     }
 
     private var actList: [CardAct] {
+        /* 机器人（AI 助手 / 腾讯新闻）：发消息 + AI 语音通话，别的按钮对它们没意义 */
+        if isBot {
+            return [CardAct(title: "发消息", key: "msg"),
+                    CardAct(title: "语音通话", key: "aicall")]
+        }
         switch relation {
         case "friend", "self":
             return [CardAct(title: "发消息", key: "msg"),
@@ -569,6 +608,8 @@ struct ContactCardView: View {
         switch act.key {
         case "msg":
             openChat()
+        case "aicall":
+            startAICall()
         case "call":
             /* 真人语音通话（WebRTC）。id 就是对方的用户 id，直接呼叫 */
             if CallCenter.shared.phase != .idle {
@@ -618,6 +659,19 @@ struct ContactCardView: View {
                 after?()
             } else {
                 app.show(Tr("打不开聊天"))
+            }
+            busy = false
+        }
+    }
+
+    /// 跟机器人打电话：先找到（或建好）和它的会话，再打开 AI 通话界面
+    private func startAICall() {
+        busy = true
+        Task {
+            if let chat = try? await API.shared.openDirect(userId: u.id) {
+                aiCall = chat
+            } else {
+                app.show(Tr("打不开对话"))
             }
             busy = false
         }

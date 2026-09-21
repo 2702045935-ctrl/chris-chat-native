@@ -130,6 +130,8 @@ struct AICallView: View {
     @State private var reply = ""
     @State private var busy = false
     @State private var denyReason = ""
+    /// 点上面那个大头像 → 弹 AI 的名片（微信里点通话页头像就是这个）
+    @State private var showCard = false
 
     var body: some View {
         ZStack {
@@ -139,7 +141,10 @@ struct AICallView: View {
 
             VStack(spacing: 0) {
                 Spacer().frame(height: 70)
-                Avatar(path: chat.avatar ?? "", size: 96, radius: 16)
+                Button { showCard = true } label: {
+                    Avatar(path: chat.avatar ?? "", size: 96, radius: 16)
+                }
+                .buttonStyle(.plain)
                 Text(chat.name)
                     .font(pf(22, .medium))
                     .foregroundColor(.white)
@@ -228,6 +233,9 @@ struct AICallView: View {
             }
         }
         .onDisappear { voice.stop() }
+        .sheet(isPresented: $showCard) {
+            BotCardView(chat: chat).environmentObject(app)
+        }
     }
 
     private func startListening() {

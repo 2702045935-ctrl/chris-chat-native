@@ -57,6 +57,8 @@ struct ChatDetailView: View {
     @State private var viewer: PhotoPager.Item?
     /// 点头像 → 名片（自己的头像是自己的名片）
     @State private var cardUser: User?
+    /// 点机器人（AI 助手 / 腾讯新闻）的头像 → 弹它的名片
+    @State private var botCard = false
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
@@ -256,6 +258,9 @@ struct ChatDetailView: View {
             PhotoPager(paths: item.paths, startIndex: item.index) { viewer = nil }
         }
         .modifier(TapAvatarCard(cardUser: $cardUser))
+        .sheet(isPresented: $botCard) {
+            BotCardView(chat: chat).environmentObject(app)
+        }
         .sheet(isPresented: $showGroupInfo) { GroupInfoView(chat: chat) }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
         .hidesTabBar()
@@ -598,6 +603,11 @@ struct ChatDetailView: View {
     private func openAvatar(_ senderId: String) {
         let id = senderId.isEmpty ? myId : senderId
         if id.isEmpty { return }
+        /* 机器人：不用去通讯录找，直接弹它自己的名片（AI 助手 / 腾讯新闻） */
+        if (chat.botRank ?? 9) < 9, senderId.isEmpty || senderId == peerUserId {
+            botCard = true
+            return
+        }
         if id == myId, let me = app.me { cardUser = me; return }
         if let u = app.contact(for: id) { cardUser = u; return }
         Task {

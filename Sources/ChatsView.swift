@@ -2,14 +2,17 @@ import SwiftUI
 
 struct ChatRow: View {
     let chat: Chat
+    /// 点左边那个头像（只有机器人那几行给）：直接弹它自己的名片
+    var onTapAvatar: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: L.rowGap) {
-            Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 6)
-                .overlay(alignment: .topTrailing) {
-                    UnreadBadge(count: chat.unreadCount)
-                        .offset(x: 12, y: -8)
-                }
+            /* 机器人那几行：点头像弹名片。普通会话：头像跟整行一样，点了进聊天 */
+            if let tap = onTapAvatar {
+                avatar.contentShape(Rectangle()).onTapGesture { tap() }
+            } else {
+                avatar
+            }
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(chat.name)
@@ -36,6 +39,14 @@ struct ChatRow: View {
         .frame(height: L.rowH)
         .contentShape(Rectangle())
     }
+
+    private var avatar: some View {
+        Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 6)
+            .overlay(alignment: .topTrailing) {
+                UnreadBadge(count: chat.unreadCount)
+                    .offset(x: 12, y: -8)
+            }
+    }
 }
 
 /* ============================================================
@@ -51,6 +62,8 @@ struct SwipeChatRow: View {
 
     let chat: Chat
     var onOpen: () -> Void
+    /// 机器人那几行：点头像弹名片（普通会话传 nil）
+    var onTapAvatar: (() -> Void)? = nil
     var onUnread: () -> Void
     var onHide: (Bool) -> Void      // true = 连记录一起清掉
     var onDelete: () -> Void
@@ -73,7 +86,7 @@ struct SwipeChatRow: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             /* ① 行内容：跟着手指往左推 */
-            ChatRow(chat: chat)
+            ChatRow(chat: chat, onTapAvatar: onTapAvatar)
                 .frame(width: L.width, height: L.rowH, alignment: .leading)
                 .background(rowBg)
                 .overlay(alignment: .bottom) { HairLine(inset: L.dividerLeft) }
@@ -192,6 +205,8 @@ struct ChatsView: View {
     @State private var openRow: String?
     /// 下拉时露出来的距离（用滚动偏移算，不会抢左右滑的手势）
     @State private var pullY: CGFloat = 0
+    /// 点会话列表里机器人那几行的头像 → 弹它的名片
+    @State private var botCardChat: Chat?
 
     private var list: [Chat] {
         /* 贾维斯从列表里拿掉（它改成左上角那只小脸，点脸进对话） */
@@ -260,6 +275,7 @@ struct ChatsView: View {
                                 SwipeChatRow(
                                     chat: chat,
                                     onOpen: { path.append(chat) },
+                                    onTapAvatar: (chat.botRank == nil) ? nil : { botCardChat = chat },
                                     onUnread: { markUnread(chat) },
                                     onHide: { clear in hide(chat, clear: clear) },
                                     onDelete: { remove(chat) }
@@ -304,6 +320,9 @@ struct ChatsView: View {
         }
         .fullScreenCover(isPresented: $showScan) {
             ScannerView { text in handleScanned(text, app: app) }
+        }
+        .sheet(item: $botCardChat) { c in
+            BotCardView(chat: c).environmentObject(app)
         }
         .task {
             // 进页面先拉一次，之后每 4 秒自动刷新一次（这样别人发消息不用切页就能看到）

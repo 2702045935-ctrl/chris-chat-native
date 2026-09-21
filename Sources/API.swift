@@ -1668,6 +1668,13 @@ final class API {
 
     /// 聊天背景：比头像清楚得多（长边 2048、画质 0.95）。
     /// 视频/大文件走二进制直传（不再 base64，少传 25%，手机上快一截）
+    /// 给播放器的资源：带上鉴权头，让 AVPlayer 自己边下边播（服务器已支持 Range 分片）
+    func streamingAsset(_ path: String) -> AVURLAsset? {
+        guard let u = assetURL(path) else { return nil }
+        let headers: [String: String] = token.isEmpty ? [:] : ["Authorization": "Bearer \(token)"]
+        return AVURLAsset(url: u, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+    }
+
     func uploadBinary(_ data: Data, mime: String) async throws -> String {
         guard let url = URL(string: base + "/api/upload/raw") else { throw APIError.message("服务器地址不正确") }
         var req = URLRequest(url: url)

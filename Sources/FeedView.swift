@@ -516,17 +516,15 @@ struct FeedCell: View {
         liked = item.liked ?? false
         likes = item.likes ?? 0
         guard player == nil, let url = API.shared.assetURL(item.video ?? "") else { return }
-        /* 注意：AVPlayer 自己有网络栈，**不认服务器那张自签证书**，直接播 https 会黑屏。
-           所以先带令牌把视频下到本地临时文件，再用本地文件播（几 MB 的短视频，秒下）。 */
+        /* 边下边播：把鉴权头交给 AVPlayer，它自己用 Range 分片拉流。
+           以前是「先整包下载到本地再播」，一条 5MB 视频要等 20 多秒才出画面。 */
         Task { @MainActor in
             do {
-                let data = try await API.shared.assetData(url)
-                let tmp = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("feed-\(item.id).mp4")
-                try data.write(to: tmp)
-                let p = AVPlayer(url: tmp)
+                let asset = API.shared.streamingAsset(item.video ?? "") ?? AVURLAsset(url: url)
+                let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.isMuted = false
                 p.actionAtItemEnd = .none
+                p.automaticallyWaitsToMinimizeStalling = false
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero)
@@ -645,11 +643,10 @@ struct FeedPlayerSheet: View {
         loading = true
         Task { @MainActor in
             do {
-                let data = try await API.shared.assetData(url)
-                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("work-\(w.id).mp4")
-                try data.write(to: tmp)
-                let p = AVPlayer(url: tmp)
+                let asset = API.shared.streamingAsset(w.video ?? "") ?? AVURLAsset(url: url)
+                let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.actionAtItemEnd = .none
+                p.automaticallyWaitsToMinimizeStalling = false
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero); p.play()

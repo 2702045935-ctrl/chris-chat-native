@@ -195,8 +195,8 @@ struct MeView: View {
 
     /// bg1/bg2：状态那一条要跟着所选状态的颜色变（两个色就是渐变）
     private func chip<Content: View>(bg1: String = "", bg2: String = "",
-                                     @ViewBuilder content: () -> Content,
-                                     action: @escaping () -> Void) -> some View {
+                                     action: @escaping () -> Void,
+                                     @ViewBuilder content: () -> Content) -> some View {
         let hasColor = !bg1.isEmpty
         Button(action: action) {
             HStack(spacing: L.v(2, 1, 4)) { content() }

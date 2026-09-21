@@ -194,8 +194,10 @@ struct ChatsView: View {
     @State private var pullY: CGFloat = 0
 
     private var list: [Chat] {
-        guard !keyword.isEmpty else { return app.chats }
-        return app.chats.filter {
+        /* 贾维斯从列表里拿掉（它改成左上角那只小脸，点脸进对话） */
+        let base = app.chats.filter { $0.botRank != 0 }
+        guard !keyword.isEmpty else { return base }
+        return base.filter {
             $0.name.contains(keyword) || (($0.lastMessage?.preview ?? "").contains(keyword))
         }
     }
@@ -215,10 +217,22 @@ struct ChatsView: View {
                 VStack(spacing: 0) {
                     /* 顶栏固定不动 —— 对着桌面 s 文件夹那两张参考图量的：
                        微信在两张图里都在同一行（y 224~252），动的是搜索框和列表。 */
-                    /* 顶栏左上角：贾维斯的小脸（和微信「小微」一个位置：
-                       靠左但不贴边，标题仍在正中间） */
+                    /* 顶栏左上角：贾维斯的小脸（和微信「小微」一个位置）。
+                       点这张脸 = 直接进贾维斯的对话（列表里那一条已经拿掉）。 */
                     NavBar(title: navTitle,
-                           leftExtra: AnyView(JarvisEyesAvatar(size: 28).padding(.leading, 12))) {
+                           leftExtra: AnyView(
+                            Button {
+                                if let jarvis = app.chats.first(where: { $0.botRank == 0 }) {
+                                    path.append(jarvis)
+                                } else {
+                                    Task { await app.loadChats()
+                                        if let j = app.chats.first(where: { $0.botRank == 0 }) { path.append(j) } }
+                                }
+                            } label: {
+                                JarvisEyesAvatar(size: 28).padding(.leading, 12)
+                            }
+                            .buttonStyle(.plain)
+                           )) {
                         Button {
                             plusMenu = true
                         } label: {

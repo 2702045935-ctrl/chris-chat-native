@@ -196,6 +196,9 @@ struct ChatDetailView: View {
     @State private var unreadHere = 0
     /// 点一下那个数字 = 滚回最新消息
     @State private var scrollTick = 0
+    @State private var hasOlder = false          // 上面还有更早的记录
+    @State private var loadingOlder = false
+    @State private var holdScroll = false        // 上翻加载时不要自动跳到底部
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -482,6 +485,19 @@ struct ChatDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    /* 上面还有更早的记录时，顶部给一个「查看更早的消息」 */
+                    if hasOlder {
+                        Button {
+                            Task { await loadOlder(proxy) }
+                        } label: {
+                            Text(loadingOlder ? Tr("加载中…") : Tr("查看更早的消息"))
+                                .font(pf(13))
+                                .foregroundColor(C.subLabel)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     ForEach(messages) { message in
                         VStack(spacing: 0) {
                             if showTime(for: message) {
@@ -544,7 +560,7 @@ struct ChatDetailView: View {
                 .padding(L.msgPad)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.count) { _ in scrollToEnd(proxy, animated: true) }
+            .onChange(of: messages.count) { _ in if !holdScroll { scrollToEnd(proxy, animated: true) } }
             .onChange(of: scrollTick) { _ in scrollToEnd(proxy, animated: true) }
             .onAppear { scrollToEnd(proxy, animated: false) }
         }
@@ -1003,12 +1019,32 @@ struct ChatDetailView: View {
                     if incoming > 0 { unreadHere += incoming }
                 }
                 messages = result.messages
+                if initial { hasOlder = result.hasMore }
             }
         } catch {
             if initial { app.show(Tr("聊天记录加载失败")) }
         }
         loading = false
         autoOpenShopCard()
+    }
+
+    /* 往上看更早的记录：服务端支持 before 翻页（一次 40 条），加载完把更早的接在前面 */
+    private func loadOlder(_ proxy: ScrollViewProxy) async {
+        guard !loadingOlder, let first = messages.first, let seq = first.seq else { return }
+        loadingOlder = true
+        defer { loadingOlder = false }
+        do {
+            let r = try await API.shared.messages(chatId: chat.id, limit: 40, before: seq)
+            hasOlder = r.hasMore
+            guard !r.messages.isEmpty else { return }
+            holdScroll = true
+            let anchorId = r.messages.first?.id
+            messages = r.messages + messages
+            if let anchorId = anchorId { proxy.scrollTo(anchorId, anchor: .top) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { holdScroll = false }
+        } catch {
+            app.show(Tr("聊天记录加载失败"))
+        }
     }
 
     /// AI 发来的「点外卖 / 买东西」卡片：一到手就直接跳（装了淘宝跳淘宝 App，没装用 App 内网页），

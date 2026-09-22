@@ -57,6 +57,7 @@ struct ChannelsView: View {
     @State private var trim = 0          // 0=不处理 1=剪底部10% 2=剪底部14% 3=剪右侧12% 4=剪右下角
     @State private var style = FeedStyle()
     @State private var flags = FeedFlags()
+    @State private var loadingMore = false          // 正在拉下一批（无限刷）
 
     var body: some View {
         GeometryReader { geo in
@@ -104,6 +105,16 @@ struct ChannelsView: View {
                         } else if (far || fast), v.translation.height > 0, index > 0 {
                             withAnimation(.easeOut(duration: 0.22)) { drag = h }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { index -= 1; drag = 0 }
+                        } else if (far || fast), v.translation.height < 0, index >= items.count - 1 {
+                            /* 已经滑到当前这批的最后一条，还往上滑 —— 去拿下一批（无限刷） */
+                            withAnimation(.easeOut(duration: 0.22)) { drag = -h }
+                            Task {
+                                await loadMore()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    if index < items.count - 1 { index += 1 }
+                                    drag = 0
+                                }
+                            }
                         } else {
                             withAnimation(.easeOut(duration: 0.22)) { drag = 0 }
                         }
@@ -131,6 +142,10 @@ struct ChannelsView: View {
             }
         }
         .task { await load() }
+        /* 快滑到最后几条就提前把下一批拉回来，滑到底也不会卡住 */
+        .onChange(of: index) { i in
+            if i >= items.count - 2 { Task { await loadMore() } }
+        }
         /* 进视频号就把音频通道设成「播放」：这样手机的静音键拨下去也有声音
            （抖音就是这个行为），离开时再交还，别影响别人听歌。 */
         .onAppear {
@@ -221,6 +236,26 @@ struct ChannelsView: View {
             flags = r.flags
         }
         loading = false
+    }
+
+    /* 无限刷：滑到快到底部时，再拉一批接在后面。
+       服务端每次会给「下一批」（它自己记着播放进度），所以这里只管往后接。
+       如果服务端这一轮给回来的都是已经有的（说明一轮刷完了、它重新排了一轮），
+       也照样接上 —— 宁可重复，也不能滑到底。 */
+    private func loadMore() async {
+        if loadingMore { return }
+        loadingMore = true
+        defer { loadingMore = false }
+        guard let r = try? await API.shared.feed(tab: ["follow", "friends", "recommend"][tab]) else { return }
+        style = r.style
+        flags = r.flags
+        let known = Set(items.map { $0.id })
+        let add = r.items.filter { !known.contains($0.id) }
+        if add.isEmpty {
+            items.append(contentsOf: r.items)
+        } else {
+            items.append(contentsOf: add)
+        }
     }
 
     private func toggleLike(_ item: FeedItem) {

@@ -1505,7 +1505,7 @@ final class OneShotLocation: NSObject, CLLocationManagerDelegate {
         /* 一分钟内定位过的位置直接用，省得每次都等 */
         if let l = mgr.location, abs(l.timestamp.timeIntervalSinceNow) < 60 { return l }
         if cont != nil { return mgr.location }        // 已经有一次在定位了，别叠着来
-        await withCheckedContinuation { c in
+        return await withCheckedContinuation { c in
             cont = c
             mgr.delegate = self
             mgr.desiredAccuracy = kCLLocationAccuracyHundredMeters

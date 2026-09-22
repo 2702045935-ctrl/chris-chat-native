@@ -59,6 +59,7 @@ struct MainTabView: View {
 
 struct TabBar: View {
     @ObservedObject private var lang = LangStore.shared
+    @EnvironmentObject var app: AppState
     @Binding var selection: Int
     var badge: Int
     /// 「通讯录」上那个小红点（有人加你为好友就亮，微信也是这样）
@@ -114,6 +115,10 @@ struct TabBar: View {
                                              color: selection == i ? C.green : C.tabInk,
                                              symbol: items[i].0)
                                 }
+                            } else if i == 3, let av = app.me?.avatarPath, !av.isEmpty {
+                                /* 「我」这一格不放图标，直接用我自己的头像 */
+                                Avatar(path: av, size: UIConfig.num("tabAvatar", 24), radius: 0, circle: true)
+                                    .overlay(Circle().stroke(selection == i ? C.green : Color.clear, lineWidth: 1.5))
                             } else {
                                 Image(systemName: selection == i ? items[i].1 : items[i].0)
                                     .font(iconFont(i))
@@ -164,20 +169,16 @@ struct TabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        /* 药丸里那一条的高度：比原来的底栏矮 12（上下各留 6 的缝） */
-        .frame(height: max(40, L.tabH - 12))
+        .frame(height: L.tabH)
         .background(
-            /* 无边框药丸（对着 vx 参考图）：整条底栏做成一颗圆角胶囊，
-               左右留边、下面留一点缝，纯色填充 + 淡淡阴影，**不画描边、不画分隔线**。
-               左右留边 / 圆角 / 高度都能在后台 ui.json 里调：
-                 tabPillPad（左右留边，默认 14）· tabPillGap（上下留缝，默认 6）
-                 tabPillRadius（圆角，默认 = 高度的一半 → 正好是胶囊） */
-            RoundedRectangle(cornerRadius: UIConfig.num("tabPillRadius", (L.tabH - 12) / 2),
-                             style: .continuous)
-                .fill(C.tabBg)
-                .shadow(color: Color.black.opacity(0.10), radius: 9, y: 2)
-                .padding(.horizontal, UIConfig.num("tabPillPad", 14))
-                .padding(.vertical, UIConfig.num("tabPillGap", 6))
+            ZStack {
+                C.tabBg.ignoresSafeArea(edges: .bottom)
+                VStack(spacing: 0) {
+                    Rectangle().fill(C.navLine).frame(height: 0.5)
+                    Spacer()
+                }
+                .ignoresSafeArea(edges: .bottom)
+            }
         )
     }
 }

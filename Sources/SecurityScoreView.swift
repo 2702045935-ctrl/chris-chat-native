@@ -198,10 +198,10 @@ struct SecurityScoreView: View {
 
     private var howCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(Tr("这是怎么算的"))
+            Text(Tr("这是怎么算的") + "（" + Tr("体验分") + "）")
                 .font(pf(15, .medium))
                 .foregroundColor(ink)
-            Text(Tr("跟微信一样，三个维度各 100 分：身份特质（资料全不全）、支付行为（转账、收款、记账）、守约历史（按时收款、没有超时退回、没有违规）。加起来 300 分，落在 550~850 上就是你的安全分。"))
+            Text(Tr("三个维度各 100 分：身份特质（资料全不全）、支付行为（转账、收款、记账）、守约历史（按时收款、没有超时退回、没有违规）。加起来 300 分，落在 550~850 上就是你的体验分。"))
                 .font(pf(13))
                 .foregroundColor(gray)
                 .fixedSize(horizontal: false, vertical: true)

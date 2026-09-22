@@ -56,6 +56,8 @@ enum L10n {
         "支付行为": "Payment activity",
         "守约历史": "Keeping promises",
         "跟微信一样，三个维度各 100 分：身份特质（资料全不全）、支付行为（转账、收款、记账）、守约历史（按时收款、没有超时退回、没有违规）。加起来 300 分，落在 550~850 上就是你的安全分。": "Like WeChat: three 100-point dimensions — Identity (how complete your profile is), Payment activity (transfers, receiving, bookkeeping) and Keeping promises (collecting on time, no expired transfers, no violations). The 300 points map onto 550-850.",
+        "三个维度各 100 分：身份特质（资料全不全）、支付行为（转账、收款、记账）、守约历史（按时收款、没有超时退回、没有违规）。加起来 300 分，落在 550~850 上就是你的体验分。": "Three 100-point dimensions — Identity (how complete your profile is), Payment activity (transfers, receiving, bookkeeping), Keeping promises (collecting on time, no expired transfers, no violations). The 300 points map onto 550-850.",
+        "体验分": "Experience score",
         "实名认证": "Real-name verified",
         "绑定手机号": "Phone bound",
         "设置支付密码": "Payment password set",

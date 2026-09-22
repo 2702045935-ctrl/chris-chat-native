@@ -275,7 +275,9 @@ struct ChatsView: View {
                                 SwipeChatRow(
                                     chat: chat,
                                     onOpen: { path.append(chat) },
-                                    onTapAvatar: (chat.botRank == nil) ? nil : { botCardChat = chat },
+                                    /* 只有真的机器人（botRank 0/1/2）点头像才弹「官方账号」名片；
+                                       好友/群聊点头像跟整行一样进聊天（微信就是这样） */
+                                    onTapAvatar: ((chat.botRank ?? 9) < 9) ? { botCardChat = chat } : nil,
                                     onUnread: { markUnread(chat) },
                                     onHide: { clear in hide(chat, clear: clear) },
                                     onDelete: { remove(chat) }

@@ -95,6 +95,17 @@ struct TabBar: View {
         UIConfig.num("tabIcon\(i)", L.tabIconBox)
     }
 
+    /* 底栏颜色（对着桌面 vx 文件夹那张参考图做的）：
+       选中的是**深色实心**图标 + 深色字，没选中的是灰色描边图标 + 灰字，不用绿色。
+       想改颜色：后台 ui.json 里加 tabSelColor / tabUnselColor（#浅色|#深色）。 */
+    private var selColor: Color { UIConfig.color("tabSelColor", 0x1A1A1A, 0xEDEDED) }
+    private var unselColor: Color { UIConfig.color("tabUnselColor", 0x6B6B6B, 0x8E8E93) }
+    /// 选中那格图标大一点点（参考图里就是这样）
+    private func tabIconFont(_ i: Int, on: Bool) -> Font {
+        let base = UIConfig.num("tabIcon\(i)", (i == 0 || i == 1) ? L.tabIcon - 2 : L.tabIcon)
+        return pf(on ? base + 1.5 : base)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
@@ -109,19 +120,19 @@ struct TabBar: View {
                                 if custom.hasPrefix("http") || custom.hasPrefix("/uploads") || custom.hasPrefix("data:") {
                                     RemoteImage(path: custom, template: true)
                                         .frame(width: customSize(i), height: customSize(i))
-                                        .foregroundColor(selection == i ? C.green : C.tabInk)
+                                        .foregroundColor(selection == i ? selColor : unselColor)
                                 } else {
                                     FlexIcon(custom: custom, size: customSize(i),
-                                             color: selection == i ? C.green : C.tabInk,
+                                             color: selection == i ? selColor : unselColor,
                                              symbol: items[i].0)
                                 }
                             } else if i == 3, let av = app.me?.avatarPath, !av.isEmpty {
                                 /* 「我」这一格不放图标，直接用我自己的头像 */
                                 Avatar(path: av, size: UIConfig.num("tabAvatar", 24), radius: 0, circle: true)
-                                    .overlay(Circle().stroke(selection == i ? C.green : Color.clear, lineWidth: 1.5))
+                                    .overlay(Circle().stroke(selection == i ? selColor : Color.clear, lineWidth: 1.5))
                             } else {
                                 Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                    .font(iconFont(i))
+                                    .font(tabIconFont(i, on: selection == i))
                                     .frame(width: L.tabIconBox, height: L.tabIconBox)
                             }
                             if i == 0 && badge > 0 {
@@ -159,9 +170,10 @@ struct TabBar: View {
                             }
                         }
                         Text(items[i].2)
-                            .font(pf(L.tabLabel))
+                            .font(pf(UIConfig.num("tabLabel", L.tabLabel),
+                                     selection == i ? .medium : .regular))
                     }
-                    .foregroundColor(selection == i ? C.green : C.tabInk)
+                    .foregroundColor(selection == i ? selColor : unselColor)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 2)
                     .contentShape(Rectangle())

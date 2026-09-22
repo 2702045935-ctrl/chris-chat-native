@@ -296,31 +296,10 @@ struct WalletUpgradeView: View {
             Text(Tr("升级要做的两步")).font(pf(13)).foregroundColor(C.subLabel)
                 .padding(.horizontal, 8).padding(.bottom, 6)
             GroupCard {
-                ForEach(Array((info?.steps ?? []).enumerated()), id: \.offset) { idx, st in
-                    if idx > 0 { HairLine(inset: 16) }
-                    Button {
-                        if st.done { return }
-                        if st.key == "realname" { showRealName = true } else { showBankCards = true }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: st.done == true ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 17))
-                                .foregroundColor(st.done == true ? C.green : C.subLabel)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(st.name ?? "").font(pf(16)).foregroundColor(C.label)
-                                Text(st.hint ?? "").font(pf(12)).foregroundColor(C.subLabel)
-                            }
-                            Spacer(minLength: 8)
-                            Text(st.done == true ? Tr("已完成") : Tr("去完成"))
-                                .font(pf(13))
-                                .foregroundColor(st.done == true ? C.subLabel : C.green)
-                            if st.done != true { Chevron(size: 9, line: 1.6) }
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(height: 62)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                let steps: [API.WalletLevelStep] = info?.steps ?? []
+                ForEach(0..<steps.count, id: \.self) { i in
+                    if i > 0 { HairLine(inset: 16) }
+                    stepRow(steps[i])
                 }
             }
         }
@@ -328,31 +307,64 @@ struct WalletUpgradeView: View {
         .padding(.top, 14)
     }
 
+    private func stepRow(_ st: API.WalletLevelStep) -> some View {
+        let done: Bool = (st.done == true)
+        return Button {
+            guard !done else { return }
+            if st.key == "realname" { showRealName = true } else { showBankCards = true }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 17))
+                    .foregroundColor(done ? C.green : C.subLabel)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(st.name ?? "").font(pf(16)).foregroundColor(C.label)
+                    Text(st.hint ?? "").font(pf(12)).foregroundColor(C.subLabel)
+                }
+                Spacer(minLength: 8)
+                Text(done ? Tr("已完成") : Tr("去完成"))
+                    .font(pf(13))
+                    .foregroundColor(done ? C.subLabel : C.green)
+                if !done { Chevron(size: 9, line: 1.6) }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 62)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var levelsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(Tr("各等级额度")).font(pf(13)).foregroundColor(C.subLabel)
                 .padding(.horizontal, 8).padding(.bottom, 6)
             GroupCard {
-                ForEach(Array((info?.levels ?? []).enumerated()), id: \.offset) { idx, lv in
-                    if idx > 0 { HairLine(inset: 16) }
-                    HStack(spacing: 10) {
-                        Text(lv.name ?? "").font(pf(15)).foregroundColor(C.label)
-                        if lv.current == true {
-                            Text(Tr("当前")).font(pf(10.5)).foregroundColor(.white)
-                                .padding(.horizontal, 5).padding(.vertical, 1.5)
-                                .background(Capsule().fill(C.green))
-                        }
-                        Spacer(minLength: 6)
-                        Text("单笔 \(money(lv.single)) · 单日 \(money(lv.day))")
-                            .font(pf(12.5)).foregroundColor(C.subLabel)
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 52)
+                let rows: [API.WalletLevelRow] = info?.levels ?? []
+                ForEach(0..<rows.count, id: \.self) { i in
+                    if i > 0 { HairLine(inset: 16) }
+                    levelRow(rows[i])
                 }
             }
         }
         .padding(.horizontal, 8)
         .padding(.top, 14)
+    }
+
+    private func levelRow(_ lv: API.WalletLevelRow) -> some View {
+        let cur: Bool = (lv.current == true)
+        return HStack(spacing: 10) {
+            Text(lv.name ?? "").font(pf(15)).foregroundColor(C.label)
+            if cur {
+                Text(Tr("当前")).font(pf(10.5)).foregroundColor(.white)
+                    .padding(.horizontal, 5).padding(.vertical, 1.5)
+                    .background(Capsule().fill(C.green))
+            }
+            Spacer(minLength: 6)
+            Text("单笔 " + money(lv.single) + " · 单日 " + money(lv.day))
+                .font(pf(12.5)).foregroundColor(C.subLabel)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 52)
     }
 
     private var upgradeButton: some View {

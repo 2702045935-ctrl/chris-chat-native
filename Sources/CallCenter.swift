@@ -411,7 +411,12 @@ final class CallCenter: NSObject, ObservableObject {
             || host.hasPrefix("192.168.") || host.hasPrefix("172.16") || host.hasPrefix("172.17")
             || host.hasPrefix("172.18") || host.hasPrefix("172.19") || host.hasPrefix("172.2")
             || host.hasPrefix("172.30") || host.hasPrefix("172.31")
-        cfg.iceTransportPolicy = isLan ? .all : .relay
+        /* 以前公网强制「只走中继」，结果 4G↔宽带 这种组合经常连不上（一边走 TCP 中继、
+           一边走 UDP 中继就配不上对）。现在改成 .all：直连能通用直连（快、不占带宽），
+           连不上时 ICE 自己会退到中继候选。 */
+        cfg.iceTransportPolicy = .all
+        note("配置 iceServers=" + iceServers.map { ($0.urlStrings.first ?? "") }.joined(separator: ",")
+             + " policy=all lan=" + (isLan ? "1" : "0"))
         cfg.sdpSemantics = .unifiedPlan
         let pc = f.peerConnection(with: cfg,
                                   constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil),
@@ -666,13 +671,21 @@ extension CallCenter: RTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
         let isRelay = candidate.sdp.contains("typ relay")
         let isSrflx = candidate.sdp.contains("typ srflx")
+        /* 诊断里写清楚类型和协议（host/srflx/relay + udp/tcp）：
+           以前只写前 24 个字符，看不出是 TCP 还是 UDP，排查时抓瞎。 */
+        let parts = candidate.sdp.split(separator: " ")
+        let typ = parts.count > 7 ? String(parts[7]) : "?"
+        let proto = parts.count > 2 ? String(parts[2]) : "?"
+        let addr = parts.count > 5 ? "\(parts[4]):\(parts[5])" : ""
+        let brief = "\(typ)/\(proto) \(addr)"
         if isRelay || isSrflx {
             Task { @MainActor in
                 if isRelay { self.relayOK = true }
-                self.note(isRelay ? "cand=relay ✓" : "cand=srflx ✓")
+                self.note("cand=" + brief)
             }
+        } else {
+            Task { @MainActor in self.note("cand=" + brief) }
         }
-        Task { @MainActor in self.note("cand=" + (candidate.sdp.hasPrefix("candidate:") ? String(candidate.sdp.prefix(24)) : candidate.sdp)) }
         let body: [String: Any] = ["action": "ice",
                                    "candidate": ["candidate": candidate.sdp,
                                                  "sdpMid": candidate.sdpMid ?? "0",

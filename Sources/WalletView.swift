@@ -25,6 +25,7 @@ struct WalletView: View {
     /// 手势密码（安全锁）：开了以后进「零钱 / 经营账户」要先画一遍
     @State private var needGesture = false
     @State private var pendingAction = ""
+    @State private var pendingLabel = ""
 
     private var st: WalletStyle { cfg?.style ?? WalletStyle() }
 
@@ -75,7 +76,7 @@ struct WalletView: View {
         .navigationDestination(isPresented: $showCards) { BankCardsView() }
         .navigationDestination(isPresented: $showBiz) { BizAccountView() }
         .sheet(isPresented: $needGesture) {
-            GestureLockView { openAfterLock(pendingAction) }
+            GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
@@ -176,14 +177,15 @@ struct WalletView: View {
         /* 零钱 / 经营账户：设了手势密码就先验一遍（微信那种安全锁） */
         if GestureStore.enabled, action == "balance" || label == "经营账户" {
             pendingAction = label == "经营账户" ? "biz" : action
+            pendingLabel = label
             needGesture = true
             return
         }
-        openAfterLock(label == "经营账户" ? "biz" : action)
+        openAfterLock(label == "经营账户" ? "biz" : action, label)
     }
 
     /// 验过手势（或本来就没开锁）之后真正打开
-    private func openAfterLock(_ action: String) {
+    private func openAfterLock(_ action: String, _ label: String) {
         switch action {
         case "balance":
             showCoin = true               // 进「零钱」页（照参考图做的那一页）

@@ -72,6 +72,10 @@ struct MeView: View {
                     SwitchAccountView()
                 } else if key == "realname" {
                     RealNameView()
+                } else if key == "account" {
+                    AccountSecurityView()
+                } else if key == "pair" {
+                    PairApproveView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -303,6 +307,12 @@ struct SettingsView: View {
     @State private var showSwitchAccount = false
     /// 实名认证状态（设置页那一行显示「已实名 / 未实名」）
     @State private var realNameText = ""
+    /// 「账号与安全」那一行右侧的小字：显示手机号（没绑就显示星言号）
+    private var accountSubtitle: String {
+        let p = (app.me?.phone ?? "").trimmingCharacters(in: .whitespaces)
+        if !p.isEmpty { return p }
+        return app.me?.username ?? ""
+    }
     @State private var showRealName = false
     @State private var showMyQR = false
     @State private var showPrivacy = false
@@ -316,25 +326,10 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     GroupCard {
-                        /* 按微信「设置」的顺序排：账号与安全 → 新消息通知 → 隐私 → 通用 → 帮助与反馈 → 关于 → 退出登录 */
-                        settingRow(Tr("个人信息"), app.me?.name ?? "") { showProfileEdit = true }
-                        HairLine(inset: 16)
-                        settingRow(Tr("账号与安全"), "") { app.show(Tr("账号与安全排在下一批")) }
-                        HairLine(inset: 16)
-                        /* 实名认证：填姓名 + 身份证号（安全分的「身份特质」靠它） */
-                        settingLink(Tr("实名认证"), realNameText, key: "realname")
-                        HairLine(inset: 16)
-                        /* 网页版「微信授权登录 / QQ 授权登录」出的 6 位数字在这里确认 */
-                        settingRow(Tr("设备确认登录"), "") { showPairApprove = true }
-                        HairLine(inset: 16)
-                        /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
-                        settingLink(Tr("支付密码"), hasPay ? "已设置" : "未设置", key: "paypwd")
-                        HairLine(inset: 16)
-                        /* 安全锁（手势密码）：开了以后进「零钱 / 经营账户」要先画一遍（微信那种） */
-                        settingLink(Tr("安全锁（手势密码）"), GestureStore.enabled ? Tr("已开启") : Tr("未开启"), key: "gesture")
-                        HairLine(inset: 16)
-                        /* 安全分（微信「支付分」那套：550~850 · 身份特质/支付行为/守约历史） */
-                        settingLink(Tr("安全分"), "", key: "score")
+                        /* 和微信「设置」一模一样的顺序：
+                           账号与安全 → 新消息通知 → 隐私 → 通用 → 帮助与反馈 → 关于 → 切换账号 → 退出登录
+                           （个人信息、实名、支付密码、安全锁、安全分、登录设备都归到「账号与安全」里了） */
+                        settingLink(Tr("账号与安全"), accountSubtitle, key: "account")
                         HairLine(inset: 16)
                         settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)

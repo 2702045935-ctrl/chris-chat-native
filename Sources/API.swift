@@ -1382,6 +1382,24 @@ final class API {
         }
     }
 
+    /* ---------------------------------------------------------- 账号与安全（微信那套） */
+
+    /// 修改登录密码：要验当前密码，成功后服务器把其他设备踢下线
+    func changePassword(current: String, new: String) async throws {
+        _ = try await request("POST", "/api/me/password",
+                              body: ["currentPassword": current, "newPassword": new])
+    }
+
+    /// 退出其他设备（微信「账号与安全 → 登录设备管理 → 退出其他设备」）
+    func logoutOtherDevices() async -> String? {
+        do {
+            _ = try await request("POST", "/api/me/logout-others", body: [:])
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "操作失败"
+        }
+    }
+
     /* ---------------------------------------------------------- 推送通知（苹果 APNs） */
 
     /// 把苹果给的 device token 交给服务器：手机没连实时通道时它就用这个推通知

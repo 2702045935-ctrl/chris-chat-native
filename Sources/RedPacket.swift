@@ -332,7 +332,12 @@ struct RedPacketSendView: View {
     @State private var note = "恭喜发财，大吉大利"
     @State private var lucky = true
     @State private var busy = false
-    @State private var showPay = false
+    /* 支付步骤直接做在这一页里（微信就是这样：点「塞钱进红包」下面翻出密码键盘）。
+       以前是在弹层里再弹一个支付面板，真机上会静默失败 —— 表现就是「按了没反应」。 */
+    @State private var paying = false
+    @State private var pwd = ""
+    @State private var hasPwd = true
+    @State private var payTip = ""
     @State private var errorText = ""
     @State private var myBalance: Double = 0
     /// 余额有没有从服务器拿到（没拿到就别用 0 去拦人，交给服务器判断）
@@ -513,16 +518,109 @@ struct RedPacketSendView: View {
             }
             .environmentObject(app)
         }
-        .sheet(isPresented: $showPay) {
-            PayPasswordSheet(amount: amount, purpose: "发红包") { pwd, face in
-                try await send(password: pwd, face: face)
-            } onDone: { info in
-                showPay = false
-                onSent?(info)
-                dismiss()
-            }
-            .environmentObject(app)
+        /* 支付键盘：压在这一页上面，不是第二个弹层 */
+        .overlay(alignment: .bottom) {
+            if paying { payPanel }
         }
+    }
+
+    /* ---------------------------------------------------------- 支付键盘（当前页内） */
+    private var payPanel: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button { paying = false; pwd = ""; payTip = "" } label: {
+                    Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(C.label).frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                Spacer(minLength: 0)
+            }
+            Text(Tr("请输入支付密码"))
+                .font(pf(14)).foregroundColor(C.subLabel)
+            Text("¥" + String(format: "%.2f", amount))
+                .font(pfMoney(28, .medium)).foregroundColor(C.label)
+                .padding(.top, 4)
+
+            HStack(spacing: 0) {
+                ForEach(0..<6, id: \.self) { i in
+                    ZStack {
+                        Rectangle().fill(C.cardBg)
+                        if pwd.count > i {
+                            Circle().fill(C.label).frame(width: 8, height: 8)
+                        }
+                    }
+                    .frame(height: 44)
+                    .overlay(Rectangle().stroke(C.hairline, lineWidth: 0.5))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+
+            keypad
+                .padding(.top, 8)
+
+            if !payTip.isEmpty {
+                Text(payTip).font(pf(13)).foregroundColor(C.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20).padding(.top, 6)
+            }
+            if Biometrics.available {
+                Button { doSend(password: "", face: true) } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "faceid").font(.system(size: 15, weight: .semibold))
+                        Text(Tr("使用面容"))
+                    }
+                    .font(pf(15, .medium)).foregroundColor(C.green)
+                    .frame(height: 38)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+            Color.clear.frame(height: 8)
+        }
+        .frame(maxWidth: .infinity)
+        .background(C.cardBg)
+        .transition(.move(edge: .bottom))
+    }
+
+    private var keypad: some View {
+        let rows: [[String]] = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "⌫"]]
+        return VStack(spacing: 0) {
+            ForEach(0..<rows.count, id: \.self) { r in
+                HStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { c in
+                        let key = rows[r][c]
+                        Button { tapKey(key) } label: {
+                            Text(key)
+                                .font(pf(23, .medium))
+                                .foregroundColor(C.label)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(C.cardBg)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(key.isEmpty)
+                    }
+                }
+                .overlay(Rectangle().stroke(C.hairline, lineWidth: 0.5))
+            }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private func tapKey(_ key: String) {
+        if busy { return }
+        if key == "⌫" {
+            if !pwd.isEmpty { pwd.removeLast() }
+            payTip = ""
+            return
+        }
+        guard !key.isEmpty, pwd.count < 6 else { return }
+        pwd.append(key)
+        payTip = ""
+        if pwd.count == 6 { doSend(password: pwd, face: false) }
     }
 
     private var helpText: String {
@@ -551,21 +649,44 @@ struct RedPacketSendView: View {
             app.show("零钱不够：这个红包要 ¥\(String(format: "%.2f", amount))，你只有 ¥\(String(format: "%.2f", myBalance))。去「我 → 服务 → 钱包 → 零钱 → 充值」")
             return
         }
-        showPay = true
+        /* 走到这里说明参数都对：把密码键盘翻出来（没设支付密码就直接发） */
+        Task {
+            hasPwd = await API.shared.hasPayPassword()
+            if hasPwd {
+                pwd = ""
+                payTip = ""
+                withAnimation(.easeOut(duration: 0.2)) { paying = true }
+            } else {
+                doSend(password: "", face: false)
+            }
+        }
     }
 
-    private func send(password: String, face: Bool) async throws -> RedPacketInfo {
+    private func doSend(password: String, face: Bool) {
+        if busy { return }
         busy = true
-        defer { busy = false }
+        payTip = ""
         let n = isGroup ? max(1, min(100, Int(countText) ?? 1)) : 1
-        let r = try await API.shared.sendRedPacket(
-            chatId: chat.id, amount: amount, count: n,
-            type: (isGroup && lucky) ? "lucky" : "normal",
-            note: note.isEmpty ? "恭喜发财，大吉大利" : note,
-            password: password, face: face, coverId: coverId)
-        myBalance = r.balance
-        if var me = app.me { me.balance = r.balance; app.me = me }
-        return RedPacketInfo(raw: r.redpacket)
+        Task {
+            do {
+                let r = try await API.shared.sendRedPacket(
+                    chatId: chat.id, amount: amount, count: n,
+                    type: (isGroup && lucky) ? "lucky" : "normal",
+                    note: note.isEmpty ? "恭喜发财，大吉大利" : note,
+                    password: password, face: face, coverId: coverId)
+                myBalance = r.balance
+                if var me = app.me { me.balance = r.balance; app.me = me }
+                busy = false
+                paying = false
+                app.show(Tr("红包已发出"))
+                onSent?(RedPacketInfo(raw: r.redpacket))
+                dismiss()
+            } catch {
+                busy = false
+                pwd = ""
+                payTip = (error as? LocalizedError)?.errorDescription ?? "发红包失败，再试一次"
+            }
+        }
     }
 }
 

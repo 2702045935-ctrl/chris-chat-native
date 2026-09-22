@@ -24,6 +24,11 @@ struct FeedItem: Decodable, Identifiable, Hashable {
     var desc: String?
     var music: String?
     var tag: String?
+    /* 短剧：集数标签（第3集）/ 总集数 / 剧集 id / 剧名 */
+    var ep: String?
+    var epTotal: Int?
+    var series: String?
+    var seriesName: String?
     var author: FeedAuthor?
     var likes: Int?
     var liked: Bool?
@@ -81,7 +86,8 @@ struct ChannelsView: View {
                     onComment: { commentFor = row.item; commentText = ""; comments = [] },
                                  onShare: { share(row.item) },
                                  onFollow: { follow(row.item) },
-                                 onDelete: { remove(row.item) })
+                                 onDelete: { remove(row.item) },
+                                 onPickEpisode: { episodeFor = row.item; seriesEpisodes = [] })
                             .frame(width: geo.size.width, height: geo.size.height)
                             .offset(y: CGFloat(row.offset) * geo.size.height + drag)
                     }
@@ -506,6 +512,7 @@ struct FeedCell: View {
     var onShare: () -> Void
     var onFollow: () -> Void
     var onDelete: () -> Void
+    var onPickEpisode: () -> Void = {}     // 短剧：点「选集」
 
     @State private var player: AVPlayer?
     @State private var loadingVideo = true
@@ -527,6 +534,37 @@ struct FeedCell: View {
             }
             LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.65)],
                            startPoint: .top, endPoint: .bottom)
+
+            /* 短剧：左上角显示当前集数，旁边一个「选集」入口 */
+            if !(item.ep ?? "").isEmpty {
+                VStack {
+                    HStack(spacing: 8) {
+                        Text(item.ep ?? "")
+                            .font(pf(13, .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                        if (item.epTotal ?? 0) > 1 {
+                            Button { onPickEpisode() } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "list.bullet").font(.system(size: 11, weight: .semibold))
+                                    Text(Tr("选集")).font(pf(13, .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Capsule().fill(Color.black.opacity(0.45)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+            }
 
             if flags.showRail != false {
                 HStack(alignment: .bottom, spacing: 0) {

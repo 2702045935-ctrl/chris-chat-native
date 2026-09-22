@@ -68,8 +68,15 @@ final class Realtime: ObservableObject {
     /// 这里最多每 0.25 秒往界面发一次，攒着的那条在稍后合并发出去。
     private var pending: PushEvent?
     private var publishTask: Task<Void, Never>?
+    /// 心跳：每 20 秒给服务器发一个 ping，45 秒收不到任何东西就认为断了、重连
+    private var heartbeat: Task<Void, Never>?
+    private var lastRx = Date()
 
     func start() {
+        /* 已经在连着就别再重建 —— 以前每调一次 start() 都会先 stop() 再新建，
+           而「回到前台 / 刷新」这些地方会调它，于是长连接被反复掐断重建
+           （日志里那个号 10 分钟断 300 多次就是这么来的，消息也就跟着卡）。 */
+        if socket != nil, connected { return }
         stop()
         guard !API.shared.token.isEmpty else { return }
         /* 服务器是加密口（5443，https/wss）。
@@ -96,6 +103,7 @@ final class Realtime: ObservableObject {
                     }
                     if !text.isEmpty { self.handle(text) }
                     self.failCount = 0        // 收得到东西就说明这条通道是通的
+                    self.lastRx = Date()
                 } catch {
                     // 断了：3 秒后重连
                     self.connected = false
@@ -104,7 +112,9 @@ final class Realtime: ObservableObject {
                        明文也连不上再换回加密，来回自愈，不会卡死在一种上。 */
                     self.failCount += 1
                     if self.failCount % 3 == 0 { self.plainFallback.toggle() }
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    /* 退避重连：1s → 2s → 3s → 最长 15s，避免疯狂重连刷屏、刷服务器 */
+                    let wait = min(15.0, 1.0 + Double(self.failCount))
+                    try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
                     if Task.isCancelled { break }
                     self.start()
                     return
@@ -112,6 +122,22 @@ final class Realtime: ObservableObject {
             }
         }
         connected = true
+        lastRx = Date()
+        /* 心跳 + 假死检测：服务器半分钟没动静就重连一次（比一直挂着收不到消息强） */
+        heartbeat?.cancel()
+        heartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                if Task.isCancelled { return }
+                guard let self = self else { return }
+                if Date().timeIntervalSince(self.lastRx) > 45 {
+                    self.connected = false
+                    self.start()
+                    return
+                }
+                self.sendJSON(["type": "ping"])
+            }
+        }
     }
 
     /// 往长连接里发一条 JSON（通话信令用）
@@ -123,6 +149,8 @@ final class Realtime: ObservableObject {
     }
 
     func stop() {
+        heartbeat?.cancel()
+        heartbeat = nil
         loop?.cancel()
         loop = nil
         socket?.cancel(with: .goingAway, reason: nil)

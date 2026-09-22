@@ -1408,6 +1408,72 @@ final class API {
 
     /* ---------------------------------------------------------- 共享实时位置 */
 
+    /* ---------------------------------------------------------- 零钱：银行卡 / 充值 / 提现 */
+
+    struct BankCard: Decodable, Identifiable, Hashable {
+        var id: String
+        var bank: String?
+        var tail: String?
+        var holder: String?
+        var isDefault: Bool?
+        var addedAt: String?
+        var label: String { (bank ?? "银行卡") + "（" + (tail ?? "****") + "）" }
+    }
+    private struct BanksPayload: Decodable { var banks: [BankCard]? }
+    private struct BankPayload: Decodable { var bank: BankCard?; var banks: [BankCard]? }
+
+    func walletBanks() async throws -> [BankCard] {
+        let p: BanksPayload = try await get("/api/wallet/banks", as: BanksPayload.self)
+        return p.banks ?? []
+    }
+
+    func addBank(bank: String, cardNo: String, holder: String) async throws -> [BankCard] {
+        let p: BankPayload = try await post("/api/wallet/banks",
+                                            ["bank": bank, "cardNo": cardNo, "holder": holder],
+                                            as: BankPayload.self)
+        return p.banks ?? []
+    }
+
+    func removeBank(id: String) async {
+        _ = try? await request("POST", "/api/wallet/banks/remove", body: ["id": id])
+    }
+
+    struct MoneyResult: Decodable {
+        var balance: Double?
+        var fee: Double?
+        var bankText: String?
+        var expect: String?
+        var status: String?
+    }
+
+    /// 充值：银行卡 → 零钱
+    func walletRecharge(amount: Double, bankId: String) async throws -> MoneyResult {
+        try await post("/api/wallet/recharge", ["amount": amount, "bankId": bankId], as: MoneyResult.self)
+    }
+
+    /// 提现：零钱 → 银行卡（要支付密码，或已通过面容）
+    func walletWithdraw(amount: Double, bankId: String, password: String, face: Bool) async throws -> MoneyResult {
+        try await post("/api/wallet/withdraw",
+                       ["amount": amount, "bankId": bankId, "password": password, "face": face],
+                       as: MoneyResult.self)
+    }
+
+    struct WalletOp: Decodable, Identifiable, Hashable {
+        var id: String
+        var kind: String?
+        var amount: Double?
+        var fee: Double?
+        var bankText: String?
+        var status: String?
+        var createdAt: String?
+    }
+    private struct OpsPayload: Decodable { var ops: [WalletOp]? }
+
+    func walletOps() async throws -> [WalletOp] {
+        let p: OpsPayload = try await get("/api/wallet/withdraws", as: OpsPayload.self)
+        return p.ops ?? []
+    }
+
     /* ---------------------------------------------------------- 存储空间 */
     struct StorageChat: Decodable, Identifiable {
         var chatId: String

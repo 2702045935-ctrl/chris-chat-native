@@ -20,6 +20,7 @@ struct BalancePageView: View {
     @State private var showBills = false
     @State private var showRecharge = false
     @State private var rechargeAmount = ""
+    @State private var showWithdraw = false
     @State private var showFaq = false
     @State private var faqAnswer: String?
 
@@ -45,10 +46,12 @@ struct BalancePageView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .navigationDestination(isPresented: $showBills) { BillsView() }
-        .alert("充值", isPresented: $showRecharge) {
-            TextField("金额", text: $rechargeAmount).keyboardType(.decimalPad)
-            Button(Tr("充值")) { doRecharge() }
-            Button(Tr("取消"), role: .cancel) { }
+        /* 充值 / 提现：微信那套完整页面（金额 + 到账银行卡 + 服务费 + 支付密码） */
+        .sheet(isPresented: $showRecharge) {
+            RechargeView().environmentObject(app)
+        }
+        .sheet(isPresented: $showWithdraw) {
+            WithdrawView().environmentObject(app)
         }
         .confirmationDialog(Tr("常见问题"), isPresented: $showFaq, titleVisibility: .visible) {
             ForEach((cfg?.faq ?? []).indices, id: \.self) { i in
@@ -157,25 +160,9 @@ struct BalancePageView: View {
         switch action {
         case "recharge": rechargeAmount = ""; showRecharge = true
         case "bills": showBills = true
-        case "withdraw": app.show(Tr("提现：还没接后端，先把页面做出来"))
+        case "withdraw": showWithdraw = true
         case "faq": showFaq = true
         default: app.show("「\(label)」还没接后端，先把页面做出来")
-        }
-    }
-
-    private func doRecharge() {
-        guard let amount = Double(rechargeAmount), amount > 0 else {
-            app.show(Tr("金额不对"))
-            return
-        }
-        Task {
-            if let balance = try? await API.shared.recharge(amount) {
-                app.me = try? await API.shared.me()
-                app.show("充值成功，余额 ¥\(String(format: "%.2f", balance))")
-                await load()
-            } else {
-                app.show(Tr("充值失败"))
-            }
         }
     }
 

@@ -80,6 +80,8 @@ final class CallCenter: NSObject, ObservableObject {
     @Published var errorText: String?
     /// 最小化：通话照旧，界面缩成顶部一条（微信左上那个画中画按钮）
     @Published var minimized = false
+    /// 有没有拿到「中继(relay)」候选：外网通话能不能兜底全看它。界面会显示出来，方便排查。
+    @Published var relayOK = false
 
     private var factory: RTCPeerConnectionFactory?
     private var pc: RTCPeerConnection?
@@ -133,6 +135,7 @@ final class CallCenter: NSObject, ObservableObject {
         peerAvatar = avatar
         isVideo = video
         iAmCaller = true
+        relayOK = false                      // 新的一通电话：中继状态重新算
         muted = false
         cameraOff = false
         seconds = 0
@@ -148,6 +151,7 @@ final class CallCenter: NSObject, ObservableObject {
     func accept() {
         guard phase == .incoming else { return }
         Ringtone.shared.stop()
+        relayOK = false                      // 接起来：中继状态重新算
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
@@ -632,6 +636,14 @@ extension CallCenter: RTCPeerConnectionDelegate {
     }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
+        let isRelay = candidate.sdp.contains("typ relay")
+        let isSrflx = candidate.sdp.contains("typ srflx")
+        if isRelay || isSrflx {
+            Task { @MainActor in
+                if isRelay { self.relayOK = true }
+                self.note(isRelay ? "cand=relay ✓" : "cand=srflx ✓")
+            }
+        }
         Task { @MainActor in self.note("cand=" + (candidate.sdp.hasPrefix("candidate:") ? String(candidate.sdp.prefix(24)) : candidate.sdp)) }
         let body: [String: Any] = ["action": "ice",
                                    "candidate": ["candidate": candidate.sdp,

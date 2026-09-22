@@ -192,6 +192,13 @@ struct CallView: View {
                     .padding(.horizontal, 40)
                     .padding(.top, 142)
             }
+            /* 通话通道自检（排查用）：有没有拿到「中继」候选，一眼就能看出来 */
+            if call.phase == .connecting || call.phase == .active {
+                Text(call.relayOK ? "通道：中继 ✓（外网也能通）" : "通道：直连中（外网连不上时靠中继）")
+                    .font(pfExact(13))
+                    .foregroundColor(.white.opacity(0.45))
+                    .padding(.top, 10)
+            }
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)

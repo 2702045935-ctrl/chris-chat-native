@@ -732,8 +732,11 @@ struct MomentsView: View {
                          alignment: .leading, spacing: gap) {
             ForEach(picked.indices, id: \.self) { i in
                 ZStack(alignment: .topTrailing) {
-                    RemoteImage(path: picked[i])
+                    Image(uiImage: picked[i])
+                        .resizable()
+                        .scaledToFill()
                         .frame(width: side, height: side)
+                        .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         .contentShape(Rectangle())
                         .onDrag {
@@ -1258,6 +1261,7 @@ struct CoverAdjustSheet: View {
     }
 
     /// 把「框住的那一块」画成一张图交给服务器
+    @MainActor
     private func render() {
         let view = Image(uiImage: image)
             .resizable()

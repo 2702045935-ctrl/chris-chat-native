@@ -38,6 +38,8 @@
   </dict>
   <key>LSApplicationQueriesSchemes</key>
   <array>
+    <string>imeituan</string>
+    <string>meituan</string>
     <string>taobao</string>
     <string>tmast</string>
     <string>alipays</string>

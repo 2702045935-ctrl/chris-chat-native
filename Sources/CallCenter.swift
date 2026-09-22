@@ -381,7 +381,15 @@ final class CallCenter: NSObject, ObservableObject {
         let f = makeFactory()
         let cfg = RTCConfiguration()
         cfg.iceServers = iceServers
-        cfg.iceTransportPolicy = .all          // 先直连，直连不成再由 TURN 中转
+        /* 连的是公网服务器（不是 192.168/10.x/127.）时：一律走中继。
+           4G ↔ 家里宽带这种组合直连常常只通一半（一边有声一边没声）甚至完全连不通，
+           走中继最稳（自己服务器上的 TURN 已经验证可用）。局域网内还是直连，快。 */
+        let host = API.shared.server.split(separator: ":").first.map(String.init) ?? ""
+        let isLan = host == "localhost" || host.hasPrefix("127.") || host.hasPrefix("10.")
+            || host.hasPrefix("192.168.") || host.hasPrefix("172.16") || host.hasPrefix("172.17")
+            || host.hasPrefix("172.18") || host.hasPrefix("172.19") || host.hasPrefix("172.2")
+            || host.hasPrefix("172.30") || host.hasPrefix("172.31")
+        cfg.iceTransportPolicy = isLan ? .all : .relay
         cfg.sdpSemantics = .unifiedPlan
         let pc = f.peerConnection(with: cfg,
                                   constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil),

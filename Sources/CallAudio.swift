@@ -22,6 +22,8 @@ final class CallAudioPipe {
     private var started = false
     /// 采集有没有真的跑起来（起不来时页面/日志能看到原因）
     var isRunning: Bool { started && engine.isRunning }
+    /// 起不来时的原因（上报日志用）
+    private(set) var lastError = ""
     private var pending = Data()                 // 攒够一帧再发
 
     /// 采到一帧就回调（交给长连接发出去）
@@ -33,17 +35,34 @@ final class CallAudioPipe {
 
     func start() {
         guard !started else { return }
-        started = true
+        started = false
+        lastError = ""
         pending.removeAll()
 
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playAndRecord, mode: .voiceChat,
-                                 options: [.defaultToSpeaker, .allowBluetooth])
-        try? session.setActive(true)
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+        } catch {
+            lastError = "setCategory 失败: \(error.localizedDescription)"
+        }
+        do { try session.setActive(true, options: []) } catch {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "setActive 失败: \(error.localizedDescription)"
+        }
 
         let input = engine.inputNode
-        let inFormat = input.inputFormat(forBus: 0)
-        guard inFormat.sampleRate > 0 else { started = false; return }
+        var inFormat = input.inputFormat(forBus: 0)
+        /* 有时候会话刚激活，输入格式还是 0：等一小会儿再来一次 */
+        var tries = 0
+        while inFormat.sampleRate <= 0 && tries < 5 {
+            Thread.sleep(forTimeInterval: 0.15)
+            inFormat = input.inputFormat(forBus: 0)
+            tries += 1
+        }
+        guard inFormat.sampleRate > 0 else {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "输入格式为 0（麦克风没就绪）"
+            return
+        }
 
         engine.attach(player)
         if let f = playFormat { engine.connect(player, to: engine.mainMixerNode, format: f) }
@@ -51,8 +70,22 @@ final class CallAudioPipe {
         input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buf, _ in
             self?.feed(buf, from: inFormat)
         }
-        engine.prepare()
-        do { try engine.start() } catch { started = false; return }
+        /* 引擎启动失败重试 3 次（iOS 上音频会话刚切换时第一次经常失败） */
+        var lastStartError: Error? = nil
+        for _ in 0..<3 {
+            engine.prepare()
+            do { try engine.start(); started = true; lastStartError = nil; break }
+            catch {
+                lastStartError = error
+                Thread.sleep(forTimeInterval: 0.2)
+            }
+        }
+        guard started else {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ")
+                + "engine.start 失败: \((lastStartError as NSError?)?.localizedDescription ?? "未知")"
+            try? input.removeTap(onBus: 0)
+            return
+        }
         player.play()
     }
 

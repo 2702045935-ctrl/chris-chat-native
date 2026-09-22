@@ -264,6 +264,8 @@ final class CallCenter: NSObject, ObservableObject {
             self.sendCall(["action": "audio", "data": data.base64EncodedString()])
         }
         CallAudioPipe.shared.start()
+        Task { await API.shared.callDiag("App 语音走服务器转发 采集=" + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
+            + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
         note("语音走服务器转发 ✓")
         /* 这条路已经开始传声音了：界面直接进入「通话中」并开始计时（不用等 ICE） */
         if phase != .active {
@@ -440,7 +442,8 @@ final class CallCenter: NSObject, ObservableObject {
                 self.sendCall(["action": "audio", "data": data.base64EncodedString()])
             }
             CallAudioPipe.shared.start()
-            Task { await API.shared.callDiag("App 语音走服务器转发 采集已启动 engine=\(CallAudioPipe.shared.isRunning ? "ok" : "失败")") }
+            Task { await API.shared.callDiag("App 语音走服务器转发 采集=" + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
+                + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
             note("语音走服务器转发 ✓")
             if phase != .active {
                 Ringtone.shared.stop()

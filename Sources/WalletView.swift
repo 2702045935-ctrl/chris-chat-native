@@ -21,6 +21,8 @@ struct WalletView: View {
     @State private var showCards = false
     @State private var showBiz = false
     @State private var showScore = false
+    /// 钱包页里的「客服中心」：进真正的客服中心页（不是那句「暂时没有在线客服」）
+    @State private var showSupport = false
     /// 「安全分」那一行显示真实分数（wallet.json 里加一项 action=score 就会读出来）
     @State private var creditText = ""
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
@@ -79,6 +81,7 @@ struct WalletView: View {
         .navigationDestination(isPresented: $showCards) { BankCardsView() }
         .navigationDestination(isPresented: $showBiz) { BizAccountView() }
         .navigationDestination(isPresented: $showScore) { SecurityScoreView() }
+        .sheet(isPresented: $showSupport) { SupportView().environmentObject(app) }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
@@ -204,9 +207,16 @@ struct WalletView: View {
         case "settings":
             app.show(Tr("支付设置：还没接后端，先把页面做出来"))
         case "service":
-            app.show(Tr("客服中心：暂时没有在线客服"))
+            showSupport = true            // 客服中心（常见问题 + 在线客服 + 工单）
         default:
-            app.show("「\(label)」还没接后端，先把页面做出来")
+            /* 后台把动作写成 soon（或者没写）时，按名字兜底 —— 这几个页面其实都做好了，
+               不能让用户点进去看到「还没开发」 */
+            if label.contains("经营账户") { showBiz = true }
+            else if label.contains("客服") { showSupport = true }
+            else if label.contains("零钱") { showCoin = true }
+            else if label.contains("账单") { showBills = true }
+            else if label.contains("银行卡") { showCards = true }
+            else { app.show("「\(label)」还没接后端，先把页面做出来") }
         }
     }
 

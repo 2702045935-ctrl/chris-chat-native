@@ -1119,6 +1119,8 @@ struct ServiceView: View {
     @State private var showRecharge = false
     @State private var showMore = false
     @State private var showWallet = false
+    /// 服务页上的「客服中心」：进真正的客服中心页
+    @State private var showServiceSupport = false
     @State private var showBillsPage = false
     @State private var detailChat: Chat?
     @State private var detailInfo: TransferInfo?
@@ -1211,6 +1213,7 @@ struct ServiceView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .navigationDestination(isPresented: $showWallet) { WalletView() }
+        .sheet(isPresented: $showServiceSupport) { SupportView().environmentObject(app) }
         .navigationDestination(isPresented: $showBillsPage) { BillsView() }
         .confirmationDialog(Tr("服务"), isPresented: $showMore, titleVisibility: .hidden) {
             Button(Tr("刷新账单")) { Task { await loadBills() } }
@@ -1434,7 +1437,10 @@ struct ServiceView: View {
         case "pay":
             app.show(Tr("收付款：还没接后端，先把页面做出来"))
         default:
-            app.show("「\(label)」还没接后端，先把页面做出来")
+            /* 名字兜底：这几页都做好了，后台动作写成 soon 也能点进去 */
+            if label.contains("客服") { showServiceSupport = true }
+            else if label.contains("经营") { showWallet = true }
+            else { app.show("「\(label)」还没接后端，先把页面做出来") }
         }
     }
 

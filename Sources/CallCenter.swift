@@ -321,7 +321,10 @@ final class CallCenter: NSObject, ObservableObject {
            直连连不上时靠它中转，比任何公网服务都靠得住。 */
         let hostOnly = API.shared.server.split(separator: ":").first.map(String.init) ?? ""
         if !hostOnly.isEmpty {
-            iceServers.insert(RTCIceServer(urlStrings: ["turn:\(hostOnly):3478?transport=udp"],
+            /* 自己服务器上的 TURN：TCP 和 UDP 都写上。
+               这台云服务器只转发了 TCP 3478（UDP 被服务商挡了），所以 TCP 那条才是能用的。 */
+            iceServers.insert(RTCIceServer(urlStrings: ["turn:\(hostOnly):3478?transport=tcp",
+                                                       "turn:\(hostOnly):3478?transport=udp"],
                                            username: "chris", credential: "chris1234"), at: 0)
         }
         guard let b = await API.shared.branding(),

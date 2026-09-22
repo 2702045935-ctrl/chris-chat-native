@@ -429,6 +429,30 @@ final class CallCenter: NSObject, ObservableObject {
         speakerOn = isVideo                    // 视频通话默认外放，语音默认听筒
         applySpeaker()
 
+        /* 语音通话：只听服务器转发，**完全不建 WebRTC**。
+           原因：WebRTC 会占住音频会话，导致我们自己的采集引擎起不来
+           （日志里网页在发帧、手机一帧都没发就是这个问题）。
+           视频通话还是走 WebRTC，语音这条路不依赖 TURN/直连，运营商挡不住。 */
+        if !isVideo {
+            serverAudioOn = true
+            CallAudioPipe.shared.onFrame = { [weak self] data in
+                guard let self = self, !self.muted else { return }
+                self.sendCall(["action": "audio", "data": data.base64EncodedString()])
+            }
+            CallAudioPipe.shared.start()
+            Task { await API.shared.callDiag("App 语音走服务器转发 采集已启动 engine=\(CallAudioPipe.shared.isRunning ? "ok" : "失败")") }
+            note("语音走服务器转发 ✓")
+            if phase != .active {
+                Ringtone.shared.stop()
+                phase = .active
+                tip = "通话中"
+                ringTimer?.invalidate()
+                ringTimer = nil
+                startTimer()
+            }
+            return
+        }
+
         let f = makeFactory()
         let cfg = RTCConfiguration()
         cfg.iceServers = iceServers

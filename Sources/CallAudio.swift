@@ -20,6 +20,8 @@ final class CallAudioPipe {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var started = false
+    /// 采集有没有真的跑起来（起不来时页面/日志能看到原因）
+    var isRunning: Bool { started && engine.isRunning }
     private var pending = Data()                 // 攒够一帧再发
 
     /// 采到一帧就回调（交给长连接发出去）

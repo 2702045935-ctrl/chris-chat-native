@@ -203,7 +203,7 @@ struct BankCardsView: View {
         if let c = bankList.first(where: { $0.name == name })?.color,
            case let hex = c.replacingOccurrences(of: "#", with: ""),
            hex.count == 6, let v = Int(hex, radix: 16) {
-            return Color(hex: v)
+            return Color(hex: UInt32(v))
         }
         let table: [String: Int] = ["工商银行": 0xC8161D, "建设银行": 0x0B4DA2, "农业银行": 0x0E8B4A,
                                     "中国银行": 0xB01F24, "招商银行": 0xC7000B, "交通银行": 0x1B4E9B,
@@ -211,7 +211,7 @@ struct BankCardsView: View {
                                     "浦发银行": 0x0A4C8B, "兴业银行": 0x1F4C9C, "光大银行": 0x8B1A2B,
                                     "平安银行": 0xF36F21, "广发银行": 0xC8102E, "华夏银行": 0x0E5EA8,
                                     "微众银行": 0x0E9C6B, "网商银行": 0x1F7BE0]
-        return Color(hex: table[name] ?? 0x8A8A8E)
+        return Color(hex: UInt32(table[name] ?? 0x8A8A8E))
     }
 
     private func bankShort(_ name: String) -> String {

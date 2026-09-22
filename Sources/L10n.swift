@@ -459,6 +459,8 @@ enum L10n {
         "允许陌生人查看朋友圈": "Let strangers see my Moments",
         "添加我的方式": "Ways to add me",
         "微信号": "ID",
+        "星言号": "Xingyan ID",
+        "星言号：": "Xingyan ID: ",
         "手机号": "Phone number",
         "二维码": "QR code",
         "关掉之后，别人就不能用这个方式找到你、加你好友。": "When off, others cannot find and add you this way.",

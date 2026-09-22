@@ -146,7 +146,7 @@ struct MeView: View {
                     Text(app.me?.name ?? "")
                         .font(pf(L.v(17, 4.8, 19.5)))
                         .foregroundColor(C.label)
-                Text("微信号：\(app.me?.username ?? "-")")
+                Text(Tr("星言号") + "：" + (app.me?.username ?? "-"))
                         .font(pf(16))
                         .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
                         .padding(.top, L.v(4, 1.8, 8))

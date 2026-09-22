@@ -103,7 +103,7 @@ struct SwitchAccountView: View {
                         .font(pf(16.5))
                         .foregroundColor(ink)
                         .lineLimit(1)
-                    Text(Tr("微信号") + "：" + a.username)
+                    Text(Tr("星言号") + "：" + a.username)
                         .font(pf(13))
                         .foregroundColor(gray)
                         .lineLimit(1)

@@ -55,9 +55,9 @@ struct ProfileEditView: View {
                         HairLine(inset: 16)
                         field("昵称", $nickname)
                         HairLine(inset: 16)
-                        /* 微信号（只读）+ 我的二维码：和微信一样排在这一屏最上面 */
+                        /* 星言号（只读）+ 我的二维码：和微信一样排在这一屏最上面 */
                         HStack(spacing: 12) {
-                            Text(Tr("微信号")).font(pf(17)).foregroundColor(C.label)
+                            Text(Tr("星言号")).font(pf(17)).foregroundColor(C.label)
                                 .frame(width: 76, alignment: .leading)
                             Text(app.me?.username ?? "-")
                                 .font(pf(17))
@@ -350,7 +350,7 @@ struct AddFriendView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(C.subLabel)
-                    TextField("输入对方的用户名（微信号）", text: $username)
+                    TextField("输入对方的用户名（星言号）", text: $username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .font(pf(16))

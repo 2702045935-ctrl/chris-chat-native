@@ -62,7 +62,7 @@ struct MyQRView: View {
                         Avatar(path: avatar, size: 46, radius: 6)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(name).font(pf(16, .medium)).foregroundColor(C.label).lineLimit(1)
-                            Text(Tr("微信号：") + (username.isEmpty ? "-" : username))
+                            Text(Tr("星言号：") + (username.isEmpty ? "-" : username))
                                 .font(pf(12.5)).foregroundColor(C.subLabel)
                         }
                         Spacer(minLength: 0)
@@ -127,7 +127,7 @@ struct MyQRView: View {
             }
             .frame(width: 520, height: 520)
             Text(name).font(.system(size: 26, weight: .semibold))
-            Text(Tr("微信号：") + username).font(.system(size: 20)).foregroundColor(.gray)
+            Text(Tr("星言号：") + username).font(.system(size: 20)).foregroundColor(.gray)
             Text(Tr("扫一扫，加我好友")).font(.system(size: 20)).foregroundColor(.gray)
         }
         .padding(40)

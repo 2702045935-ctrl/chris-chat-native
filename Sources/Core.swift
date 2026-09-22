@@ -617,6 +617,8 @@ enum TimeFmt {
         let days = cal.dateComponents([.day],
                                       from: cal.startOfDay(for: d),
                                       to: cal.startOfDay(for: Date())).day ?? 99
+        /* 微信会话列表：今天 HH:mm → 昨天 → 前天 → 星期一~日 → M月d日 → yyyy年M月d日 */
+        if days == 2 { return "前天" }
         if days < 7 {
             f.dateFormat = "EEEE"
             return f.string(from: d)

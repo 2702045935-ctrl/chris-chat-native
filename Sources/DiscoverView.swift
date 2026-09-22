@@ -540,7 +540,10 @@ struct MomentsView: View {
                           onOpenImage: { path in openPhoto(path, in: moment) },
                           onOpenAvatar: { u in cardUser = u },
                           onDeleteComment: { cid in deleteComment(moment.id, cid) },
-                          myId: app.me?.id ?? "")
+                          myId: app.me?.id ?? "",
+                          onLike: { like(moment) },
+                          onComment: { commentText = ""; commenting = moment },
+                          onDeleteMoment: { remove(moment) })
             }
             // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
             if hasMoreMoments {
@@ -1007,8 +1010,14 @@ struct MomentRow: View {
     var onDeleteComment: ((String) -> Void)? = nil
     /// 我的用户 id（判断哪条评论是我自己发的）
     var myId: String = ""
+    /// 点赞 / 评论 / 删除自己的动态（微信「···」旁边那个小横条上的按钮）
+    var onLike: (() -> Void)? = nil
+    var onComment: (() -> Void)? = nil
+    var onDeleteMoment: (() -> Void)? = nil
 
     @State private var deletingComment: String?
+    /// 微信：点「···」是在按钮**旁边**弹出「赞 | 评论」小横条，不是底部弹层
+    @State private var showActions = false
 
     private var images: [String] { moment.images ?? [] }
     var body: some View {
@@ -1044,7 +1053,7 @@ struct MomentRow: View {
                     Spacer()
 
                     Button {
-                        onMore?()
+                        withAnimation(.easeOut(duration: 0.14)) { showActions.toggle() }
                     } label: {
                         HStack(spacing: 2.6) {
                             ForEach(0..<3, id: \.self) { _ in
@@ -1098,6 +1107,16 @@ struct MomentRow: View {
         }
         .padding(.top, 15)
         .padding(.bottom, 12)
+        /* 微信那个小横条：贴着「···」左边弹出来，里面有「赞 | 评论」（自己的动态多一个删除） */
+        .overlay(alignment: .bottomTrailing) {
+            if showActions {
+                actionBar
+                    .offset(x: -34, y: -6)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { if showActions { withAnimation(.easeOut(duration: 0.12)) { showActions = false } } }
         /* 点自己发的评论 → 删除（微信就是这样） */
         .confirmationDialog(Tr("删除这条评论？"), isPresented: Binding(
             get: { deletingComment != nil },
@@ -1115,6 +1134,64 @@ struct MomentRow: View {
         MomentImageGrid(images: images,
                         avail: L.width - L.momentPadH * 2 - L.momentAvatar - 9,
                         onTap: { i in if i < images.count { onOpenImage?(images[i]) } })
+    }
+
+    /* 微信那个「赞 | 评论」小横条：深色底、白字白图标，贴着「···」左边 */
+    private var actionBar: some View {
+        HStack(spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.12)) { showActions = false }
+                onLike?()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "hand.thumbsup")
+                        .font(.system(size: 12.5))
+                    Text(moment.likedByMe == true ? Tr("取消赞") : Tr("赞"))
+                        .font(pf(14.5))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 13)
+                .frame(height: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Rectangle().fill(Color.white.opacity(0.22)).frame(width: 0.5, height: 18)
+
+            Button {
+                withAnimation(.easeOut(duration: 0.12)) { showActions = false }
+                onComment?()
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "bubble.right")
+                        .font(.system(size: 12.5))
+                    Text(Tr("评论")).font(pf(14.5))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 13)
+                .frame(height: 32)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if moment.mine == true, onDeleteMoment != nil {
+                Rectangle().fill(Color.white.opacity(0.22)).frame(width: 0.5, height: 18)
+                Button {
+                    withAnimation(.easeOut(duration: 0.12)) { showActions = false }
+                    onDeleteMoment?()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 13)
+                        .frame(height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color.black.opacity(0.82)))
+        .shadow(color: Color.black.opacity(0.18), radius: 6, y: 2)
     }
 }
 

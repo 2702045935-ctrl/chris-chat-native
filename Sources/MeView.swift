@@ -164,10 +164,12 @@ struct MeView: View {
                     showMyQR = true
                 } label: {
                     SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: C.arrow)
-                        .frame(width: L.v(26, 7.4, 30), height: L.v(26, 7.4, 30))
+                        /* 点击区按微信标准做成 44×44（以前只有 26，真机上经常点不到） */
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 2)
+                .padding(.trailing, -6)
                 .frame(maxHeight: .infinity, alignment: .top)
             }
             .padding(.leading, 28)

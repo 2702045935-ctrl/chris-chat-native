@@ -62,6 +62,8 @@ struct ChatDetailView: View {
     /* 位置：微信「＋ → 位置」会先问一句「发送位置 / 共享实时位置」 */
     @State private var showLocationMenu = false
     @State private var showLiveLocation = false
+    /// 发送位置：用新的地图选点页（微信那种），不再用那个手填经纬度的表单
+    @State private var showSendLocation = false
     @State private var showTransfer = false
     @State private var showGroupInfo = false
     @State private var showSearch = false
@@ -407,9 +409,12 @@ struct ChatDetailView: View {
         }
         /* 位置：发送位置 / 共享实时位置（微信那一套） */
         .confirmationDialog(Tr("位置"), isPresented: $showLocationMenu, titleVisibility: .visible) {
-            Button(Tr("发送位置")) { showLocation = true }
+            Button(Tr("发送位置")) { showSendLocation = true }
             Button(Tr("共享实时位置")) { showLiveLocation = true }
             Button(Tr("取消"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showSendLocation) {
+            SendLocationView { payload in send(kind: "location", content: payload) }
         }
         .sheet(isPresented: $showLiveLocation) {
             LiveLocationView(chat: chat) {

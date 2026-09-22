@@ -30,6 +30,8 @@ struct PushEvent: Equatable {
     var callCandidate: String? = nil
     /// 挂断原因：hangup / rejected / cancel / timeout / offline / disconnected
     var callReason = ""
+    /// 通话前问服务器「两端是不是同一个网络」的回答（同一个 → 直连，不同 → 强制走中继）
+    var callSameNetwork = false
     /* ---- 直播专场（弹幕/点赞/在线人数） ---- */
     var roomId = ""
     var liveAction = ""
@@ -160,6 +162,7 @@ final class Realtime: ObservableObject {
         ev.callPeerAvatar = (obj["peerAvatar"] as? String) ?? ""
         ev.callError = (obj["error"] as? String) ?? ""
         ev.callReason = (obj["reason"] as? String) ?? ""
+        if let same = obj["same"] as? Bool { ev.callSameNetwork = same }
         // 直播：进的哪个房间、什么动作（弹幕/点赞/人数）、谁说的、多少人
         ev.roomId = (obj["roomId"] as? String) ?? ""
         ev.liveAction = (obj["action"] as? String) ?? ""

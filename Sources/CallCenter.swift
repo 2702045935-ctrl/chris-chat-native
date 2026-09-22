@@ -91,6 +91,23 @@ final class CallCenter: NSObject, ObservableObject {
     private var iAmCaller = false
     private var remoteOfferSDP: String?
     private var pendingIce: [RTCIceCandidate] = []
+    /// 等服务器回答「两端是不是同一个网络」的等待者
+    private var netWaiters: [String: CheckedContinuation<Bool, Never>] = [:]
+
+    /// 问服务器：我和对端是不是同一个网络？
+    /// 同一个 → 直连（快、不占带宽）；不同 → 强制走中继（4G↔宽带这种直连经常只通一半）
+    func askSameNetwork(peerUserId: String) async -> Bool {
+        await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            netWaiters[peerUserId] = cont
+            Realtime.shared.sendJSON(["type": "call", "action": "net", "peerId": peerUserId])
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                if let c = netWaiters.removeValue(forKey: peerUserId) {
+                    c.resume(returning: false)      // 问不到就按「不同网络」处理：走中继最稳
+                }
+            }
+        }
+    }
     private var audioTrack: RTCAudioTrack?
     private var localVideoTrack: RTCVideoTrack?
     private var videoSource: RTCVideoSource?
@@ -244,6 +261,8 @@ final class CallCenter: NSObject, ObservableObject {
         }
         let action = ev.callAction
         switch action {
+        case "net":
+            if let c = netWaiters.removeValue(forKey: ev.callPeerId) { c.resume(returning: ev.callSameNetwork) }
         case "incoming":
             // 已经在通话里就自动挂掉（和网页版一样，服务器也会挡忙线）
             guard phase == .idle else {
@@ -381,15 +400,17 @@ final class CallCenter: NSObject, ObservableObject {
         let f = makeFactory()
         let cfg = RTCConfiguration()
         cfg.iceServers = iceServers
-        /* 连的是公网服务器（不是 192.168/10.x/127.）时：一律走中继。
-           4G ↔ 家里宽带这种组合直连常常只通一半（一边有声一边没声）甚至完全连不通，
-           走中继最稳（自己服务器上的 TURN 已经验证可用）。局域网内还是直连，快。 */
+        /* 先问服务器两端是不是同一个网络：
+           同一个网络（同一 Wi-Fi / 同一出口）→ 直连，快、不占服务器带宽；
+           不同网络（4G ↔ 家里宽带）→ 强制走中继，不然直连经常只通一半甚至完全连不通。
+           服务器是局域网地址（本机部署）时也直接走直连。 */
+        let sameNet = await askSameNetwork(peerUserId: peerId)
         let host = API.shared.server.split(separator: ":").first.map(String.init) ?? ""
         let isLan = host == "localhost" || host.hasPrefix("127.") || host.hasPrefix("10.")
             || host.hasPrefix("192.168.") || host.hasPrefix("172.16") || host.hasPrefix("172.17")
             || host.hasPrefix("172.18") || host.hasPrefix("172.19") || host.hasPrefix("172.2")
             || host.hasPrefix("172.30") || host.hasPrefix("172.31")
-        cfg.iceTransportPolicy = isLan ? .all : .relay
+        cfg.iceTransportPolicy = (sameNet || isLan) ? .all : .relay
         cfg.sdpSemantics = .unifiedPlan
         let pc = f.peerConnection(with: cfg,
                                   constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil),

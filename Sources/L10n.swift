@@ -134,6 +134,7 @@ enum L10n {
         "转账金额": "Amount",
         "登录后同步最近的聊天记录": "Sign in to sync your recent chats",
         "微信登录": "WeChat login",
+        "星言登录": "Xingyan login",
         "手机号登录": "Phone login",
         "保存": "Save",
         "获取验证码": "Get code",

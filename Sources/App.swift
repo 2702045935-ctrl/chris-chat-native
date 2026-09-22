@@ -854,7 +854,7 @@ struct LoginView: View {
                             Image(systemName: "message.fill")
                                 .resizable()
                                 .frame(width: 22, height: 22)
-                            Text(Tr("微信登录"))
+                            Text(Tr("星言登录"))
                                 .font(.system(size: 16, weight: .medium))
                         }
                         .foregroundColor(.white)
@@ -959,16 +959,26 @@ struct LoginView: View {
         }
         .onAppear {
             Task {
-                if let b = await API.shared.branding() {
-                    LoginTheme.apply(b)
-                    if let n = b.login?.appName ?? b.appName, !n.isEmpty { appName = n }
-                    if let lg = b.login?.logo ?? b.logo, !lg.isEmpty { logoPath = lg }
-                    bgImage = b.login?.bgImage ?? ""      // 背景图（用状态存，才能刷新生效）
-                    themeTick += 1
-                }
+                await loadLoginBranding()
             }
         }
         }   // 关掉最外层 ZStack
+    }
+
+    /// 拉登录页那套配色（后台「🎨 登录页」）。
+    /// 刚启动网络偶尔会抖，所以最多试 4 次；一次成功就应用 + 让界面重画。
+    private func loadLoginBranding() async {
+        for attempt in 0..<4 {
+            if let b = await API.shared.branding() {
+                LoginTheme.apply(b)
+                if let n = b.login?.appName ?? b.appName, !n.isEmpty { appName = n }
+                if let lg = b.login?.logo ?? b.logo, !lg.isEmpty { logoPath = lg }
+                bgImage = b.login?.bgImage ?? ""      // 背景图（用状态存，才能刷新生效）
+                themeTick += 1
+                return
+            }
+            if attempt < 3 { try? await Task.sleep(nanoseconds: 1_500_000_000) }
+        }
     }
 
     /// 登录页背景：后台配了背景图就铺满整屏（压一层很淡的底色保证文字看得清），否则用系统背景
@@ -1494,7 +1504,7 @@ struct PairSheet: View {
             }
             .frame(maxWidth: .infinity)
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle(Tr("微信登录"))
+            .navigationTitle(Tr("星言登录"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { stop(); dismiss() } } }
         }

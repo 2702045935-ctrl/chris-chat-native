@@ -1377,7 +1377,7 @@ struct MessageRow: View {
                 .foregroundColor(C.subLabel)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.hairLine))
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.hairline))
         }
     }
 

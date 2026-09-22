@@ -13,83 +13,68 @@ struct MsgAction: Identifiable, Hashable {
     var id: String { key }
 }
 
-struct MsgActionSheet: View {
-    let title: String
+/* 长按消息弹出来的那个小方框（微信那种：白色圆角框 + 一排图标文字，
+   贴在消息旁边，点外面就收起来）。 */
+struct MsgMenuBox: View {
     let actions: [MsgAction]
     var onPick: (MsgAction) -> Void
-    var onCancel: () -> Void
 
     @Environment(\.colorScheme) private var scheme
-
-    private var sheetBg: Color { scheme == .dark ? Color(hex: 0x2C2C2E) : .white }
+    private var bg: Color { scheme == .dark ? Color(hex: 0x3A3A3C) : .white }
     private var ink: Color { scheme == .dark ? Color(hex: 0xEDEDED) : Color(hex: 0x1A1A1A) }
 
-    private let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 5)
+    static let itemW: CGFloat = 56
+    static let itemH: CGFloat = 62
+    static let padH: CGFloat = 6
+    static let padV: CGFloat = 8
+
+    /// 一排最多放几个（微信也是这么横着排）
+    static func columns(_ n: Int) -> Int { min(6, max(1, n)) }
+
+    static func size(_ n: Int) -> CGSize {
+        let cols = columns(n)
+        let rows = Int(ceil(Double(n) / Double(cols)))
+        return CGSize(width: CGFloat(cols) * itemW + padH * 2,
+                      height: CGFloat(rows) * itemH + padV * 2)
+    }
 
     var body: some View {
+        let cols = MsgMenuBox.columns(actions.count)
+        let rows = Int(ceil(Double(actions.count) / Double(cols)))
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
-                .contentShape(Rectangle())
-                .onTapGesture { onCancel() }
-
-            VStack(spacing: 10) {
-                if !title.isEmpty {
-                    Text(title)
-                        .font(pf(12))
-                        .foregroundColor(C.subLabel)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 14)
-                        .padding(.top, 12)
-                }
-
-                LazyVGrid(columns: cols, spacing: 14) {
-                    ForEach(actions) { a in
-                        Button {
-                            onPick(a)
-                        } label: {
-                            VStack(spacing: 6) {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.dyn(0xF2F2F7, 0x3A3A3C))
+            ForEach(0..<rows, id: \.self) { r in
+                HStack(spacing: 0) {
+                    ForEach(Array(actions.enumerated()), id: \.element.id) { idx, a in
+                        if idx / cols == r {
+                            Button {
+                                onPick(a)
+                            } label: {
+                                VStack(spacing: 5) {
                                     Image(systemName: a.icon)
-                                        .font(.system(size: 19))
+                                        .font(.system(size: 20))
                                         .foregroundColor(a.danger ? Color(hexString: "#FA5151") : ink)
+                                        .frame(height: 22)
+                                    Text(Tr(a.label))
+                                        .font(pf(11.5))
+                                        .foregroundColor(a.danger ? Color(hexString: "#FA5151") : ink)
+                                        .lineLimit(1)
+                                        .fixedSize()
                                 }
-                                .frame(width: 54, height: 54)
-                                Text(Tr(a.label))
-                                    .font(pf(12))
-                                    .foregroundColor(a.danger ? Color(hexString: "#FA5151") : ink)
-                                    .lineLimit(1)
+                                .frame(width: MsgMenuBox.itemW, height: MsgMenuBox.itemH)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, title.isEmpty ? 14 : 0)
-                .padding(.bottom, 16)
             }
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(sheetBg))
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
-
-            Button {
-                onCancel()
-            } label: {
-                Text(Tr("取消"))
-                    .font(pf(17))
-                    .foregroundColor(ink)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(sheetBg))
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
         }
-        .background(Color.black.opacity(0.28).ignoresSafeArea())
-        .transition(.opacity)
+        .padding(.horizontal, MsgMenuBox.padH)
+        .padding(.vertical, MsgMenuBox.padV)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(bg))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .stroke(Color.black.opacity(scheme == .dark ? 0 : 0.08), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
     }
 }
 

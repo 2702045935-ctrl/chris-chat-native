@@ -53,6 +53,9 @@ struct ChatDetailView: View {
     @State private var selectMode = false
     @State private var selected: Set<String> = []
     @State private var quote: Message?
+    /// 每条消息在屏幕上的位置（长按弹的小方框要贴在它旁边）
+    @State private var msgFrames: [String: CGRect] = [:]
+    @State private var menuRect: CGRect = .zero
 
     @State private var showPhoto = false
     @State private var showCamera = false
@@ -76,6 +79,7 @@ struct ChatDetailView: View {
 
     private func openActions(_ m: Message) {
         if selectMode { toggleSelect(m); return }
+        menuRect = msgFrames[m.id] ?? .zero
         actionMessage = m
     }
 
@@ -347,18 +351,35 @@ struct ChatDetailView: View {
                 composer
             }
         }
-        /* 长按弹出来的动作条 */
+        /* 长按：贴着那条消息弹出一个小方框（微信那种，不是从底下滑上来的） */
         .overlay {
-            if let m = actionMessage {
-                MsgActionSheet(title: actionTitle(m), actions: actions(for: m)) { a in
-                    actionMessage = nil
-                    run(a, on: m)
-                } onCancel: {
-                    actionMessage = nil
+            GeometryReader { geo in
+                if let m = actionMessage {
+                    let g = geo.frame(in: .global)
+                    let box = MsgMenuBox.size(actions(for: m).count)
+                    let rect = menuRect == .zero
+                        ? CGRect(x: g.midX, y: g.midY, width: 0, height: 0)
+                        : menuRect
+                    let above = (rect.minY - g.minY) > (box.height + 16)
+                    let x = min(max(8, rect.midX - g.minX - box.width / 2),
+                                max(8, geo.size.width - box.width - 8))
+                    let y = above ? (rect.minY - g.minY - box.height - 8)
+                                  : min(geo.size.height - box.height - 8, rect.maxY - g.minY + 8)
+                    ZStack(alignment: .topLeading) {
+                        Color.black.opacity(0.03)
+                            .ignoresSafeArea()
+                            .onTapGesture { actionMessage = nil }
+                        MsgMenuBox(actions: actions(for: m)) { a in
+                            actionMessage = nil
+                            run(a, on: m)
+                        }
+                        .offset(x: x, y: max(8, y))
+                    }
                 }
-                .zIndex(30)
             }
+            .zIndex(30)
         }
+        .onPreferenceChange(MsgFrameKey.self) { msgFrames = $0 }
         .sheet(isPresented: $showForward) {
             ForwardPickerView(kind: forwardKind, content: forwardBody) { }
                 .environmentObject(app)
@@ -500,6 +521,10 @@ struct ChatDetailView: View {
                                             .onTapGesture { toggleSelect(message) }
                                     }
                                 }
+                                .background(GeometryReader { g in
+                                    Color.clear.preference(key: MsgFrameKey.self,
+                                                           value: [message.id: g.frame(in: .global)])
+                                })
                             }
                         }
                         .id(message.id)

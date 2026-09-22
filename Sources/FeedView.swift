@@ -587,6 +587,9 @@ struct FeedCell: View {
     @State private var liked = false
     @State private var likes = 0
     @State private var bounced = false
+    @State private var progress: Double = 0        // 播放进度 0~1（抖音式底部进度条）
+    @State private var durationSec: Double = 0
+    @State private var timeObserver: Any?
 
     var body: some View {
         ZStack {
@@ -602,6 +605,28 @@ struct FeedCell: View {
             }
             LinearGradient(colors: [.black.opacity(0.35), .clear, .black.opacity(0.65)],
                            startPoint: .top, endPoint: .bottom)
+
+            /* 抖音式底部细进度条：能看进度，按住还能拖 */
+            VStack {
+                Spacer()
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(Color.white.opacity(0.22))
+                        Rectangle().fill(Color.white)
+                            .frame(width: max(0, min(1, progress)) * g.size.width)
+                    }
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 0).onChanged { v in
+                        let r = max(0, min(1, v.location.x / max(1, g.size.width)))
+                        progress = r
+                        if durationSec > 0 {
+                            player?.seek(to: CMTime(seconds: r * durationSec, preferredTimescale: 600),
+                                         toleranceBefore: .zero, toleranceAfter: .zero)
+                        }
+                    })
+                }
+                .frame(height: 3)
+            }
 
             /* 短剧：左上角显示当前集数，旁边一个「选集」入口 */
             if !(item.ep ?? "").isEmpty {
@@ -662,6 +687,10 @@ struct FeedCell: View {
             .padding(.bottom, max(style.padBottom ?? 28, L.safeBottom + 10))
         }
         .onAppear { setup() }
+        .onDisappear {
+            if let obs = timeObserver, let p = player { p.removeTimeObserver(obs) }
+            timeObserver = nil
+        }
         .onDisappear { player?.pause() }
         .onChange(of: active) { on in
             if on { player?.play() } else { player?.pause(); player?.seek(to: .zero) }
@@ -853,6 +882,7 @@ struct FeedPlayerSheet: View {
     private func load(_ w: FeedItem) {
         guard let url = API.shared.assetURL(w.video ?? "") else { loading = false; return }
         loading = true
+        if let obs = timeObserver, let old = player { old.removeTimeObserver(obs); timeObserver = nil }
         Task { @MainActor in
             do {
                 let asset = API.shared.streamingAsset(w.video ?? "") ?? AVURLAsset(url: url)
@@ -860,6 +890,14 @@ struct FeedPlayerSheet: View {
                 p.actionAtItemEnd = .none
                 p.automaticallyWaitsToMinimizeStalling = true
                 p.currentItem?.preferredForwardBufferDuration = 3
+                /* 每 0.1 秒回一次播放位置，驱动底部进度条 */
+                timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { t in
+                    let d = p.currentItem?.duration.seconds ?? 0
+                    if d.isFinite, d > 0 {
+                        durationSec = d
+                        progress = min(1, max(0, t.seconds / d))
+                    }
+                }
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero); p.play()

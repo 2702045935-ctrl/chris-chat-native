@@ -325,6 +325,12 @@ struct MomentsView: View {
                 if baseTop == nil { baseTop = y }
                 topY = y
             }
+            /* 手指在朋友圈里滑动时，就别把这一下当成「点开一张图」 */
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 6).onChanged { _ in
+                    tapLockUntil = Date().addingTimeInterval(0.35)
+                }
+            )
             .onPreferenceChange(OffsetKey2.self) { y in
                 if baseBlock == nil { baseBlock = y }
                 blockY = y
@@ -1597,12 +1603,16 @@ struct MomentSingleImage: View {
         let limit = a >= 1 ? avail : avail * 0.62
         let w = naturalW > 0 ? min(limit, naturalW) : limit  // 小图不放大
         let h = min(w / a, 300)                              // 超长图限高裁切
-        RemoteImage(path: path, icon: "photo")
-            .frame(width: w, height: h)
-            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .contentShape(Rectangle())
-            .onTapGesture { onTap() }
-            .onAppear { if !started { started = true; Task { await measure() } } }
+        /* 用 Button 而不是 onTapGesture：手指在图上滑动（滚动朋友圈）时按钮会自动取消，
+           以前用手势，滑动经常被当成「点开这张图」，看起来就是莫名其妙弹出一张图 */
+        Button { onTap() } label: {
+            RemoteImage(path: path, icon: "photo")
+                .frame(width: w, height: h)
+                .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onAppear { if !started { started = true; Task { await measure() } } }
     }
 
     private func measure() async {

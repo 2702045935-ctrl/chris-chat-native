@@ -534,3 +534,249 @@ struct GroupInfoView: View {
             .padding(.leading, 14)
     }
 }
+
+/* ============================================================
+   单聊的「聊天信息」页 —— 微信里点右上「⋯」出来的就是这一页：
+   · 顶上是对方：头像 + 昵称 + 星言号（点一下进名片）
+   · 消息免打扰、置顶聊天
+   · 音视频通话 / 查找聊天记录 / 设置当前聊天背景
+   · 清空聊天记录
+   · 删除该聊天
+   ============================================================ */
+struct DirectChatInfoView: View {
+    @ObservedObject private var lang = LangStore.shared
+    let chat: Chat
+
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var peer: User?
+    @State private var pinned = false
+    @State private var muted = false
+    @State private var showSearch = false
+    @State private var showCard = false
+    @State private var confirmClear = false
+    @State private var confirmDelete = false
+    @State private var showCall = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("聊天信息"), back: { dismiss() })
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 8) {
+                    peerCard
+                    switchCard
+                    toolCard
+                    dangerCard
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 30)
+            }
+        }
+        .background(C.pageBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .task {
+            pinned = chat.pinned == true
+            muted = chat.muted == true
+            if let r = try? await API.shared.chatMembers(chatId: chat.id) {
+                peer = r.members.first { $0.id != app.me?.id }
+            }
+            /* 会话列表里没带成员时（比如从搜索进来的），按 id 再捞一次 */
+            if peer == nil, let other = chat.memberIds?.first(where: { $0 != app.me?.id }) {
+                peer = try? await API.shared.user(id: other)
+            }
+        }
+        .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
+        .sheet(isPresented: $showCard) {
+            if let p = peer {
+                ContactCardView(user: p,
+                                onOpenChat: { _ in showCard = false },
+                                onOpenMoments: { _ in showCard = false })
+                    .environmentObject(app)
+            }
+        }
+        .confirmationDialog(Tr("清空聊天记录？"), isPresented: $confirmClear, titleVisibility: .visible) {
+            Button(Tr("清空"), role: .destructive) { clearHistory() }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .confirmationDialog(Tr("删除该聊天？"), isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(Tr("删除"), role: .destructive) { deleteChat() }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .confirmationDialog(Tr("音视频通话"), isPresented: $showCall, titleVisibility: .hidden) {
+            Button(Tr("语音通话")) { start(video: false) }
+            Button(Tr("视频通话")) { start(video: true) }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+    }
+
+    /* ---------------------------------------------------------- 对方 */
+
+    private var peerCard: some View {
+        Button {
+            if peer != nil { showCard = true }
+        } label: {
+            HStack(spacing: 12) {
+                Avatar(path: peer?.avatarPath ?? "", size: 46, radius: 6)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(peer?.name ?? chat.name).font(pf(17)).foregroundColor(C.label)
+                    if let un = peer?.username, !un.isEmpty {
+                        Text(Tr("星言号") + "：" + un).font(pf(13)).foregroundColor(C.subLabel)
+                    }
+                }
+                Spacer(minLength: 8)
+                Chevron(size: 9, line: 1.6)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 72)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+    }
+
+    /* ---------------------------------------------------------- 开关 */
+
+    private var switchCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(Tr("消息免打扰")).font(pf(16)).foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { muted },
+                    set: { v in
+                        muted = v
+                        Task {
+                            muted = await API.shared.setMuted(chatId: chat.id, muted: v)
+                            await app.loadChats()
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(C.green)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
+            divider
+            HStack(spacing: 10) {
+                Text(Tr("置顶聊天")).font(pf(16)).foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { pinned },
+                    set: { v in
+                        pinned = v
+                        Task {
+                            pinned = await API.shared.setPinned(chatId: chat.id, pinned: v)
+                            await app.loadChats()
+                        }
+                    }
+                ))
+                .labelsHidden()
+                .tint(C.green)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
+        }
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+    }
+
+    /* ---------------------------------------------------------- 功能行 */
+
+    private var toolCard: some View {
+        VStack(spacing: 0) {
+            row(Tr("音视频通话")) { showCall = true }
+            divider
+            row(Tr("查找聊天记录")) { showSearch = true }
+            divider
+            row(Tr("设置当前聊天背景")) {
+                app.show(Tr("换聊天背景：点「我 → 设置 → 聊天背景」"))
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+    }
+
+    private func row(_ title: String, tap: @escaping () -> Void) -> some View {
+        Button(action: tap) {
+            HStack(spacing: 10) {
+                Text(title).font(pf(16)).foregroundColor(C.label)
+                Spacer(minLength: 8)
+                Chevron(size: 9, line: 1.6)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 50)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /* ---------------------------------------------------------- 危险操作 */
+
+    private var dangerCard: some View {
+        VStack(spacing: 0) {
+            Button { confirmClear = true } label: {
+                Text(Tr("清空聊天记录"))
+                    .font(pf(16))
+                    .foregroundColor(C.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            divider
+            Button { confirmDelete = true } label: {
+                Text(Tr("删除该聊天"))
+                    .font(pf(16))
+                    .foregroundColor(C.red)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(C.hairline)
+            .frame(height: 0.5)
+            .padding(.leading, 14)
+    }
+
+    /* ---------------------------------------------------------- 干活 */
+
+    private func start(video: Bool) {
+        let p = peer
+        CallCenter.shared.start(peerId: p?.id ?? "",
+                                name: p?.name ?? chat.name,
+                                avatar: p?.avatarPath ?? "",
+                                video: video)
+        dismiss()
+    }
+
+    private func clearHistory() {
+        Task {
+            if let err = await API.shared.clearChat(chatId: chat.id) {
+                app.show(err)
+            } else {
+                app.show(Tr("聊天记录已清空"))
+            }
+        }
+    }
+
+    private func deleteChat() {
+        Task {
+            if let err = await API.shared.hideChat(chatId: chat.id) {
+                app.show(err)
+                return
+            }
+            await app.loadChats()
+            dismiss()
+            app.show(Tr("已删除该聊天"))
+        }
+    }
+}

@@ -60,9 +60,9 @@ struct ChatDetailView: View {
     @State private var showCamera = false
     @State private var showLocation = false
     @State private var showTransfer = false
-    @State private var showChatMenu = false
     @State private var showGroupInfo = false
     @State private var showSearch = false
+    @State private var showChatInfo = false
     @State private var showFile = false
     @State private var showCall = false
     @State private var billInfo: TransferInfo?
@@ -294,7 +294,9 @@ struct ChatDetailView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             NavBar(title: navTitle, back: { dismiss() }, leftExtra: leftUnreadBadge) {
                 Button {
-                    showChatMenu = true
+                    /* 微信逻辑：右上「⋯」不是弹菜单，而是进聊天信息页
+                       —— 群聊进「群聊信息」，单聊进「聊天信息」 */
+                    if isGroup { showGroupInfo = true } else { showChatInfo = true }
                 } label: {
                     Text("⋯")
                         .font(pf(22))
@@ -382,22 +384,10 @@ struct ChatDetailView: View {
             ForwardPickerView(items: forwardItems) { }
                 .environmentObject(app)
         }
-        /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */
-        .confirmationDialog(Tr("聊天"), isPresented: $showChatMenu, titleVisibility: .hidden) {
-            if isGroup {
-                Button(Tr("聊天信息")) { showGroupInfo = true }
-                Button(Tr("查找聊天记录")) { showSearch = true }
-            }
-            if (chat.botRank ?? 9) < 9 {
-                Button(Tr("语音通话")) { showCall = true }
-                Button(Tr("视频通话")) { showCall = true }
-            } else {
-                Button(Tr("语音通话")) { startRealCall(video: false) }
-                Button(Tr("视频通话")) { startRealCall(video: true) }
-            }
-            Button(Tr("聊天背景")) { app.show(Tr("换聊天背景：点「我 → 设置 → 聊天背景」")) }
-            Button(Tr("刷新消息")) { Task { await load(initial: true) } }
-            Button(Tr("取消"), role: .cancel) { }
+        /* 右上「⋯」进的是聊天信息页（微信那套）；页里能打语音/视频、免打扰、置顶、
+           查记录、换背景、清空、删除 —— 见 DirectChatInfoView */
+        .sheet(isPresented: $showChatInfo) {
+            DirectChatInfoView(chat: chat).environmentObject(app)
         }
         .swipeBack { dismiss() }
         .hidesTabBar()

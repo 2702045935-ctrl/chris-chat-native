@@ -35,14 +35,38 @@ final class PushCenter: NSObject, ObservableObject, UIApplicationDelegate, UNUse
             let ok = (s.authorizationStatus == .authorized || s.authorizationStatus == .provisional
                       || s.authorizationStatus == .ephemeral)
             DispatchQueue.main.async { self.authorized = ok }
+            /* 把「这台手机到底允不允许通知 / 允不允许标记」报给服务器：
+               桌面图标没有数字时，后台一看就知道是权限问题还是没配密钥 */
+            self.report(s)
             if s.authorizationStatus == .notDetermined {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
                     DispatchQueue.main.async { self.authorized = granted }
                     if granted { DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() } }
+                    UNUserNotificationCenter.current().getNotificationSettings { s2 in self.report(s2) }
                 }
             } else if ok {
                 DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
             }
+        }
+    }
+
+    private func report(_ s: UNNotificationSettings) {
+        var status = "unknown"
+        switch s.authorizationStatus {
+        case .authorized: status = "authorized"
+        case .denied: status = "denied"
+        case .provisional: status = "provisional"
+        case .ephemeral: status = "ephemeral"
+        case .notDetermined: status = "not-determined"
+        @unknown default: status = "unknown"
+        }
+        let badgeOn = (s.badgeSetting != .disabled)
+        let alertOn = (s.alertSetting != .disabled)
+        let soundOn = (s.soundSetting != .disabled)
+        Task {
+            await API.shared.reportPushSettings(status: status, badge: badgeOn,
+                                                alert: alertOn, sound: soundOn,
+                                                token: token, sandbox: PushCenter.isSandbox)
         }
     }
 

@@ -1304,6 +1304,15 @@ final class API {
         _ = try? await request("POST", "/api/push/unregister", body: ["token": token])
     }
 
+    /// 把手机上的通知设置报给服务器（允许通知没、标记有没有开）——桌面图标没数字时用来定位
+    func reportPushSettings(status: String, badge: Bool, alert: Bool, sound: Bool,
+                            token: String, sandbox: Bool) async {
+        _ = try? await request("POST", "/api/push/settings", body: [
+            "status": status, "badge": badge, "alert": alert, "sound": sound,
+            "token": token, "env": sandbox ? "sandbox" : "prod"
+        ])
+    }
+
     struct PushStatus: Decodable {
         var configured: Bool?
         var enabled: Bool?

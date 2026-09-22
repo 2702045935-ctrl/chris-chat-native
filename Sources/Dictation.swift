@@ -62,7 +62,7 @@ final class Dictation: NSObject, ObservableObject {
         node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { buf, _ in req.append(buf) }
         engine.prepare()
         do { try engine.start() } catch {
-            error = "麦克风打不开，等一下再试"
+            self.error = "麦克风打不开，等一下再试"
             return
         }
         listening = true

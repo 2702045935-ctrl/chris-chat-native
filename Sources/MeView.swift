@@ -140,32 +140,40 @@ struct MeView: View {
             // 网页版量出来：头像离内容顶部 67px（.me-profile padding-top: 67px）
             Spacer().frame(height: L.safeTop + 67)
 
-            Button {
-                path.append("profile")
-            } label: {
+            /* 头像/昵称/星言号 = 一个按钮（进个人信息）；右上角二维码 = **另一个并列的按钮**。
+               以前二维码按钮套在这个按钮里面 —— SwiftUI 里按钮套按钮，里面的永远点不到
+               （点哪里都算点外层），所以「二维码点不开」的真正原因就是这个。 */
             HStack(alignment: .center, spacing: 0) {
-                Avatar(path: app.me?.avatarPath ?? "", size: L.v(58, 15.6, 66), circle: true)
-                    .frame(width: L.v(58, 15.6, 66), height: L.v(58, 15.6, 66))
+                Button {
+                    path.append("profile")
+                } label: {
+                    HStack(alignment: .center, spacing: 0) {
+                        Avatar(path: app.me?.avatarPath ?? "", size: L.v(58, 15.6, 66), circle: true)
+                            .frame(width: L.v(58, 15.6, 66), height: L.v(58, 15.6, 66))
 
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(app.me?.name ?? "")
-                        .font(pf(L.v(17, 4.8, 19.5)))
-                        .foregroundColor(C.label)
-                Text(Tr("星言号") + "：" + (app.me?.username ?? "-"))
-                        .font(pf(16))
-                        .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
-                        .padding(.top, L.v(4, 1.8, 8))
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(app.me?.name ?? "")
+                                .font(pf(L.v(17, 4.8, 19.5)))
+                                .foregroundColor(C.label)
+                            Text(Tr("星言号") + "：" + (app.me?.username ?? "-"))
+                                .font(pf(16))
+                                .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
+                                .padding(.top, L.v(4, 1.8, 8))
+                        }
+                        .padding(.leading, 21.5)
+
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .padding(.leading, 21.5)
+                .buttonStyle(.plain)
 
-                Spacer(minLength: 0)
-
+                /* 二维码：点开就是「我的二维码」（和微信一样） */
                 Button {
                     showMyQR = true
                 } label: {
                     SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: C.arrow)
-                        /* 点击区按微信标准做成 44×44（以前只有 26，真机上经常点不到） */
-                        .frame(width: 44, height: 44)
+                        .frame(width: 44, height: 44)      // 微信标准点击区
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -175,8 +183,6 @@ struct MeView: View {
             .padding(.leading, 28)
             .padding(.trailing, L.v(14, 4, 18))
             .padding(.bottom, 4)
-            }
-            .buttonStyle(.plain)
 
             HStack(spacing: L.v(8, 2.6, 11)) {
                 statusChip

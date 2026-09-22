@@ -1718,6 +1718,54 @@ final class API {
         var bizBalance: Double?
         var amount: Double?
     }
+    /* 身份信息（钱包 → 身份信息） */
+    struct IdentityInfo: Decodable {
+        var verified: Bool?
+        var realName: String?
+        var idMask: String?
+        var verifiedAt: String?
+        var idValid: String?
+        var occupation: String?
+        var address: String?
+        var level: Int?
+        var levelName: String?
+        var bankCount: Int?
+    }
+    /* 支付设置（钱包 → 支付设置） */
+    struct AutoDebit: Decodable, Identifiable {
+        var id: String
+        var name: String?
+        var amount: Double?
+        var cycle: String?
+        var createdAt: String?
+    }
+    struct PaySettings: Decodable {
+        var hasPayPassword: Bool?
+        var noPin: Bool?
+        var noPinLimit: Double?
+        var payMethod: String?
+        var autoDebits: [AutoDebit]?
+        var payPasswordUpdatedAt: String?
+    }
+    struct SimpleOK: Decodable { var saved: Bool? }
+
+    func identity() async throws -> IdentityInfo {
+        try await get("/api/me/identity", as: IdentityInfo.self)
+    }
+    func saveIdentity(idValid: String, occupation: String, address: String) async {
+        let _: SimpleOK? = try? await post("/api/me/identity",
+            ["idValid": idValid, "occupation": occupation, "address": address], as: SimpleOK.self)
+    }
+    func paySettings() async throws -> PaySettings {
+        try await get("/api/me/paysettings", as: PaySettings.self)
+    }
+    func savePaySettings(noPin: Bool, noPinLimit: Double, payMethod: String) async {
+        let _: SimpleOK? = try? await post("/api/me/paysettings",
+            ["noPin": noPin, "noPinLimit": noPinLimit, "payMethod": payMethod], as: SimpleOK.self)
+    }
+    func cancelAutoDebit(_ id: String) async {
+        let _: SimpleOK? = try? await post("/api/me/paysettings", ["cancelAutoDebit": id], as: SimpleOK.self)
+    }
     struct BizInvoiceResult: Decodable {
         var invoice: BizInvoiceRaw?
         var invoices: [BizInvoiceRaw]?

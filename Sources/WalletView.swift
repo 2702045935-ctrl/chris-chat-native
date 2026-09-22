@@ -23,6 +23,9 @@ struct WalletView: View {
     @State private var showScore = false
     /// 钱包页里的「客服中心」：进真正的客服中心页（不是那句「暂时没有在线客服」）
     @State private var showSupport = false
+    /// 钱包页里的「身份信息」「支付设置」
+    @State private var showIdentity = false
+    @State private var showPaySettings = false
     /// 「安全分」那一行显示真实分数（wallet.json 里加一项 action=score 就会读出来）
     @State private var creditText = ""
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
@@ -82,6 +85,8 @@ struct WalletView: View {
         .navigationDestination(isPresented: $showBiz) { BizAccountView() }
         .navigationDestination(isPresented: $showScore) { SecurityScoreView() }
         .sheet(isPresented: $showSupport) { SupportView().environmentObject(app) }
+        .sheet(isPresented: $showIdentity) { IdentityView().environmentObject(app) }
+        .sheet(isPresented: $showPaySettings) { PaySettingsView().environmentObject(app) }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
@@ -205,7 +210,9 @@ struct WalletView: View {
         case "card":
             showCards = true            // 进「银行卡」页（绑定 / 解绑，对应功能清单里的「银行卡」）
         case "settings":
-            app.show(Tr("支付设置：还没接后端，先把页面做出来"))
+            showPaySettings = true        // 支付设置（支付密码 / 免密 / 自动续费）
+        case "identity":
+            showIdentity = true           // 身份信息（实名 + 证件有效期/职业/地址）
         case "service":
             showSupport = true            // 先到客服中心（常见问题页），里面的「联系在线客服」进独立客服页
         default:

@@ -224,6 +224,14 @@ struct MomentsView: View {
     @Environment(\.dismiss) private var dismiss
 
     var target: User? = nil
+    /// 「我的朋友圈」（从「我」那一页进来的）：只显示我自己的动态，封面也是我的。
+    /// 微信的逻辑就是这样：发现页进去是好友动态，我→朋友圈进去只看自己的。
+    var mineOnly: Bool = false
+
+    /// 这一页要拉谁的动态：mineOnly = 只看自己；target = 看某个好友；都没有 = 好友动态时间轴
+    private var feedUserId: String? { mineOnly ? app.me?.id : target?.id }
+    /// 能不能换封面（自己这一页才行）
+    private var coverEditable: Bool { target == nil || mineOnly }
 
     /// 滚动量：两路测量各存一份（1pt 条的屏幕 y、整个内容块的屏幕 y），取滚得更多的那个
     @State private var topY: CGFloat = 0
@@ -527,7 +535,7 @@ struct MomentsView: View {
         .frame(height: L.coverH)
         .zIndex(1)
         /* 微信：点自己朋友圈顶部这张封面图 → 弹「更换相册封面」 */
-        .onTapGesture { if target == nil { coverMenu = true } }
+        .onTapGesture { if coverEditable { coverMenu = true } }
     }
 
     /* ---------------------------------------------------------- 列表 */
@@ -868,7 +876,7 @@ struct MomentsView: View {
                 try? await Task.sleep(nanoseconds: 16_000_000)
                 if Date().timeIntervalSince(started) > 1.0 { break }   // 至少转 1 秒
             }
-            if target == nil { app.me = try? await API.shared.me() }    // 封面也一起更新
+            if coverEditable { app.me = try? await API.shared.me() }    // 封面也一起更新
             await reload()
             pullY = 0                       // 转完收回去（一定收）
             spin = 0
@@ -877,7 +885,7 @@ struct MomentsView: View {
     }
 
     private func reload() async {
-        if let feed = try? await API.shared.momentsFeed(limit: 30, userId: target?.id) {
+        if let feed = try? await API.shared.momentsFeed(limit: 30, userId: feedUserId) {
             moments = feed.moments
             hasMoreMoments = feed.hasMore
             momentTotal = feed.total
@@ -897,7 +905,7 @@ struct MomentsView: View {
         guard hasMoreMoments, !loadingMore, let last = moments.last else { return }
         loadingMore = true
         if let feed = try? await API.shared.momentsFeed(limit: 30, before: last.createdAt, beforeId: last.id,
-                                                        userId: target?.id) {
+                                                        userId: feedUserId) {
             let known = Set(moments.map { $0.id })
             moments.append(contentsOf: feed.moments.filter { !known.contains($0.id) })
             hasMoreMoments = feed.hasMore && !feed.moments.isEmpty
@@ -909,7 +917,7 @@ struct MomentsView: View {
 
     /// 轮询 / 收到推送时：只把「新出现的」插到最前面，已经在列表里的和翻过的页都不动
     private func pollNewMoments() async {
-        guard let feed = try? await API.shared.momentsFeed(limit: 30, userId: target?.id) else { return }
+        guard let feed = try? await API.shared.momentsFeed(limit: 30, userId: feedUserId) else { return }
         let known = Set(moments.map { $0.id })
         let fresh = feed.moments.filter { !known.contains($0.id) }
         if !fresh.isEmpty { moments.insert(contentsOf: fresh, at: 0) }

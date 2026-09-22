@@ -48,7 +48,8 @@ struct MeView: View {
                 if key == "settings" {
                     SettingsView()
                 } else if key == "moments" {
-                    MomentsView()
+                    /* 微信的逻辑：从「我」这一页进朋友圈 = 只看我自己的动态（封面也是我的） */
+                    MomentsView(mineOnly: true)
                 } else if key == "profile" {
                     ProfileEditView()
                 } else if key == "service" {
@@ -173,9 +174,15 @@ struct MeView: View {
 
             HStack(spacing: L.v(8, 2.6, 11)) {
                 statusChip
-                chip {
+            chip {
+                HStack(spacing: 4) {
                     Text(Tr("朋友圈"))
-                    Text("\(friendCount) 个朋友")
+                    /* 有好友发了新动态：这儿亮一个小红点（微信「我」那一页也是这个逻辑） */
+                    if app.momentsUnread > 0 {
+                        Circle().fill(C.red).frame(width: 6, height: 6)
+                    }
+                }
+                Text("\(friendCount) 个朋友")
                         .font(pf(L.v(11.5, 3.2, 12.5)))
                         .foregroundColor(C.subLabel)
                         .padding(.leading, L.v(3, 1.2, 5))

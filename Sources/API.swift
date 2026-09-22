@@ -226,6 +226,15 @@ private struct FeedPayload: Decodable {
 }
 private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
 private struct FeedCommentPayload: Decodable { var comments: Int? }
+private struct FeedCommentsPayload: Decodable { var comments: [FeedCommentItem]?; var count: Int? }
+/// 视频号一条评论
+struct FeedCommentItem: Decodable, Hashable, Identifiable {
+    var id: String
+    var name: String?
+    var avatar: String?
+    var text: String?
+    var at: String?
+}
 private struct FeedPublishPayload: Decodable { var id: String?; var video: String? }
 private struct FeedTrimPayload: Decodable { var url: String?; var width: Int?; var height: Int? }
 
@@ -1266,6 +1275,11 @@ final class API {
         let p: FeedCommentPayload = try await post("/api/feed/comment", ["id": id, "text": text],
                                                    as: FeedCommentPayload.self)
         return p.comments ?? 0
+    }
+    /// 读某条视频的评论列表
+    func feedComments(_ id: String) async throws -> [FeedCommentItem] {
+        let p: FeedCommentsPayload = try await get("/api/feed/comments?id=\(id)", as: FeedCommentsPayload.self)
+        return p.comments ?? []
     }
     func feedPublish(video: String, desc: String, music: String) async throws -> String {
         let p: FeedPublishPayload = try await post("/api/feed/publish",

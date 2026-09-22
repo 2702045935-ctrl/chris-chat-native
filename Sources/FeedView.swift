@@ -46,6 +46,7 @@ struct ChannelsView: View {
     @State private var loading = true
     @State private var commentFor: FeedItem?
     @State private var commentText = ""
+    @State private var comments: [FeedCommentItem] = []      // 评论列表
     @State private var pickOpen = false
     @State private var picked: PhotosPickerItem?
     @State private var uploading = false
@@ -77,7 +78,7 @@ struct ChannelsView: View {
                                  style: style,
                                  flags: flags,
                                  onLike: { toggleLike(row.item) },
-                                 onComment: { commentFor = row.item; commentText = "" },
+                    onComment: { commentFor = row.item; commentText = ""; comments = [] },
                                  onShare: { share(row.item) },
                                  onFollow: { follow(row.item) },
                                  onDelete: { remove(row.item) })
@@ -300,14 +301,20 @@ struct ChannelsView: View {
     private func sendComment(_ item: FeedItem) {
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        commentFor = nil
+        commentText = ""
         Task {
             if let n = try? await API.shared.feedComment(item.id, text: text),
                let i = items.firstIndex(where: { $0.id == item.id }) {
                 items[i].comments = n
             }
+            await loadComments(item)          // 发完立刻能在列表里看到
             app.show(Tr("评论成功"))
         }
+    }
+
+    /// 拉某条视频的评论列表
+    private func loadComments(_ item: FeedItem) async {
+        comments = (try? await API.shared.feedComments(item.id)) ?? []
     }
 
     private func commentSheet(_ item: FeedItem) -> some View {
@@ -315,6 +322,24 @@ struct ChannelsView: View {
             Text(Tr("评论")).font(pf(16, .medium)).padding(.top, 16)
             Text(item.desc ?? "").font(pf(13)).foregroundColor(.secondary)
                 .multilineTextAlignment(.center).padding(.horizontal, 20)
+            /* 评论列表（以前只显示视频文案，看不到别人说了什么） */
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if comments.isEmpty {
+                        Text(Tr("还没有评论，来说第一句")).font(pf(13)).foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                    }
+                    ForEach(comments) { c in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(c.name ?? Tr("用户")).font(pf(13, .medium))
+                            Text(c.text ?? "").font(pf(14))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .frame(maxHeight: 220)
             TextField("说点什么…", text: $commentText)
                 .textFieldStyle(.roundedBorder).padding(.horizontal, 20)
             Button { sendComment(item) } label: {
@@ -326,7 +351,8 @@ struct ChannelsView: View {
             .padding(.horizontal, 20)
             Spacer()
         }
-        .presentationDetents([.height(260)])
+        .presentationDetents([.height(430)])
+        .task { await loadComments(item) }
     }
 
     /* ---------------------------------------------------------- 发表 */

@@ -26,6 +26,8 @@ struct PushEvent: Equatable {
     var callError = ""
     /// 通话里的 SDP（WebRTC 协商用，字符串形式）
     var callSDP: String? = nil
+    /// 语音「服务器转发」的一帧音频（base64 的 16kHz 单声道 PCM）
+    var callAudioData: String? = nil
     /// 通话里的 ICE 候选（整段 JSON 字符串）
     var callCandidate: String? = nil
     /// 挂断原因：hangup / rejected / cancel / timeout / offline / disconnected
@@ -178,6 +180,7 @@ final class Realtime: ObservableObject {
            let t2 = String(data: d2, encoding: .utf8) { ev.liveCandidate = t2 }
         // WebRTC 协商内容：SDP 和 ICE 候选（网页版也是这么传的）
         if let sdp = obj["sdp"] as? [String: Any] { ev.callSDP = (sdp["sdp"] as? String) ?? "" }
+        if let audio = obj["data"] as? String, !audio.isEmpty { ev.callAudioData = audio }
         if let cand = obj["candidate"] as? [String: Any],
            let data = try? JSONSerialization.data(withJSONObject: cand),
            let text = String(data: data, encoding: .utf8) {

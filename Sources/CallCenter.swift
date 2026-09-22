@@ -54,6 +54,8 @@ final class CallCenter: NSObject, ObservableObject {
     private var failTask: Task<Void, Never>?
     /// 连不上时的诊断记录（ICE 状态、候选数量…），通话结束时一起报给服务器
     private var diag: [String] = []
+    /// 语音是否正在走「服务器转发」这条路
+    private var serverAudioOn = false
 
     func dismissDialog() {
         dialogTask?.cancel()
@@ -173,6 +175,7 @@ final class CallCenter: NSObject, ObservableObject {
         tip = "正在接通…"
         Task { await beginMedia() }
         startConnectWatch()
+        startServerAudioIfVoice()            // 语音：立刻开始走服务器转发
     }
 
     /// 拒接
@@ -250,6 +253,29 @@ final class CallCenter: NSObject, ObservableObject {
         Realtime.shared.sendJSON(msg)
     }
 
+    /// 语音通话：开始走「服务器转发」这条路（不用等 WebRTC，运营商挡不住）
+    private func startServerAudioIfVoice() {
+        guard !isVideo else { return }
+        guard !serverAudioOn else { return }
+        serverAudioOn = true
+        audioTrack?.isEnabled = false          // 别让 WebRTC 的音频再叠一份
+        CallAudioPipe.shared.onFrame = { [weak self] data in
+            guard let self = self, !self.muted else { return }
+            self.sendCall(["action": "audio", "data": data.base64EncodedString()])
+        }
+        CallAudioPipe.shared.start()
+        note("语音走服务器转发 ✓")
+        /* 这条路已经开始传声音了：界面直接进入「通话中」并开始计时（不用等 ICE） */
+        if phase != .active {
+            Ringtone.shared.stop()
+            phase = .active
+            tip = "通话中"
+            ringTimer?.invalidate()
+            ringTimer = nil
+            startTimer()
+        }
+    }
+
     private func handle(_ ev: PushEvent) {
         if ev.type == "call-error" {
             if !ev.callError.isEmpty { errorText = ev.callError }
@@ -295,6 +321,12 @@ final class CallCenter: NSObject, ObservableObject {
             phase = .connecting
             tip = "正在接通…"
             startConnectWatch()
+            startServerAudioIfVoice()      // 语音：立刻开始走服务器转发（不等 WebRTC）
+
+        case "audio":
+            /* 服务器转发过来的语音帧：直接丢给播放器（这条路不依赖 TURN/直连，一定通） */
+            guard let b64 = ev.callAudioData, let d = Data(base64Encoded: b64) else { return }
+            CallAudioPipe.shared.play(d)
 
         case "sdp":
             guard ev.callId == callId, let sdp = ev.callSDP else { return }
@@ -548,6 +580,10 @@ final class CallCenter: NSObject, ObservableObject {
         ringTimer = nil
         connectTimer?.invalidate()
         connectTimer = nil
+        /* 结束通话：把服务器转发的那条音频通道也关掉 */
+        CallAudioPipe.shared.onFrame = nil
+        CallAudioPipe.shared.stop()
+        serverAudioOn = false
         stopMedia()
         /* 把这一通的 ICE 过程报给服务器（写进 call-trace.log），
            「一直在连接中」这种问题一看就知道卡在哪一步 */

@@ -761,6 +761,15 @@ struct FeedCell: View {
                    缓存 3 秒 + 让系统自己判断，起播只慢零点几秒，但基本不会卡顿。 */
                 p.automaticallyWaitsToMinimizeStalling = true
                 p.currentItem?.preferredForwardBufferDuration = 3
+                /* 每 0.1 秒回一次播放位置，驱动底部进度条 */
+                if let old = timeObserver, let oldP = player { oldP.removeTimeObserver(old) }
+                timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { t in
+                    let d = p.currentItem?.duration.seconds ?? 0
+                    if d.isFinite, d > 0 {
+                        durationSec = d
+                        progress = min(1, max(0, t.seconds / d))
+                    }
+                }
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero)
@@ -882,7 +891,6 @@ struct FeedPlayerSheet: View {
     private func load(_ w: FeedItem) {
         guard let url = API.shared.assetURL(w.video ?? "") else { loading = false; return }
         loading = true
-        if let obs = timeObserver, let old = player { old.removeTimeObserver(obs); timeObserver = nil }
         Task { @MainActor in
             do {
                 let asset = API.shared.streamingAsset(w.video ?? "") ?? AVURLAsset(url: url)
@@ -890,14 +898,6 @@ struct FeedPlayerSheet: View {
                 p.actionAtItemEnd = .none
                 p.automaticallyWaitsToMinimizeStalling = true
                 p.currentItem?.preferredForwardBufferDuration = 3
-                /* 每 0.1 秒回一次播放位置，驱动底部进度条 */
-                timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { t in
-                    let d = p.currentItem?.duration.seconds ?? 0
-                    if d.isFinite, d > 0 {
-                        durationSec = d
-                        progress = min(1, max(0, t.seconds / d))
-                    }
-                }
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero); p.play()

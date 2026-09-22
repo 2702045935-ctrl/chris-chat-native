@@ -364,6 +364,12 @@ struct CHRISApp: App {
     init() {
         /* 一启动就装崩溃上报：连登录页崩都能抓到（以前放在登录之后，前面的崩抓不到） */
         CrashCatcher.install()
+        /* 图片/视频/媒体走系统磁盘缓存：服务器现在给上传文件发的是「一年内不用再问」的长缓存，
+           把缓存容量调大以后，头像、封面、朋友圈图片、看过的视频就不再每次重下了 ——
+           这是手机上"卡"和费流量的大头。默认只有 10MB，太小。 */
+        URLCache.shared = URLCache(memoryCapacity: 64 * 1024 * 1024,
+                                   diskCapacity: 512 * 1024 * 1024,
+                                   diskPath: "chris-media-cache")
     }
 
     var body: some Scene {

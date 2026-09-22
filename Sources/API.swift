@@ -228,6 +228,7 @@ private struct FeedLikePayload: Decodable { var liked: Bool?; var likes: Int? }
 private struct FeedCommentPayload: Decodable { var comments: Int? }
 private struct FeedCommentsPayload: Decodable { var comments: [FeedCommentItem]?; var count: Int? }
 private struct FeedSeriesPayload: Decodable { var series: String?; var name: String?; var items: [FeedItem]? }
+private struct FeedFavoritePayload: Decodable { var favorited: Bool?; var favorites: Int? }
 /// 视频号一条评论
 struct FeedCommentItem: Decodable, Hashable, Identifiable {
     var id: String
@@ -1286,6 +1287,11 @@ final class API {
     func feedSeries(_ id: String) async throws -> (name: String, items: [FeedItem]) {
         let p: FeedSeriesPayload = try await get("/api/feed/series?id=\(id)", as: FeedSeriesPayload.self)
         return (p.name ?? "", p.items ?? [])
+    }
+    /// 收藏 / 取消收藏一条视频
+    func feedFavorite(_ id: String) async throws -> (favorited: Bool, favorites: Int) {
+        let p: FeedFavoritePayload = try await post("/api/feed/favorite", ["id": id], as: FeedFavoritePayload.self)
+        return (p.favorited ?? false, p.favorites ?? 0)
     }
     func feedPublish(video: String, desc: String, music: String) async throws -> String {
         let p: FeedPublishPayload = try await post("/api/feed/publish",

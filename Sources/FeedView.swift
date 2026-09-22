@@ -29,6 +29,8 @@ struct FeedItem: Decodable, Identifiable, Hashable {
     var epTotal: Int?
     var series: String?
     var seriesName: String?
+    var favorited: Bool?
+    var favorites: Int?
     var author: FeedAuthor?
     var likes: Int?
     var liked: Bool?
@@ -89,7 +91,8 @@ struct ChannelsView: View {
                                  onShare: { share(row.item) },
                                  onFollow: { follow(row.item) },
                                  onDelete: { remove(row.item) },
-                                 onPickEpisode: { episodeFor = row.item; seriesEpisodes = [] })
+                                 onPickEpisode: { episodeFor = row.item; seriesEpisodes = [] },
+                                 onFavorite: { toggleFavorite(row.item) })
                             .frame(width: geo.size.width, height: geo.size.height)
                             .offset(y: CGFloat(row.offset) * geo.size.height + drag)
                     }
@@ -267,6 +270,17 @@ struct ChannelsView: View {
             items.append(contentsOf: r.items)
         } else {
             items.append(contentsOf: add)
+        }
+    }
+
+    /* 收藏 / 取消收藏 */
+    private func toggleFavorite(_ item: FeedItem) {
+        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return }
+        Task {
+            if let r = try? await API.shared.feedFavorite(item.id) {
+                items[i].favorited = r.favorited
+                items[i].favorites = r.favorites
+            }
         }
     }
 
@@ -581,11 +595,14 @@ struct FeedCell: View {
     var onFollow: () -> Void
     var onDelete: () -> Void
     var onPickEpisode: () -> Void = {}     // 短剧：点「选集」
+    var onFavorite: () -> Void = {}        // 收藏
 
     @State private var player: AVPlayer?
     @State private var loadingVideo = true
     @State private var liked = false
     @State private var likes = 0
+    @State private var favorited = false
+    @State private var favorites = 0
     @State private var bounced = false
     @State private var progress: Double = 0        // 播放进度 0~1（抖音式底部进度条）
     @State private var durationSec: Double = 0
@@ -698,49 +715,77 @@ struct FeedCell: View {
     }
 
     private var rightRail: some View {
-        VStack(spacing: style.railGap ?? 20) {
+        VStack(spacing: max(style.railGap ?? 22, 22)) {
             ZStack(alignment: .bottom) {
                 Avatar(path: item.author?.avatar ?? "", size: style.avatar ?? 46,
                        radius: (style.avatar ?? 46) / 2, circle: true)
-                    .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.5))
+                    .overlay(Circle().stroke(Color.white.opacity(0.92), lineWidth: 1.6))
+                    .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
                 Button { onFollow() } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 12, weight: .heavy))
                         .foregroundColor(.white)
-                        .frame(width: 20, height: 20)
-                        .background(Circle().fill(Color(hex: 0xFA5151)))
-                        .offset(y: 9)
+                        .frame(width: 21, height: 21)
+                        .background(Circle().fill(LinearGradient(colors: [Color(hex: 0xFF6B6B), Color(hex: 0xFA5151)],
+                                                                 startPoint: .top, endPoint: .bottom)))
+                        .overlay(Circle().stroke(Color.white, lineWidth: 1.2))
+                        .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+                        .offset(y: 10)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
 
-            railButton(icon: "heart.fill", tint: liked ? Color(hex: 0xFF4D6D) : .white,
-                       text: "\(likes)") {
+            railAction(icon: "heart.fill", tint: liked ? Color(hex: 0xFF4D6D) : .white,
+                       count: "\(likes)", active: liked, bounce: bounced) {
                 liked.toggle()
                 likes += liked ? 1 : -1
                 bounced = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { bounced = false }
                 onLike()
             }
-            railButton(icon: "bubble.right.fill", tint: .white, text: "\(item.comments ?? 0)", action: onComment)
-            railButton(icon: "arrowshape.turn.up.right.fill", tint: .white,
-                       text: "\(item.shares ?? 0)", action: onShare)
+            railAction(icon: "bubble.right.fill", tint: .white, count: "\(item.comments ?? 0)", action: onComment)
+            /* 收藏（抖音那排的星标） */
+            railAction(icon: "star.fill", tint: favorited ? Color(hex: 0xFFC542) : .white,
+                       count: "\(favorites)", active: favorited) {
+                favorited.toggle()
+                favorites += favorited ? 1 : -1
+                onFavorite()
+            }
+            railAction(icon: "arrowshape.turn.up.right.fill", tint: .white, count: "\(item.shares ?? 0)", action: onShare)
             if item.mine == true {
-                railButton(icon: "trash.fill", tint: .white, text: "删除", action: onDelete)
+                railAction(icon: "trash.fill", tint: .white, count: Tr("删除"), action: onDelete)
             }
         }
     }
 
-    private func railButton(icon: String, tint: Color, text: String, action: @escaping () -> Void) -> some View {
+    /* 右侧按钮：毛玻璃圆底 + 图标 + 数字。
+       比原来光秃秃的图标更精致：白色描边、柔和投影、激活时整体轻微放大。 */
+    private func railAction(icon: String, tint: Color, count: String, active: Bool = false,
+                            bounce: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: style.railIcon ?? 27))
-                    .foregroundColor(tint)
-                    .scaleEffect(bounced && icon == "heart.fill" ? 1.25 : 1)
-                Text(text).font(pf(12.5, .medium)).foregroundColor(.white)
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 44, height: 44)
+                        .overlay(Circle().fill(Color.black.opacity(active ? 0.26 : 0.14)))
+                        .overlay(Circle().stroke(Color.white.opacity(active ? 0.36 : 0.18), lineWidth: 0.9))
+                        .shadow(color: .black.opacity(0.35), radius: 8, y: 3)
+                    Image(systemName: icon)
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundColor(tint)
+                        .shadow(color: .black.opacity(0.4), radius: 3, y: 1)
+                }
+                .scaleEffect(bounce ? 1.18 : 1)
+                if !count.isEmpty {
+                    Text(count)
+                        .font(pf(12.5, .semibold))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                }
             }
+            .frame(width: 54)
         }
         .buttonStyle(.plain)
     }
@@ -748,6 +793,8 @@ struct FeedCell: View {
     private func setup() {
         liked = item.liked ?? false
         likes = item.likes ?? 0
+        favorited = item.favorited ?? false
+        favorites = item.favorites ?? 0
         guard player == nil, let url = API.shared.assetURL(item.video ?? "") else { return }
         /* 边下边播：把鉴权头交给 AVPlayer，它自己用 Range 分片拉流。
            以前是「先整包下载到本地再播」，一条 5MB 视频要等 20 多秒才出画面。 */

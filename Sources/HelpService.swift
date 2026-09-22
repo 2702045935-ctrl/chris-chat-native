@@ -325,7 +325,10 @@ struct WalletUpgradeView: View {
                 Text(done ? Tr("已完成") : Tr("去完成"))
                     .font(pf(13))
                     .foregroundColor(done ? C.subLabel : C.green)
-                if !done { Chevron(size: 9, line: 1.6) }
+                /* 原来写的是 if !done { Chevron(...) }，Swift 类型检查偶尔会报
+                   "type of expression is ambiguous without a type annotation"，
+                   导致云端构建时好时坏。改成用透明度控制，结果一样但不再有歧义。 */
+                Chevron(size: 9, line: 1.6).opacity(done ? 0 : 1)
             }
             .padding(.horizontal, 16)
             .frame(height: 62)

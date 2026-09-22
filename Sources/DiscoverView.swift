@@ -949,7 +949,8 @@ struct MomentsView: View {
     private func changeCover(_ image: UIImage) {
         Task {
             uploading = true
-            if let url = try? await API.shared.upload(image: image) {
+            /* 封面用高清通道（长边 2048、画质 0.95）—— 以前走的是聊天图片那条压缩通道，所以糊 */
+            if let url = try? await API.shared.uploadOriginal(image: image) {
                 await API.shared.updateMe(["momentCover": url])
                 if let me = try? await API.shared.me() {
                     app.me = me
@@ -1388,7 +1389,8 @@ struct CoverAdjustSheet: View {
             .frame(width: frameSize.width, height: frameSize.height)
             .clipped()
         let renderer = ImageRenderer(content: view)
-        renderer.scale = 2
+        /* 按 3 倍屏渲染（封面在真机上是 3x），以前 2 倍所以看着糊 */
+        renderer.scale = max(3, UIScreen.main.scale)
         if let out = renderer.uiImage { onDone(out) }
         dismiss()
     }

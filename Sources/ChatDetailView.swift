@@ -41,6 +41,10 @@ struct ChatDetailView: View {
     @State private var panel: PanelKind = .none
     @State private var plusItems: [PlusItem] = []
     @State private var gifts: [Gift] = []
+    /// App 内打开的网页（AI 发的淘宝 / 闪购卡片，没装 App 时用这个）
+    @State private var web: WebURL?
+    /// 已经自动跳过的卡片（同一条只跳一次）
+    @State private var autoOpened: Set<String> = []
 
     @State private var showPhoto = false
     @State private var showCamera = false
@@ -263,6 +267,8 @@ struct ChatDetailView: View {
         .sheet(isPresented: $botCard) {
             BotCardView(chat: chat).environmentObject(app)
         }
+        .sheet(item: $web) { SafariSheet(url: $0.url) }
+        .onChange(of: messages.count) { _ in autoOpenShopCard() }
         .sheet(isPresented: $showGroupInfo) { GroupInfoView(chat: chat) }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
         .hidesTabBar()
@@ -332,7 +338,8 @@ struct ChatDetailView: View {
                                            ? "" : displayName(message),
                                        onTapTransfer: { info in billInfo = info },
                                        onOpenImage: { path in openImage(path) },
-                                       onOpenAvatar: { id in openAvatar(id) })
+                                       onOpenAvatar: { id in openAvatar(id) },
+                                       onOpenWeb: { url in web = WebURL(url: url) })
                                 .padding(.bottom, 15)
                                 .contextMenu {
                                     if message.senderId == myId {
@@ -790,6 +797,17 @@ struct ChatDetailView: View {
             if initial { app.show(Tr("聊天记录加载失败")) }
         }
         loading = false
+        autoOpenShopCard()
+    }
+
+    /// AI 发来的「点外卖 / 买东西」卡片：一到手就直接跳（装了淘宝跳淘宝 App，没装用 App 内网页），
+    /// 不用用户自己去点那串网址。同一条只跳一次。
+    private func autoOpenShopCard() {
+        guard let last = messages.last, last.kindName == "link",
+              last.senderId != myId, !autoOpened.contains(last.id),
+              let link = ShopLink(json: last.body) else { return }
+        autoOpened.insert(last.id)
+        ShopOpener.open(link) { url in web = WebURL(url: url) }
     }
     /// 转账页预填的「收款账号」：一对一会话里对方的微信号；找不到就留空让用户自己填
     private var peerAccount: String {
@@ -835,6 +853,8 @@ struct MessageRow: View {
     var onOpenImage: ((String) -> Void)? = nil
     /// 点头像 → 名片
     var onOpenAvatar: ((String) -> Void)? = nil
+    /// 点 AI 的「点外卖 / 买东西」卡片 → 打开（没装淘宝就用 App 内网页）
+    var onOpenWeb: ((URL) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
     /// 语音消息播放状态（哪条在播）
@@ -912,6 +932,20 @@ struct MessageRow: View {
 
         case "gift":
             giftBubble
+
+        case "link":
+            if let link = ShopLink(json: message.body) {
+                ShopLinkCard(link: link) {
+                    ShopOpener.open(link) { url in onOpenWeb?(url) }
+                }
+            } else {
+                Text(message.body)
+                    .font(pf(L.chatFontSize))
+                    .foregroundColor(C.bubbleText)
+                    .padding(.horizontal, L.bubblePadH)
+                    .padding(.vertical, L.bubblePadV)
+                    .background(BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther))
+            }
 
         case "file":
             fileBubble

@@ -36,6 +36,13 @@
     <key>NSAllowsArbitraryLoads</key><true/>
     <key>NSAllowsLocalNetworking</key><true/>
   </dict>
+  <key>LSApplicationQueriesSchemes</key>
+  <array>
+    <string>taobao</string>
+    <string>tmast</string>
+    <string>alipays</string>
+    <string>alipay</string>
+  </array>
   <key>CFBundleIcons</key>
   <dict>
     <key>CFBundlePrimaryIcon</key>

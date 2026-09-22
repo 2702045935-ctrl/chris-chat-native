@@ -405,12 +405,13 @@ final class CallCenter: NSObject, ObservableObject {
            不同网络（4G ↔ 家里宽带）→ 强制走中继，不然直连经常只通一半甚至完全连不通。
            服务器是局域网地址（本机部署）时也直接走直连。 */
         let sameNet = await askSameNetwork(peerUserId: peerId)
+        _ = sameNet        // 只记诊断用；策略上公网一律走中继（两端一致，避免半通）
         let host = API.shared.server.split(separator: ":").first.map(String.init) ?? ""
         let isLan = host == "localhost" || host.hasPrefix("127.") || host.hasPrefix("10.")
             || host.hasPrefix("192.168.") || host.hasPrefix("172.16") || host.hasPrefix("172.17")
             || host.hasPrefix("172.18") || host.hasPrefix("172.19") || host.hasPrefix("172.2")
             || host.hasPrefix("172.30") || host.hasPrefix("172.31")
-        cfg.iceTransportPolicy = (sameNet || isLan) ? .all : .relay
+        cfg.iceTransportPolicy = isLan ? .all : .relay
         cfg.sdpSemantics = .unifiedPlan
         let pc = f.peerConnection(with: cfg,
                                   constraints: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil),

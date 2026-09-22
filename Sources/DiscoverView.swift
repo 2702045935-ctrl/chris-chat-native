@@ -501,7 +501,7 @@ struct MomentsView: View {
                 LinearGradient(colors: [Color(hex: 0x0D3B66), Color(hex: 0x1D6FB8), Color(hex: 0x0099FF)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
             } else {
-                RemoteImage(path: cover, icon: "photo")
+                RemoteImage(path: cover, icon: "photo", maxSide: 2560)
                     .id(cover)        // 换封面立刻生效
             }
 
@@ -964,7 +964,7 @@ struct MomentsView: View {
         Task {
             uploading = true
             /* 封面用高清通道（长边 2048、画质 0.95）—— 以前走的是聊天图片那条压缩通道，所以糊 */
-            if let url = try? await API.shared.uploadOriginal(image: image) {
+            if let url = try? await API.shared.uploadCover(image: image) {
                 await API.shared.updateMe(["momentCover": url])
                 if let me = try? await API.shared.me() {
                     app.me = me

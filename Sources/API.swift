@@ -1934,6 +1934,13 @@ final class API {
         return try await uploadData(data)
     }
 
+    /// 朋友圈封面：比聊天背景还要大一点（长边 2560、画质 0.95）。
+    /// 封面要能缩放拖动裁切，2048 放大后还是会糊，所以单独给一档。
+    func uploadCover(image: UIImage) async throws -> String {
+        let data = image.resizedJPEG(maxSide: 2560, quality: 0.95)
+        return try await uploadData(data)
+    }
+
     private func uploadData(_ data: Data?) async throws -> String {
         guard let data = data else {
             throw APIError.message("图片处理失败")

@@ -471,6 +471,9 @@ struct RemoteImage: View {
     /// 当「模板图」渲染：只取形状，颜色由外面的 foregroundColor 决定
     /// （底栏那些自己上传的图标就是这么跟着选中状态变色的）
     var template: Bool = false
+    /// 解码上限（默认 1600，防大图解压把内存打爆）。
+    /// 封面这种大图单独放宽（见 coverView 传 2560），不然会被压到 1600 看着糊。
+    var maxSide: CGFloat = 1600
 
     @State private var image: UIImage?
     @State private var started = false
@@ -511,7 +514,7 @@ struct RemoteImage: View {
             if let comma = path.firstIndex(of: ",") {
                 let b64 = String(path[path.index(after: comma)...])
                 if let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters),
-                   let img = RemoteImage.downsampled(data, maxSide: 1600) {
+                   let img = RemoteImage.downsampled(data, maxSide: maxSide) {
                     ImageStore.shared.put(path, img)
                     image = img
                 }
@@ -525,7 +528,7 @@ struct RemoteImage: View {
                直接用 UIImage(data:) 会把原图整张解到内存里 —— 一张 20000×20000 的图
                （文件才 1MB）解码要 1.5GB 内存，手机当场被杀（解压炸弹）。
                改成 CGImageSource 缩略图：解码阶段就直接出 1600px 的位图，多大都不怕。 */
-            if let img = RemoteImage.downsampled(data, maxSide: 1600) {
+            if let img = RemoteImage.downsampled(data, maxSide: maxSide) {
                 ImageStore.shared.put(path, img)
                 image = img
             }

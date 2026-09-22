@@ -64,6 +64,8 @@ struct ChannelsView: View {
     @State private var style = FeedStyle()
     @State private var flags = FeedFlags()
     @State private var loadingMore = false          // 正在拉下一批（无限刷）
+    @State private var episodeFor: FeedItem?         // 短剧「选集」面板
+    @State private var seriesEpisodes: [FeedItem] = []
 
     var body: some View {
         GeometryReader { geo in
@@ -133,6 +135,9 @@ struct ChannelsView: View {
         .swipeBack { dismiss() }
         .sheet(item: $commentFor) { item in
             commentSheet(item)
+        }
+        .sheet(item: $episodeFor) { item in
+            episodeSheet(item)
         }
         .sheet(isPresented: $showPublish) {
             publishSheet
@@ -321,6 +326,69 @@ struct ChannelsView: View {
     /// 拉某条视频的评论列表
     private func loadComments(_ item: FeedItem) async {
         comments = (try? await API.shared.feedComments(item.id)) ?? []
+    }
+
+    /* 短剧「选集」：列出这套剧的全部集数，点哪集跳哪集 */
+    private func episodeSheet(_ item: FeedItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(item.seriesName?.isEmpty == false ? (item.seriesName ?? "") : Tr("选集"))
+                .font(pf(16, .semibold))
+                .padding(.top, 16)
+                .padding(.horizontal, 18)
+            Text(Tr("共\(item.epTotal ?? seriesEpisodes.count)集"))
+                .font(pf(12.5))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 18)
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(seriesEpisodes) { ep in
+                        Button {
+                            jumpToEpisode(ep)
+                            episodeFor = nil
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(ep.ep ?? "")
+                                    .font(pf(15, .medium))
+                                    .foregroundColor(ep.id == item.id ? C.green : .primary)
+                                Text(String((ep.desc ?? "").prefix(18)))
+                                    .font(pf(13))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                Spacer()
+                                if ep.id == item.id {
+                                    Text(Tr("正在播放")).font(pf(12)).foregroundColor(C.green)
+                                }
+                            }
+                            .padding(.vertical, 11)
+                            .padding(.horizontal, 14)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if seriesEpisodes.isEmpty {
+                        ProgressView().padding(.top, 20)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .task {
+            guard let sid = item.series, !sid.isEmpty else { return }
+            if let r = try? await API.shared.feedSeries(sid) { seriesEpisodes = r.items }
+        }
+    }
+
+    /* 跳到某一集：已经在列表里就直接跳，否则插到当前这条后面再跳 */
+    private func jumpToEpisode(_ ep: FeedItem) {
+        if let i = items.firstIndex(where: { $0.id == ep.id }) {
+            index = i
+        } else {
+            let at = min(items.count, index + 1)
+            items.insert(ep, at: at)
+            index = at
+        }
     }
 
     private func commentSheet(_ item: FeedItem) -> some View {

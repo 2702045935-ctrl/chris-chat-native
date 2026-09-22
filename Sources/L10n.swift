@@ -40,6 +40,7 @@ enum L10n {
         "余额随时可以提到零钱": "Your balance can be moved to Balance anytime",
         "开发票要先填抬头和税号，下一步再接": "Invoices need a title and tax number; coming next",
         "验证身份，打开零钱": "Verify to open Balance",
+        "正在听你说，说完自己上屏…": "Listening… your words go into the box",
         "仅聊天的朋友": "Chat-only",
         "标签": "Tags",
         "服务号": "Service accounts",

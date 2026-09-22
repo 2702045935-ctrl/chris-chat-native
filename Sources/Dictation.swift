@@ -17,6 +17,11 @@ final class Dictation: NSObject, ObservableObject {
     private var onText: ((String) -> Void)?
     private var silence: Timer?
     private var started = false
+    /// 已经说过的部分（识别会自动「翻页」，这里把每次的结果接起来，别丢字）
+    private var settled = ""
+    private var lastEmitted = ""
+    private var beganAt = Date()
+    private var lastRollover = Date.distantPast
 
     /// 点一下开 / 点一下关
     func toggle(_ onText: @escaping (String) -> Void) {
@@ -27,6 +32,9 @@ final class Dictation: NSObject, ObservableObject {
         self.onText = onText
         text = ""
         error = ""
+        settled = ""
+        lastEmitted = ""
+        beganAt = Date()
         SFSpeechRecognizer.requestAuthorization { [weak self] st in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -54,6 +62,7 @@ final class Dictation: NSObject, ObservableObject {
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
+        req.taskHint = .dictation          // 按「听写」来识别，长句子更准、少断
         request = req
 
         let node = engine.inputNode
@@ -73,22 +82,54 @@ final class Dictation: NSObject, ObservableObject {
             guard let self = self else { return }
             DispatchQueue.main.async {
                 if let result = result {
-                    let s = result.bestTranscription.formattedString
-                    self.text = s
-                    self.onText?(s)
-                    self.bumpSilence()
-                    if result.isFinal { self.stop() }
+                    let piece = result.bestTranscription.formattedString
+                    let full = self.settled.isEmpty ? piece : (self.settled + piece)
+                    if full != self.lastEmitted {
+                        self.lastEmitted = full
+                        self.text = full
+                        self.onText?(full)
+                        self.bumpSilence()          // 只在真的听到新字时才重新计时
+                    }
+                    if result.isFinal {
+                        self.settled = full
+                        self.rollover()             // 不打断：接着听下一段
+                    }
                 }
-                if err != nil, self.listening { self.stop() }
+                if err != nil {
+                    /* 识别偶尔会自己结束/报错，只要用户没点停就接着听，别中途断掉 */
+                    if self.listening {
+                        self.settled = self.lastEmitted
+                        self.rollover()
+                    }
+                }
             }
         }
     }
 
-    /// 停口一会儿就自己收工（微信也是这样：说完就出字）
+    /// 一句话说完（停口）才收工：2.4 秒没有新字就停
     private func bumpSilence() {
         silence?.invalidate()
-        silence = Timer.scheduledTimer(withTimeInterval: 1.4, repeats: false) { _ in
+        silence = Timer.scheduledTimer(withTimeInterval: 2.4, repeats: false) { _ in
             Task { @MainActor in self.stop() }
+        }
+    }
+
+    /// 识别任务到点会自己结束 —— 只要还在听，就马上开一段新的接着听（最多 5 分钟）
+    private func rollover() {
+        guard listening else { return }
+        guard Date().timeIntervalSince(beganAt) < 300 else { stop(); return }
+        /* 如果识别一直起不来（连续失败），别在这儿死循环 */
+        if Date().timeIntervalSince(lastRollover) < 0.6 { stop(); return }
+        lastRollover = Date()
+        task?.cancel()
+        task = nil
+        request?.endAudio()
+        request = nil
+        if engine.isRunning { engine.stop() }
+        engine.inputNode.removeTap(onBus: 0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let self = self, self.listening else { return }
+            self.begin()
         }
     }
 

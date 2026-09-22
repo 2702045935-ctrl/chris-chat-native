@@ -69,6 +69,9 @@ struct ChatDetailView: View {
     @ObservedObject private var recorder = VoiceRecorder.shared
     /// 输入框里那个小喇叭：语音转文字
     @StateObject private var dictation = Dictation()
+    /// 话筒按钮：按下多久了（<0.22s 松手 = 语音转文字，按住 = 发语音）
+    @State private var pressStart: Date?
+    @State private var voiceStarting = false
     @State private var pushTask: Task<Void, Never>?
     /// 左上角返回箭头旁边那个未读数字（微信同位置）
     @State private var unreadHere = 0
@@ -426,26 +429,47 @@ struct ChatDetailView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Button {
-                    /* 点一下：提示"按住说话"（真正的录音在下面的长按手势里） */
-                    app.show(Tr("按住左边的麦克风说话，松开发送，上滑取消"))
+                    /* 点一下 = 语音转文字（说的字直接进输入框）；
+                       按住不动 = 录音发语音（松开发送，上滑取消）。都是这一个话筒图标。 */
                 } label: {
                     SVGIcon(markup: I.voice, size: L.composerIcon,
-                            color: recorder.recording ? C.green : C.chatBarIcon)
+                            color: (recorder.recording || dictation.listening) ? C.green : C.chatBarIcon)
                         .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
                 .buttonStyle(.plain)
-                /* 按住说话：按住开始录，松开发送，上滑取消 */
+                /* 同一个话筒：轻点 = 语音转文字；按住 = 录音发语音 */
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { v in
-                            if !recorder.recording {
+                            if pressStart == nil { pressStart = Date() }
+                            if recorder.recording {
+                                recorder.drag(v.translation.height)
+                            } else if !voiceStarting,
+                                      Date().timeIntervalSince(pressStart ?? Date()) > 0.22 {
+                                /* 按住 0.22 秒以上才当「按住说话」，避免和轻点撞车 */
+                                voiceStarting = true
+                                if dictation.listening { dictation.stop() }
                                 focused = false
                                 panel = .none
-                                Task { _ = await recorder.begin() }
+                                Task {
+                                    _ = await recorder.begin()
+                                    voiceStarting = false
+                                }
                             }
-                            recorder.drag(v.translation.height)
                         }
-                        .onEnded { _ in finishVoice() }
+                        .onEnded { _ in
+                            let held = Date().timeIntervalSince(pressStart ?? Date())
+                            pressStart = nil
+                            voiceStarting = false
+                            if recorder.recording { finishVoice(); return }
+                            /* 没按住（很快松手）= 语音转文字 */
+                            if held < 0.22 {
+                                focused = false
+                                panel = .none
+                                let base = input
+                                dictation.toggle { s in input = base.isEmpty ? s : (base + s) }
+                            }
+                        }
                 )
 
                 HStack(spacing: 0) {
@@ -454,20 +478,6 @@ struct ChatDetailView: View {
                         .font(pf(17))
                         .foregroundColor(C.label)
                         .onTapGesture { panel = .none }
-                    /* 输入框右边那个小喇叭 = 语音转文字（和微信一样）：
-                       点一下开始听，说的字直接进输入框；说完自己停，再点一下也能停。 */
-                    Button {
-                        focused = false
-                        panel = .none
-                        let base = input
-                        dictation.toggle { s in input = base.isEmpty ? s : (base + s) }
-                    } label: {
-                        SVGIcon(markup: dictation.listening ? I.voice : I.speaker, size: 22,
-                                color: dictation.listening ? C.green : C.chatBarIcon)
-                            .frame(width: 30, height: L.inputH)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 4)
                 }
                 .padding(.horizontal, 8)
                 .frame(height: L.inputH)

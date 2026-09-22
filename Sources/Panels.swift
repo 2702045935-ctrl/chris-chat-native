@@ -26,10 +26,42 @@ let emojiAll: [String] = [
     "🐷", "🐵", "🐯", "🐟", "🍎", "🍓", "🍉", "🍺"
 ]
 
+/* ============================================================ 我们自己的表情（OpenMoji 那套，后台不用配） */
+enum EmojiSet {
+    static let names = ["smile", "grin", "laugh", "joy", "rofl", "wink", "love", "kiss",
+                        "cool", "shy", "smirk", "think", "wow", "doubt", "sweat", "shh",
+                        "cry", "sob", "angry", "sleep", "pray", "clap", "ok", "thumb",
+                        "heart", "fire", "gift", "redpacket", "party", "money"]
+    static var ours: [String] { names }
+    static func url(_ i: Int) -> String { "/uploads/emj2-" + names[max(0, min(i, names.count - 1))] + ".png" }
+}
+
+/// 表情小图（九宫格里的一个）
+struct StickerThumb: View {
+    let url: String
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image = image {
+                Image(uiImage: image).resizable().scaledToFit()
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: url) {
+            guard let u = API.shared.assetURL(url) else { return }
+            if let data = try? await API.shared.assetData(u) { image = UIImage(data: data) }
+        }
+    }
+}
+
 struct EmojiPanel: View {
     @Binding var draft: String
     var onSend: () -> Void
     var onDelete: () -> Void
+    /// 点我们自己的表情：以图片消息发出去（系统 emoji 那套一个都没动，只是多一页）
+    var onSendSticker: ((String) -> Void)? = nil
 
     @State private var page = 0
 
@@ -40,26 +72,62 @@ struct EmojiPanel: View {
         }
     }
 
+    /// 系统表情那一页（原样）
+    private func unicodePage(_ p: Int) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 8), spacing: 0) {
+            ForEach(pages[p].indices, id: \.self) { i in
+                Button {
+                    draft += pages[p][i]
+                } label: {
+                    Text(pages[p][i])
+                        .font(pf(L.v(23, 6.6, 28)))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: panelH * 0.80 / 4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, L.v(6, 2, 10))
+        .padding(.top, L.v(6, 2, 10))
+    }
+
+    /// 我们自己的表情（多出来的一页，不替换系统那套）
+    private var stickerPage: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 5), spacing: 0) {
+            ForEach(EmojiSet.ours.indices, id: \.self) { i in
+                Button {
+                    onSendSticker?(EmojiSet.url(i))
+                } label: {
+                    StickerThumb(url: EmojiSet.url(i))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: panelH * 0.80 / 4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, L.v(6, 2, 10))
+        .padding(.top, L.v(6, 2, 10))
+        .overlay(alignment: .top) {
+            Text(Tr("我们的表情"))
+                .font(pf(11))
+                .foregroundColor(C.subLabel)
+                .padding(.top, 2)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             TabView(selection: $page) {
-                ForEach(pages.indices, id: \.self) { p in
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 8), spacing: 0) {
-                        ForEach(pages[p].indices, id: \.self) { i in
-                            Button {
-                                draft += pages[p][i]
-                            } label: {
-                                Text(pages[p][i])
-                                    .font(pf(L.v(23, 6.6, 28)))
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: panelH * 0.80 / 4)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
+                ForEach(0..<(pages.count + 1), id: \.self) { p in
+                    Group {
+                        if p < pages.count {
+                            unicodePage(p)
+                        } else {
+                            stickerPage
                         }
                     }
-                    .padding(.horizontal, L.v(6, 2, 10))
-                    .padding(.top, L.v(6, 2, 10))
                     .tag(p)
                 }
             }

@@ -802,7 +802,12 @@ struct ChatDetailView: View {
         case .emoji:
             EmojiPanel(draft: $input,
                        onSend: { sendText(); panel = .none },
-                       onDelete: { if !input.isEmpty { input.removeLast() } })
+                       onDelete: { if !input.isEmpty { input.removeLast() } },
+                       onSendSticker: { url in
+                           /* 我们的表情：以图片消息发出去（和微信发自定义表情一样） */
+                           send(kind: "image", content: url)
+                           panel = .none
+                       })
         case .plus:
             PlusPanel(items: plusItems) { item in handlePlus(item) }
         case .gift:

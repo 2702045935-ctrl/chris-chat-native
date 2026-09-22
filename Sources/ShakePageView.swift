@@ -196,7 +196,8 @@ struct ShakePageView: View {
 
     private var navBar: some View {
         ZStack {
-            Text(Tr("摇一摇")).font(pf(17, .semibold)).foregroundColor(ink)
+            /* 标题读后台：ui.json 里写 shakeTitle（不写就是「摇一摇」） */
+            Text(Tr(UIConfig.text("shakeTitle", "摇一摇"))).font(pf(17, .semibold)).foregroundColor(ink)
             HStack(spacing: 0) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")

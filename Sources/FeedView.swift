@@ -157,7 +157,10 @@ struct ChannelsView: View {
                 /* 顶部三个 tab（和微信视频号一致）：关注 / 朋友 / 推荐
                    推荐 = 抖音那套（热度+新鲜度，每次刷新顺序会变） */
                 HStack(spacing: 22) {
-                    ForEach(Array(["关注", "朋友", "推荐"].enumerated()), id: \.offset) { i, name in
+                    /* 三个 tab 的文字后台能改：ui.json 里写 feedTab0 / feedTab1 / feedTab2 */
+                    ForEach(Array([UIConfig.text("feedTab0", "关注"),
+                                   UIConfig.text("feedTab1", "朋友"),
+                                   UIConfig.text("feedTab2", "推荐")].enumerated()), id: \.offset) { i, name in
                         Button {
                             guard tab != i else { return }
                             tab = i

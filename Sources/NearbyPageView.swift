@@ -105,7 +105,8 @@ struct NearbyPageView: View {
         VStack(spacing: 0) {
             /* 顶栏：照参考图，深色 + 居中标题 + 右侧 ⋯ */
             ZStack {
-                Text(Tr("附近的人"))
+                /* 标题读后台：ui.json 里写 nearbyTitle（不写就是「附近的人」） */
+                Text(Tr(UIConfig.text("nearbyTitle", "附近的人")))
                     .font(pf(17, .semibold))
                     .foregroundColor(nameInk)
                 HStack(spacing: 0) {

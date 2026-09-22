@@ -1384,6 +1384,44 @@ final class API {
 
     /* ---------------------------------------------------------- 账号与安全（微信那套） */
 
+    /* ---------------------------------------------------------- 共享实时位置 */
+
+    struct LiveStart: Decodable { var sessionId: String; var joined: Bool? }
+    struct LiveMember: Decodable {
+        var userId: String
+        var name: String?
+        var avatar: String?
+        var lat: Double?
+        var lng: Double?
+        var at: Double?
+    }
+    struct LiveStatePayload: Decodable {
+        var sessionId: String
+        var chatId: String?
+        var fromId: String?
+        var members: [LiveMember]
+    }
+
+    func liveStart(chatId: String, lat: Double? = nil, lng: Double? = nil) async -> (sessionId: String, joined: Bool)? {
+        var body: [String: Any] = ["chatId": chatId]
+        if let lat = lat, let lng = lng { body["lat"] = lat; body["lng"] = lng }
+        guard let r: LiveStart = try? await post("/api/live/start", body, as: LiveStart.self) else { return nil }
+        return (r.sessionId, r.joined ?? false)
+    }
+
+    func livePos(sessionId: String, lat: Double, lng: Double) async {
+        _ = try? await request("POST", "/api/live/pos",
+                               body: ["sessionId": sessionId, "lat": lat, "lng": lng])
+    }
+
+    func liveState(sessionId: String) async -> LiveStatePayload? {
+        try? await get("/api/live/\(sessionId)/state", as: LiveStatePayload.self)
+    }
+
+    func liveStop(sessionId: String) async {
+        _ = try? await request("POST", "/api/live/stop", body: ["sessionId": sessionId])
+    }
+
     /// 修改登录密码：要验当前密码，成功后服务器把其他设备踢下线
     func changePassword(current: String, new: String) async throws {
         _ = try await request("POST", "/api/me/password",

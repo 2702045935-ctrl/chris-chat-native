@@ -59,6 +59,9 @@ struct ChatDetailView: View {
     @State private var showPhoto = false
     @State private var showCamera = false
     @State private var showLocation = false
+    /* 位置：微信「＋ → 位置」会先问一句「发送位置 / 共享实时位置」 */
+    @State private var showLocationMenu = false
+    @State private var showLiveLocation = false
     @State private var showTransfer = false
     @State private var showGroupInfo = false
     @State private var showSearch = false
@@ -401,6 +404,18 @@ struct ChatDetailView: View {
         }
         .sheet(isPresented: $showLocation) {
             LocationSheet { payload in send(kind: "location", content: payload) }
+        }
+        /* 位置：发送位置 / 共享实时位置（微信那一套） */
+        .confirmationDialog(Tr("位置"), isPresented: $showLocationMenu, titleVisibility: .visible) {
+            Button(Tr("发送位置")) { showLocation = true }
+            Button(Tr("共享实时位置")) { showLiveLocation = true }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showLiveLocation) {
+            LiveLocationView(chat: chat) {
+                send(kind: "text", content: "📍 我发起了共享实时位置，点＋→位置→共享实时位置就能加入")
+            }
+            .environmentObject(app)
         }
         .sheet(isPresented: $showTransfer) {
             /* 用「照网页版一条条量出来」的那套转账页（TransferView）：
@@ -765,7 +780,7 @@ struct ChatDetailView: View {
             showCamera = true
         case "location":
             panel = .none
-            showLocation = true
+            showLocationMenu = true
         case "gift":
             panel = .gift
             if gifts.isEmpty { Task { gifts = (try? await API.shared.gifts()) ?? [] } }

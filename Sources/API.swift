@@ -359,6 +359,8 @@ struct LoginBrand: Decodable, Hashable {
     var card: String?
     var text: String?
     var sub: String?
+    /// 深色模式下登录页的文字颜色（后台「深色·文字」）
+    var darkText: String?
     var bgImage: String?
     var appName: String?
     var subTitle: String?

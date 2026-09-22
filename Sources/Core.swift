@@ -941,7 +941,22 @@ enum LoginTheme {
     static var disabledGray = Color(hexString: "#C7C7CC")
     static var text: Color? = nil
     static var sub: Color? = nil
+    /// 深色模式下的文字颜色（后台「深色·文字」）
+    static var darkText: Color? = nil
     static var pageBg: Color? = nil
+
+    /// 正文颜色：按当前深浅色取后台配的那个，没配就用系统默认
+    static func ink(_ scheme: ColorScheme) -> Color {
+        if scheme == .dark, let d = darkText { return d }
+        if let t = text { return t }
+        return Color.primary
+    }
+    /// 次要文字（副标题、说明、版本号）：后台没单独配就按正文颜色淡一点
+    static func inkSub(_ scheme: ColorScheme) -> Color {
+        if let s = sub { return s }
+        if text != nil || darkText != nil { return ink(scheme).opacity(0.62) }
+        return Color.secondary
+    }
     /// 登录页背景图（后台「🎨 登录页 → 背景图」）
     static var bgImage = ""
     /// 用户协议 / 隐私政策全文（后台可改）
@@ -964,6 +979,7 @@ enum LoginTheme {
         if let v = l.disabledGray, !v.isEmpty { disabledGray = Color(hexString: v) }
         if let v = l.text, !v.isEmpty { text = Color(hexString: v) }
         if let v = l.sub, !v.isEmpty { sub = Color(hexString: v) }
+        if let v = l.darkText, !v.isEmpty { darkText = Color(hexString: v) }
         if let v = l.bg, !v.isEmpty { pageBg = Color(hexString: v) }
         bgImage = l.bgImage ?? ""
         terms = l.terms ?? ""

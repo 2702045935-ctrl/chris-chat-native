@@ -836,10 +836,11 @@ struct LoginView: View {
                     VStack(spacing: 0) {
                     Text(appName)
                         .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(LoginTheme.ink(colorScheme))   // 文字颜色接后台
                         .padding(.top, 16)
                     Text(Tr("登录后同步最近的聊天记录"))
                         .font(.system(size: 13))
-                        .foregroundColor(LoginTheme.sub ?? .secondary)
+                        .foregroundColor(LoginTheme.inkSub(colorScheme))
                         .padding(.top, 18)
 
                     Spacer(minLength: 44)
@@ -916,6 +917,7 @@ struct LoginView: View {
 
                         Text(.init("我已阅读并同意 [《用户协议》](terms://0) 和 [《隐私政策》](terms://1)"))
                             .font(.system(size: 12))
+                            .foregroundColor(LoginTheme.ink(colorScheme))    // 协议那行文字颜色也接后台
                             .tint(LoginTheme.accent2)
                             .environment(\.openURL, OpenURLAction { url in
                                 if url.scheme == "terms" {
@@ -933,14 +935,14 @@ struct LoginView: View {
                         Text(Tr("全程 HTTPS 加密传输，密码只以加密哈希保存"))
                             .font(.system(size: 11.5))
                     }
-                    .foregroundColor(LoginTheme.sub ?? Color(hexString: "#8A8F99"))
+                    .foregroundColor(LoginTheme.inkSub(colorScheme))
                     .padding(.top, 14)
 
                     Spacer()
 
                     Text("V1.0.0")
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hexString: "#AEAEB2"))
+                        .foregroundColor(LoginTheme.inkSub(colorScheme))
                         .padding(.top, 60)
                         .padding(.bottom, 20)
                 }
@@ -1129,6 +1131,7 @@ struct LoginView: View {
 struct AccountLoginSheet: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var focus: Field?
 
     private enum Field: Hashable { case phone, code, user, pass }
@@ -1150,18 +1153,22 @@ struct AccountLoginSheet: View {
             ScrollView {
                 VStack(spacing: 0) {
                     if mode == .phone {
-                        row { TextField("手机号", text: $phone).keyboardType(.numberPad).focused($focus, equals: .phone) }
+                        row { TextField("手机号", text: $phone).keyboardType(.numberPad).focused($focus, equals: .phone)
+                            .foregroundColor(LoginTheme.ink(colorScheme)) }
                         HairLine(color: C.navLine)
                         row {
                             TextField("验证码", text: $code).keyboardType(.numberPad).focused($focus, equals: .code)
+                                .foregroundColor(LoginTheme.ink(colorScheme))
                             Button(Tr("获取验证码")) { sendCode() }
                                 .font(.system(size: 14)).foregroundColor(C.loginGreen)
                         }
                     } else {
                         row { TextField("微信号 / 用户名", text: $username).focused($focus, equals: .user)
+                            .foregroundColor(LoginTheme.ink(colorScheme))
                             .textInputAutocapitalization(.never).autocorrectionDisabled(true) }
                         HairLine(color: C.navLine)
-                        row { SecureField("密码", text: $password).focused($focus, equals: .pass) }
+                        row { SecureField("密码", text: $password).focused($focus, equals: .pass)
+                            .foregroundColor(LoginTheme.ink(colorScheme)) }
                     }
                     if let e = error {
                         Text(e).font(.system(size: 13)).foregroundColor(C.red)

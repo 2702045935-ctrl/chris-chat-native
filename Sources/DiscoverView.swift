@@ -543,7 +543,8 @@ struct MomentsView: View {
                           myId: app.me?.id ?? "",
                           onLike: { like(moment) },
                           onComment: { commentText = ""; commenting = moment },
-                          onDeleteMoment: { remove(moment) })
+                          onDeleteMoment: { remove(moment) },
+                          onTogglePin: { togglePin(moment) })
             }
             // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
             if hasMoreMoments {
@@ -966,6 +967,16 @@ struct MomentsView: View {
         }
     }
 
+    /// 置顶 / 取消置顶自己那条动态：置顶的固定排最上面，只能置顶一条
+    private func togglePin(_ moment: Moment) {
+        let next = !(moment.pinned == true)
+        Task {
+            await API.shared.pinMoment(id: moment.id, pinned: next)
+            await reload()
+            app.show(next ? Tr("已置顶，会固定显示在最上面") : Tr("已取消置顶"))
+        }
+    }
+
     /// 删自己发的评论（微信：点一下自己的评论 → 删除）
     private func deleteComment(_ momentId: String, _ commentId: String) {
         Task {
@@ -1014,6 +1025,8 @@ struct MomentRow: View {
     var onLike: (() -> Void)? = nil
     var onComment: (() -> Void)? = nil
     var onDeleteMoment: (() -> Void)? = nil
+    /// 置顶 / 取消置顶（只对自己的动态）
+    var onTogglePin: (() -> Void)? = nil
 
     @State private var deletingComment: String?
     /// 微信：点「···」是在按钮**旁边**弹出「赞 | 评论」小横条，不是底部弹层
@@ -1038,6 +1051,16 @@ struct MomentRow: View {
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 6)
+                }
+
+                /* 置顶的那条：和微信「置顶」一样在时间旁边标一下 */
+                if moment.pinned == true {
+                    HStack(spacing: 3) {
+                        Image(systemName: "pin.fill").font(.system(size: 10))
+                        Text(Tr("置顶")).font(pf(12.5))
+                    }
+                    .foregroundColor(C.subLabel)
+                    .padding(.top, 6)
                 }
 
                 if !images.isEmpty {
@@ -1175,6 +1198,22 @@ struct MomentRow: View {
             .buttonStyle(.plain)
 
             if moment.mine == true, onDeleteMoment != nil {
+                Rectangle().fill(Color.white.opacity(0.22)).frame(width: 0.5, height: 18)
+                Button {
+                    withAnimation(.easeOut(duration: 0.12)) { showActions = false }
+                    onTogglePin?()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: moment.pinned == true ? "pin.slash" : "pin")
+                            .font(.system(size: 12.5))
+                        Text(moment.pinned == true ? Tr("取消置顶") : Tr("置顶")).font(pf(14.5))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 13)
+                    .frame(height: 32)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 Rectangle().fill(Color.white.opacity(0.22)).frame(width: 0.5, height: 18)
                 Button {
                     withAnimation(.easeOut(duration: 0.12)) { showActions = false }

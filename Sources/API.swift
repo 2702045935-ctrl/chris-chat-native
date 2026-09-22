@@ -252,6 +252,8 @@ struct Moment: Decodable, Identifiable, Hashable {
     var images: [String]?
     /// 发表时选的「所在位置」（微信发表页那一行，不填就是空）
     var location: String?
+    /// 我置顶的那条动态（置顶的永远排在朋友圈最上面）
+    var pinned: Bool?
     var createdAt: String?
     var likes: [MomentLike]?
     var likedByMe: Bool?
@@ -1971,6 +1973,11 @@ final class API {
 
     func deleteMoment(id: String) async {
         _ = try? await request("DELETE", "/api/moments/\(id)")
+    }
+
+    /// 置顶 / 取消置顶自己发的动态（置顶的固定排在朋友圈最上面，只能置顶一条）
+    func pinMoment(id: String, pinned: Bool) async {
+        _ = try? await request("POST", "/api/moments/\(id)/pin", body: ["pinned": pinned])
     }
 
     /// 删朋友圈评论（微信：点自己的评论 → 删除）

@@ -659,16 +659,24 @@ enum TimeFmt {
 
     static func ago(_ s: String?) -> String {
         guard let d = date(s) else { return "" }
-        let mins = Int(Date().timeIntervalSince(d) / 60)
-        if mins < 1 { return "刚刚" }
-        if mins < 60 { return "\(mins)分钟前" }
-        let hours = mins / 60
-        if hours < 24 { return "\(hours)小时前" }
-        let days = hours / 24
-        if days < 30 { return "\(days)天前" }
+        /* 微信朋友圈那套时间逻辑：
+           1 分钟内「刚刚」→ 1 小时内「X分钟前」→ 今天内「X小时前」
+           → 昨天 / 前天 → 7 天内「X天前」→ 本年「M月d日」→ 往年「yyyy年M月d日」 */
+        let cal = Calendar.current
+        let secs = Date().timeIntervalSince(d)
+        if secs < 60 { return "刚刚" }
+        if secs < 3600 { return "\(Int(secs / 60))分钟前" }
+        if cal.isDateInToday(d) { return "\(max(1, Int(secs / 3600)))小时前" }
+        if cal.isDateInYesterday(d) { return "昨天" }
+        let days = cal.dateComponents([.day],
+                                      from: cal.startOfDay(for: d),
+                                      to: cal.startOfDay(for: Date())).day ?? 99
+        if days == 2 { return "前天" }
+        if days < 7 { return "\(days)天前" }
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
-        f.dateFormat = "M月d日"
+        let sameYear = cal.component(.year, from: d) == cal.component(.year, from: Date())
+        f.dateFormat = sameYear ? "M月d日" : "yyyy年M月d日"
         return f.string(from: d)
     }
 }

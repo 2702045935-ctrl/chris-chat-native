@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import CoreMedia
 
 /* ============================================================
    语音通话的「服务器转发」通道（兜底方案）
@@ -10,18 +11,28 @@ import AVFoundation
      · 收到对方的帧 → 直接丢给播放器
    服务端只是原样转发（action: 'audio'），1 帧 1280 字节，够小。
    ============================================================ */
-final class CallAudioPipe {
+final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
     static let shared = CallAudioPipe()
 
     /// 每帧多少采样（16000Hz × 0.04s = 640）
     private let sampleRate: Double = 16000
     private let frameSamples = 640
 
-    private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    /* 采集用 AVCaptureSession（录视频那套音频管线）：
+       它自己管音频会话，不像 AVAudioEngine.inputNode 那样容易被会话状态卡住
+       —— 之前「engine 起不来」就是栽在这儿。 */
+    private let capture = AVCaptureSession()
+    private let audioOut = AVCaptureAudioDataOutput()
+    private let captureQueue = DispatchQueue(label: "chris.call.capture")
+
+    /* 播放单独一个「只挂播放器」的引擎：不带输入，一定起得来 */
+    private let player = AVAudioEngine()
+    private let playerNode = AVAudioPlayerNode()
+    private var playerReady = false
+
     private var started = false
     /// 采集有没有真的跑起来（起不来时页面/日志能看到原因）
-    var isRunning: Bool { started && engine.isRunning }
+    var isRunning: Bool { started && capture.isRunning }
     /// 起不来时的原因（上报日志用）
     private(set) var lastError = ""
     private var pending = Data()                 // 攒够一帧再发
@@ -42,7 +53,7 @@ final class CallAudioPipe {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+                                    options: [.defaultToSpeaker, .allowBluetooth])
         } catch {
             lastError = "setCategory 失败: \(error.localizedDescription)"
         }
@@ -50,71 +61,86 @@ final class CallAudioPipe {
             lastError = (lastError.isEmpty ? "" : lastError + " / ") + "setActive 失败: \(error.localizedDescription)"
         }
 
-        let input = engine.inputNode
-        var inFormat = input.inputFormat(forBus: 0)
-        /* 有时候会话刚激活，输入格式还是 0：等一小会儿再来一次 */
-        var tries = 0
-        while (inFormat.sampleRate <= 0 || inFormat.channelCount == 0) && tries < 8 {
-            Thread.sleep(forTimeInterval: 0.15)
-            inFormat = input.inputFormat(forBus: 0)
-            tries += 1
-        }
-        guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else {
-            lastError = (lastError.isEmpty ? "" : lastError + " / ")
-                + "输入没就绪 fmt=\(Int(inFormat.sampleRate))/\(inFormat.channelCount)ch"
-            return
-        }
-
-        engine.attach(player)
-        if let f = playFormat { engine.connect(player, to: engine.mainMixerNode, format: f) }
-
-        /* tap 用 nil（让引擎用它自己的原生格式）—— 指定格式时真机上经常直接起不来 */
-        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
-            self?.feed(buf, from: buf.format)
-        }
-        /* 引擎启动：失败或者「起来了但没在跑」都重试（iOS 上很常见，重试几次就好了） */
-        var lastStartError: Error? = nil
-        for attempt in 0..<4 {
-            if attempt > 0 {
-                Thread.sleep(forTimeInterval: 0.3)
-                try? session.setActive(true, options: [])
-            }
-            engine.prepare()
-            do {
-                try engine.start()
-                if engine.isRunning { started = true; lastStartError = nil; break }
-                lastStartError = NSError(domain: "CallAudio", code: 1,
-                                         userInfo: [NSLocalizedDescriptionKey: "start 了但没运行"])
-            }
-            catch {
-                lastStartError = error
-            }
-        }
-        guard started else {
-            lastError = (lastError.isEmpty ? "" : lastError + " / ")
-                + "engine 起不来: \((lastStartError as NSError?)?.localizedDescription ?? "未知")"
-                + " fmt=\(Int(inFormat.sampleRate))/\(inFormat.channelCount)ch"
-            try? input.removeTap(onBus: 0)
-            return
-        }
-        player.play()
+        startPlayback()
+        startCapture()
     }
 
     func stop() {
         guard started else { return }
         started = false
-        engine.inputNode.removeTap(onBus: 0)
+        captureQueue.async { [capture] in if capture.isRunning { capture.stopRunning() } }
+        playerNode.stop()
         player.stop()
-        engine.stop()
+        playerReady = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    /// 把采集到的 buffer 转成 16kHz 单声道 Int16，攒成 40ms 一帧发走
-    private func feed(_ buf: AVAudioPCMBuffer, from inFormat: AVAudioFormat) {
-        guard let target = playFormat,
+    /* ---------------------------------------------------------- 播放：只挂播放器的引擎 */
+
+    private func startPlayback() {
+        guard !playerReady, let fmt = playFormat else { return }
+        player.attach(playerNode)
+        player.connect(playerNode, to: player.mainMixerNode, format: fmt)
+        player.prepare()
+        for attempt in 0..<4 {
+            do {
+                try player.start()
+                if player.isRunning {
+                    playerNode.play()
+                    playerReady = true
+                    return
+                }
+            } catch {
+                lastError = (lastError.isEmpty ? "" : lastError + " / ") + "播放引擎: \(error.localizedDescription)"
+            }
+            if attempt < 3 { Thread.sleep(forTimeInterval: 0.25); try? AVAudioSession.sharedInstance().setActive(true, options: []) }
+        }
+    }
+
+    /* ---------------------------------------------------------- 采集：AVCaptureSession */
+
+    private func startCapture() {
+        capture.beginConfiguration()
+        if capture.canSetSessionPreset(.high) { capture.sessionPreset = .high }
+        guard let dev = AVCaptureDevice.default(for: .audio),
+              let input = try? AVCaptureDeviceInput(device: dev),
+              capture.canAddInput(input) else {
+            capture.commitConfiguration()
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "拿不到麦克风输入"
+            return
+        }
+        capture.addInput(input)
+        audioOut.setSampleBufferDelegate(self, queue: captureQueue)
+        if capture.canAddOutput(audioOut) { capture.addOutput(audioOut) }
+        capture.commitConfiguration()
+
+        captureQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.capture.startRunning()
+            DispatchQueue.main.async {
+                self.started = self.capture.isRunning
+                if !self.started {
+                    self.lastError = (self.lastError.isEmpty ? "" : self.lastError + " / ") + "AVCaptureSession 没能启动"
+                }
+            }
+        }
+    }
+
+    /// 采集回调：CMSampleBuffer → 16kHz 单声道 Int16 → 攒够 40ms 发一帧
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let fmtDesc = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fmtDesc) else { return }
+        var streamDesc = asbd.pointee
+        guard let inFormat = AVAudioFormat(streamDescription: &streamDesc),
+              let target = playFormat,
               let converter = AVAudioConverter(from: inFormat, to: target) else { return }
-        let ratio = target.sampleRate / inFormat.sampleRate
-        let outCap = AVAudioFrameCount(Double(buf.frameLength) * ratio + 32)
+        let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sampleBuffer))
+        guard frames > 0, let inBuf = AVAudioPCMBuffer(pcmFormat: inFormat, frameCapacity: frames) else { return }
+        inBuf.frameLength = frames
+        guard CMSampleBufferCopyPCMDataIntoAudioBufferList(sampleBuffer, at: 0,
+                                                          frameCount: Int32(frames),
+                                                          into: inBuf.mutableAudioBufferList) == noErr else { return }
+        let outCap = AVAudioFrameCount(Double(frames) * target.sampleRate / inFormat.sampleRate + 32)
         guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: outCap) else { return }
         var done = false
         var err: NSError?
@@ -122,11 +148,10 @@ final class CallAudioPipe {
             if done { status.pointee = .noDataNow; return nil }
             done = true
             status.pointee = .haveData
-            return buf
+            return inBuf
         }
         guard err == nil, out.frameLength > 0, let ch = out.int16ChannelData else { return }
         pending.append(Data(bytes: ch[0], count: Int(out.frameLength) * 2))
-
         let frameBytes = frameSamples * 2
         while pending.count >= frameBytes {
             let chunk = pending.prefix(frameBytes)
@@ -137,7 +162,7 @@ final class CallAudioPipe {
 
     /// 播放对方传来的一帧（16kHz 单声道 Int16）
     func play(_ data: Data) {
-        guard started, let fmt = playFormat else { return }
+        guard playerReady, let fmt = playFormat else { return }
         let frames = data.count / 2
         guard frames > 0,
               let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames)) else { return }
@@ -148,6 +173,6 @@ final class CallAudioPipe {
                 memcpy(ch[0], base, frames * 2)
             }
         }
-        player.scheduleBuffer(buf, completionHandler: nil)
+        playerNode.scheduleBuffer(buf, completionHandler: nil)
     }
 }

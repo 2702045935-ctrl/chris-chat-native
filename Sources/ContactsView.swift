@@ -856,8 +856,10 @@ struct ContactCardView: View {
                 app.show(err)
                 return
             }
-            await app.loadContacts()
+            /* 先退回去、再刷通讯录：反过来的话这个人的数据先从列表里没了，
+               这一页的路径值就失效了，dismiss() 会退不动（用户反馈的「删除后不跳转」）。 */
             dismiss()
+            await app.loadContacts()
             app.show(Tr("已删除好友"))
         }
     }

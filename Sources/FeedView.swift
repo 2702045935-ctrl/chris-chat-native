@@ -27,6 +27,8 @@ struct FeedItem: Decodable, Identifiable, Hashable {
     var author: FeedAuthor?
     var likes: Int?
     var liked: Bool?
+    /// 我有没有关注这个作者（视频号的关注是单独的，和好友关系无关）
+    var followed: Bool?
     var comments: Int?
     var shares: Int?
     var mine: Bool?
@@ -239,11 +241,15 @@ struct ChannelsView: View {
     private func follow(_ item: FeedItem) {
         guard let uid = item.author?.id, !uid.isEmpty else { return }
         Task {
-            do {
-                try await API.shared.addFriend(username: uid)
-                app.show(Tr("已发送关注（好友申请）"))
-            } catch {
-                app.show(Tr("关注失败，可能已经是好友了"))
+            /* 以前这里是拿用户 id 当用户名去发好友申请 → 服务器查不到 → 永远失败。
+               现在走真的关注接口（和好友关系分开，微信视频号也是这个逻辑）。 */
+            let now = !(item.followed == true)
+            let ok = await API.shared.feedFollow(userId: uid, follow: now)
+            if ok {
+                app.show(now ? Tr("已关注") : Tr("已取消关注"))
+                await load()
+            } else {
+                app.show(Tr("关注失败，稍后再试"))
             }
         }
     }

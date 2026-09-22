@@ -1251,8 +1251,16 @@ final class API {
         return (p.items, p.style ?? FeedStyle(), p.flags ?? FeedFlags())
     }
     func feedLike(_ id: String) async throws -> (liked: Bool, likes: Int) {
+        /* 注意：服务器这条是 POST /api/feed/like，body 里带 id（不是路径参数） */
         let p: FeedLikePayload = try await post("/api/feed/like", ["id": id], as: FeedLikePayload.self)
         return (p.liked ?? false, p.likes ?? 0)
+    }
+
+    /// 视频号「关注 / 取消关注」（和好友关系分开，微信视频号就是这个逻辑）
+    func feedFollow(userId: String, follow: Bool) async -> Bool {
+        struct P: Decodable { var following: Bool?; var count: Int? }
+        let p: P? = try? await post("/api/feed/follow", ["userId": userId, "follow": follow], as: P.self)
+        return p?.following ?? false
     }
     func feedComment(_ id: String, text: String) async throws -> Int {
         let p: FeedCommentPayload = try await post("/api/feed/comment", ["id": id, "text": text],

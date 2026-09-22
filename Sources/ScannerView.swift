@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import CoreImage
 
 /* 扫到的内容统一在这里处理：群二维码 → 进群；6 位数字 → 确认别的设备登录；其它 → 原样提示 */
 @MainActor
@@ -80,6 +81,9 @@ struct ScannerView: View {
     @State private var torch = false
     @State private var denied = false
     @State private var hint = "把二维码放进框里，自动识别"
+    /* 微信扫一扫下面那个「相册」：从相册里挑一张带二维码的图片来识别 */
+    @State private var showAlbum = false
+    @State private var busy = false
 
     var body: some View {
         ZStack {
@@ -150,12 +154,48 @@ struct ScannerView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
                         .padding(.top, 8)
-                        .padding(.bottom, 40)
+
+                    /* 相册：扫相册里的二维码图片（微信扫一扫底部左边那个） */
+                    Button { showAlbum = true } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 22))
+                            Text(busy ? Tr("识别中…") : Tr("相册"))
+                                .font(pf(13))
+                        }
+                        .foregroundColor(.white)
+                        .frame(width: 74, height: 66)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.35)))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                    .padding(.top, 18)
+                    .padding(.bottom, 40)
                 }
             }
         }
         .statusBarHidden(false)
         .onAppear { askPermission() }
+        .sheet(isPresented: $showAlbum) {
+            PhotoPicker { image in scanAlbum(image) }
+        }
+    }
+
+    /// 识别相册里的二维码：用系统 CIDetector，识别不到再提示一句
+    private func scanAlbum(_ image: UIImage) {
+        busy = true
+        guard let cg = image.cgImage else { busy = false; hint = Tr("这张图读不出来，换一张试试"); return }
+        let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
+                                  options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
+        let found = (detector?.features(in: CIImage(cgImage: cg)) as? [CIQRCodeFeature])?
+            .compactMap { $0.messageString }.first
+        busy = false
+        if let text = found, !text.isEmpty {
+            onFound(text)
+            dismiss()
+        } else {
+            hint = Tr("这张图里没找到二维码，换一张试试")
+        }
     }
 
     private func askPermission() {

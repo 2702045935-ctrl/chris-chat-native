@@ -2176,11 +2176,32 @@ final class API {
         return p?.cards ?? []
     }
 
+    struct BankInfo: Decodable, Identifiable, Hashable {
+        var name: String
+        var color: String?
+        var short: String?
+        var id: String { name }
+    }
+    private struct BankListPayload: Decodable { var banks: [BankInfo]? }
+
+    /// 绑卡时能选的银行（名字 + 品牌色）
+    func banks() async -> [BankInfo] {
+        let p: BankListPayload? = try? await get("/api/banks", as: BankListPayload.self)
+        return p?.banks ?? []
+    }
+
+    /// 改一张卡的「免密支付」开关
+    func setBankCardNoPin(id: String, noPin: Bool) async {
+        _ = try? await patch("/api/me/bankcards/" + id, ["noPin": noPin], as: [String: String].self)
+    }
+
     @discardableResult
-    func addBankCard(bank: String, number: String, holder: String) async -> String? {
+    func addBankCard(bank: String, number: String, holder: String,
+                     idCard: String = "", phone: String = "", type: String = "") async -> String? {
         do {
             let _: BankCardsPayload = try await post("/api/me/bankcards",
-                                                     ["bank": bank, "number": number, "holder": holder],
+                                                     ["bank": bank, "number": number, "holder": holder,
+                                                      "idCard": idCard, "phone": phone, "type": type],
                                                      as: BankCardsPayload.self)
             return nil
         } catch { return (error as? APIError)?.errorDescription ?? "绑定失败" }

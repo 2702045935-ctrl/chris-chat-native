@@ -63,6 +63,8 @@ struct ChatDetailView: View {
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
     @ObservedObject private var recorder = VoiceRecorder.shared
+    /// 输入框里那个小喇叭：语音转文字
+    @StateObject private var dictation = Dictation()
     @State private var pushTask: Task<Void, Never>?
     /// 左上角返回箭头旁边那个未读数字（微信同位置）
     @State private var unreadHere = 0
@@ -445,8 +447,20 @@ struct ChatDetailView: View {
                         .font(pf(17))
                         .foregroundColor(C.label)
                         .onTapGesture { panel = .none }
-                    SVGIcon(markup: I.speaker, size: 22, color: C.chatBarIcon)
-                        .padding(.leading, 6)
+                    /* 输入框右边那个小喇叭 = 语音转文字（和微信一样）：
+                       点一下开始听，说的字直接进输入框；说完自己停，再点一下也能停。 */
+                    Button {
+                        focused = false
+                        panel = .none
+                        let base = input
+                        dictation.toggle { s in input = base.isEmpty ? s : (base + s) }
+                    } label: {
+                        SVGIcon(markup: dictation.listening ? I.voice : I.speaker, size: 22,
+                                color: dictation.listening ? C.green : C.chatBarIcon)
+                            .frame(width: 30, height: L.inputH)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 4)
                 }
                 .padding(.horizontal, 8)
                 .frame(height: L.inputH)
@@ -499,6 +513,21 @@ struct ChatDetailView: View {
                 /* 表情 / ＋ / 礼物面板还是实心底（和微信一样），不跟着玻璃一起透 */
                 .background(panel == .none ? Color.clear : C.tabBg)
         }
+        .overlay(alignment: .top) {
+            if dictation.listening {
+                Text("正在听你说，说完自己上屏…")
+                    .font(pf(12))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(C.green))
+                    .offset(y: -22)
+            }
+        }
+        .onChange(of: dictation.error) { msg in
+            if !msg.isEmpty { app.show(msg) }
+        }
+        .onDisappear { dictation.stop() }
         /* 输入栏：和顶栏同一套超薄毛玻璃 + 一层白；上面压一条 0.5px 细线做分隔（微信也有） */
         .background {
             ZStack {

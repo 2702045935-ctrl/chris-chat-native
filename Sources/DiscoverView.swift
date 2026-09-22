@@ -1392,17 +1392,23 @@ struct CoverAdjustSheet: View {
     /// 把「框住的那一块」画成一张图交给服务器
     @MainActor
     private func render() {
+        /* 出图分辨率不看设备倍数，直接按「2048 像素宽」渲染 ——
+           以前是按屏幕点数 ×3 渲染（比如 393×380 点 → 1179×1140），
+           有的机型 / 有的系统版本 ImageRenderer 取到的倍数不对，出图就只有 393×380，
+           传上去就是糊的（你的封面文件就是这么来的）。现在固定 2048 宽，怎么都不会糊。 */
+        let targetW: CGFloat = 2048
+        let targetH = (targetW * frameSize.height / max(1, frameSize.width)).rounded()
+        let k = targetW / max(1, frameSize.width)          // 拖动/缩放的位移也要按同样的倍数放大
         let view = Image(uiImage: image)
             .resizable()
             .scaledToFill()
-            .frame(width: frameSize.width, height: frameSize.height)
+            .frame(width: targetW, height: targetH)
             .scaleEffect(scale)
-            .offset(offset)
-            .frame(width: frameSize.width, height: frameSize.height)
+            .offset(x: offset.width * k, y: offset.height * k)
+            .frame(width: targetW, height: targetH)
             .clipped()
         let renderer = ImageRenderer(content: view)
-        /* 按 3 倍屏渲染（封面在真机上是 3x），以前 2 倍所以看着糊 */
-        renderer.scale = max(3, UIScreen.main.scale)
+        renderer.scale = 1
         if let out = renderer.uiImage { onDone(out) }
         dismiss()
     }

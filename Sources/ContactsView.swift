@@ -310,7 +310,6 @@ struct ContactCardView: View {
     @State private var showInfo = false
     @State private var showPhone = false
     @State private var showApply = false
-    @State private var viewer: Int?
     /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
     @State private var aiCall: Chat?
 
@@ -353,11 +352,6 @@ struct ContactCardView: View {
             }
             .background(sheetBg.ignoresSafeArea())
 
-            if let idx = viewer, !thumbs.isEmpty {
-                PhotoPager(paths: thumbs, startIndex: idx) { viewer = nil }
-                    .transition(.opacity)
-                    .zIndex(20)
-            }
         }
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
@@ -534,13 +528,10 @@ struct ContactCardView: View {
 
             HStack(spacing: L.cdThumbGap) {
                 ForEach(thumbs.prefix(5).indices, id: \.self) { i in
-                    Button { viewer = i } label: {
-                        RemoteImage(path: thumbs[i])
-                            .frame(width: L.cdThumb, height: L.cdThumb)
-                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                    /* 缩略图只是让你扫一眼，点了不弹大图 —— 整行都是「进朋友圈」（微信就是这样） */
+                    RemoteImage(path: thumbs[i])
+                        .frame(width: L.cdThumb, height: L.cdThumb)
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                 }
             }
 

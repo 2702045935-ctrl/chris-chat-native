@@ -647,15 +647,17 @@ struct MomentsView: View {
             }
 
             HStack(spacing: 0) {
+                /* 返回箭头：和全 App 用同一个（后台「UI 图标」还能换成你自己的），
+                   点击区 56×48、层级拉到最上面 —— 以前是自绘 SVG + 44 宽，真机上偶尔点不到 */
                 Button { dismiss() } label: {
-                    SVGIcon(markup: I.backCover, size: 20, color: solid ? C.label : .white)
-                        .frame(width: 44, height: 44)          // 点击区按微信标准 44×44
+                    FlexIcon(custom: IconOverrides.custom("nav.back"),
+                             size: 20, color: solid ? C.label : .white,
+                             symbol: "chevron.left", weight: .medium)
+                        .frame(width: 56, height: L.navH)
                         .shadow(color: solid ? .clear : Color.black.opacity(0.55), radius: 2, x: 0, y: 1)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 2)
-                .contentShape(Rectangle())
 
                 Spacer(minLength: 0)
 
@@ -681,7 +683,8 @@ struct MomentsView: View {
             }
             .ignoresSafeArea(edges: .top)
         )
-        .zIndex(10)          // 永远在最上层：不能被下面的滚动层吃掉点击
+        .zIndex(25)          // 永远在最上层：不能被下面的滚动层吃掉点击
+        .allowsHitTesting(true)
     }
 
     /* ---------------------------------------------------------- 发表 / 评论 / 点赞 */

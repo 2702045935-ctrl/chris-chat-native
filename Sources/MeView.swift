@@ -67,6 +67,8 @@ struct MeView: View {
                     GestureSetupView()
                 } else if key == "score" {
                     SecurityScoreView()
+                } else if key == "switch" {
+                    SwitchAccountView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -289,6 +291,7 @@ struct SettingsView: View {
     @State private var showAbout = false
     @State private var showLang = false
     @State private var showPairApprove = false
+    @State private var showSwitchAccount = false
     @State private var showMyQR = false
     @State private var showPrivacy = false
     @State private var showNotify = false
@@ -333,6 +336,28 @@ struct SettingsView: View {
                         HairLine(inset: 16)
                         settingRow(Tr("关于我们 · 版本更新"), "1.0 · " + AppInfo.build) { showAbout = true }
                     }
+
+                    /* 切换账号（微信就在「退出登录」上面这一行） */
+                    Button {
+                        showSwitchAccount = true
+                    } label: {
+                        HStack {
+                            Text(Tr("切换账号"))
+                                .font(pf(17))
+                                .foregroundColor(C.label)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(C.subLabel)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(C.cardBg)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
 
                     Button {
                         confirmLogout = true
@@ -385,6 +410,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showNotify) { NotifyView() }
         .sheet(isPresented: $showGeneral) { GeneralView() }
         .sheet(isPresented: $showProfileEdit) { ProfileEditView() }
+        .sheet(isPresented: $showSwitchAccount) { SwitchAccountView() }
         .confirmationDialog(Tr("界面语言"), isPresented: $showLang, titleVisibility: .visible) {
             Button(Tr("简体中文")) { setLang("zh") }
             Button("English") { setLang("en") }

@@ -1012,4 +1012,10 @@ enum AccountStore {
     static func token(for username: String) -> String {
         return Keychain.get("token." + username) ?? ""
     }
+
+    /// 从「切过的账号」里去掉一个（钥匙串里的令牌也一起清掉）
+    static func remove(username: String) {
+        saveList(load().filter { $0.username != username })
+        Keychain.remove("token." + username)
+    }
 }

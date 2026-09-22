@@ -38,6 +38,54 @@ struct PhotoPicker: UIViewControllerRepresentable {
 }
 
 /// 拍照
+/* ============================================================
+   相册选一张图（不依赖 SwiftUI 的 sheet）
+   扫一扫是全屏相机页，从里面再弹 SwiftUI 的 sheet 有时候弹不出来；
+   而且 PHPicker 自己 dismiss 之后 SwiftUI 还以为在展示，第二次点就没反应了。
+   这里直接找到最上面的控制器把它 present 出来，最稳。
+   ============================================================ */
+enum AlbumPicker {
+    private static var keep: AlbumDelegate?
+
+    static func present(_ onPick: @escaping (UIImage) -> Void) {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+                ?? scene.windows.first?.rootViewController else { return }
+        var cfg = PHPickerConfiguration()
+        cfg.filter = .images
+        cfg.selectionLimit = 1
+        cfg.preferredAssetRepresentationMode = .current
+        let vc = PHPickerViewController(configuration: cfg)
+        let d = AlbumDelegate(onPick: onPick)
+        vc.delegate = d
+        keep = d                       // 保住 delegate，不然会被放了
+        var top = root
+        while let p = top.presentedViewController { top = p }
+        top.present(vc, animated: true)
+    }
+
+    final class AlbumDelegate: NSObject, PHPickerViewControllerDelegate {
+        private let onPick: (UIImage) -> Void
+        init(onPick: @escaping (UIImage) -> Void) { self.onPick = onPick }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            picker.dismiss(animated: true)
+            guard let provider = results.first?.itemProvider,
+                  provider.canLoadObject(ofClass: UIImage.self) else {
+                AlbumPicker.keep = nil
+                return
+            }
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                let img = object as? UIImage
+                DispatchQueue.main.async {
+                    if let img = img { self.onPick(img) }
+                    AlbumPicker.keep = nil
+                }
+            }
+        }
+    }
+}
+
 /// 相册多选（最多 limit 张，回调按用户选择的先后顺序给回来）
 struct PhotosPicker: UIViewControllerRepresentable {
     var limit: Int = 9

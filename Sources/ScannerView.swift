@@ -82,7 +82,6 @@ struct ScannerView: View {
     @State private var denied = false
     @State private var hint = "把二维码放进框里，自动识别"
     /* 微信扫一扫下面那个「相册」：从相册里挑一张带二维码的图片来识别 */
-    @State private var showAlbum = false
     @State private var busy = false
 
     var body: some View {
@@ -156,7 +155,7 @@ struct ScannerView: View {
                         .padding(.top, 8)
 
                     /* 相册：扫相册里的二维码图片（微信扫一扫底部左边那个） */
-                    Button { showAlbum = true } label: {
+                    Button { AlbumPicker.present { image in scanAlbum(image) } } label: {
                         VStack(spacing: 6) {
                             Image(systemName: "photo.on.rectangle")
                                 .font(.system(size: 22))
@@ -176,9 +175,6 @@ struct ScannerView: View {
         }
         .statusBarHidden(false)
         .onAppear { askPermission() }
-        .sheet(isPresented: $showAlbum) {
-            PhotoPicker { image in scanAlbum(image) }
-        }
     }
 
     /// 识别相册里的二维码：用系统 CIDetector，识别不到再提示一句

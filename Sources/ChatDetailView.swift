@@ -891,7 +891,14 @@ struct MessageRow: View {
             audioBubble
 
         default:
-            Text(message.body)
+            Group {
+                /* AI 发来的淘宝 / 淘宝闪购链接：做成能直接点开的蓝色链接 */
+                if message.body.contains("http://") || message.body.contains("https://") {
+                    Text(linkText(message.body))
+                } else {
+                    Text(message.body)
+                }
+            }
                 .font(pf(L.chatFontSize))
                 .foregroundColor(C.bubbleText)
                 .padding(.horizontal, L.bubblePadH)
@@ -907,6 +914,32 @@ struct MessageRow: View {
         guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
         return obj
+    }
+
+    /// 把消息里的 http/https 链接挑出来，做成可以点开的链接（微信里就是蓝色的那种）
+    private func linkText(_ s: String) -> AttributedString {
+        var out = AttributedString()
+        var idx = s.startIndex
+        while idx < s.endIndex {
+            guard let r = s.range(of: "http", range: idx..<s.endIndex) else {
+                out += AttributedString(String(s[idx..<s.endIndex]))
+                break
+            }
+            if r.lowerBound > idx { out += AttributedString(String(s[idx..<r.lowerBound])) }
+            var end = r.lowerBound
+            while end < s.endIndex, !s[end].isWhitespace, s[end] != "，", s[end] != "。", s[end] != "、", s[end] != "）" {
+                end = s.index(after: end)
+            }
+            let text = String(s[r.lowerBound..<end])
+            var seg = AttributedString(text)
+            if let u = URL(string: text) {
+                seg.link = u
+                seg.foregroundColor = Color.dyn(0x576B95, 0x7D90B8)
+            }
+            out += seg
+            idx = end
+        }
+        return out
     }
 
     private var locationBubble: some View {

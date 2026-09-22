@@ -1,4 +1,6 @@
 import SwiftUI
+import UniformTypeIdentifiers
+import CoreLocation
 
 struct DiscoverView: View {
     @ObservedObject private var lang = LangStore.shared
@@ -235,6 +237,10 @@ struct MomentsView: View {
     @State private var showPhoto = false
     @State private var showCamera = false
     @State private var showCoverPhoto = false
+    /* 换封面（微信：点封面 → 从相册选择/拍一张 → 拖动调整 → 完成） */
+    @State private var coverMenu = false
+    @State private var showCoverCamera = false
+    @State private var coverDraft: UIImage?
     @State private var composerPick = false
     @State private var posting = false
     @State private var draft = ""
@@ -257,6 +263,12 @@ struct MomentsView: View {
     @State private var pickMode = "partial"
     @State private var visibleTo: Set<String> = []
     @State private var hiddenFrom: Set<String> = []
+    /* 发朋友圈：所在位置 / 提醒谁看（微信发表页那两行） */
+    @State private var draftLocation = ""
+    @State private var remindIds: Set<String> = []
+    @State private var showLocation = false
+    /* 九宫格拖动排序：正在拖的那一格 */
+    @State private var dragIndex: Int?
     @State private var loadingMore = false
     @State private var momentTotal = 0
     /// 下拉刷新：拉出来的距离 / 正在刷新 / 彩球自转角度
@@ -401,8 +413,27 @@ struct MomentsView: View {
         .confirmationDialog(Tr("发表"), isPresented: $cameraMenu, titleVisibility: .visible) {
             Button(Tr("拍摄")) { showCamera = true }
             Button(Tr("从相册选择")) { showPhoto = true }
-            if target == nil { Button(Tr("换封面")) { showCoverPhoto = true } }
             Button(Tr("取消"), role: .cancel) { }
+        }
+        /* 点封面图 → 微信那个「更换相册封面」 */
+        .confirmationDialog(Tr("更换相册封面"), isPresented: $coverMenu, titleVisibility: .visible) {
+            Button(Tr("从手机相册选择")) { showCoverPhoto = true }
+            Button(Tr("拍一张")) { showCoverCamera = true }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showCoverCamera) {
+            CameraPicker { image in coverDraft = image }
+        }
+        /* 选完先「拖动调整」，点完成才真正换（微信就是这样，不会一选就换） */
+        .sheet(isPresented: Binding(get: { coverDraft != nil },
+                                    set: { if !$0 { coverDraft = nil } })) {
+            if let img = coverDraft {
+                CoverAdjustSheet(image: img,
+                                 frameSize: CGSize(width: L.width, height: L.coverH)) { out in
+                    changeCover(out)
+                    coverDraft = nil
+                }
+            }
         }
         .sheet(isPresented: $showPhoto) {
             PhotosPicker(limit: 9) { images in
@@ -417,7 +448,7 @@ struct MomentsView: View {
             }
         }
         .sheet(isPresented: $showCoverPhoto) {
-            PhotoPicker { image in changeCover(image) }
+            PhotoPicker { image in coverDraft = image }
         }
         .sheet(isPresented: $posting) { publishSheet }
         .alert("评论", isPresented: Binding(
@@ -483,6 +514,8 @@ struct MomentsView: View {
         }
         .frame(height: L.coverH)
         .zIndex(1)
+        /* 微信：点自己朋友圈顶部这张封面图 → 弹「更换相册封面」 */
+        .onTapGesture { if target == nil { coverMenu = true } }
     }
 
     /* ---------------------------------------------------------- 列表 */
@@ -595,58 +628,74 @@ struct MomentsView: View {
     }
 
     private var publishSheet: some View {
-        NavigationView {
-            VStack(alignment: .leading, spacing: 12) {
-                TextEditor(text: $draft)
-                    .frame(minHeight: 110)
-                    .font(pf(17))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.gray.opacity(0.2))
-                    )
-                if !picked.isEmpty {
-                    // 这里按发表后的样子摆（同一套规则）：2/4 张两列，3 张以上三列
-                    PickedGrid(images: picked) { i in
-                        picked.remove(at: i)                  // 点一下＝删掉这张，顺序不变
-                    }
-                    Text(Tr("最多 9 张 · 顺序就是你选图的先后顺序 · 点缩略图可以删掉"))
-                        .font(pf(12))
-                        .foregroundColor(C.subLabel)
+        VStack(spacing: 0) {
+            /* 微信发表页：右上角「发表」，什么都没写的时候是灰的、点不动 */
+            NavBar(title: Tr("发表"), back: { posting = false }) {
+                Button { publish() } label: {
+                    Text(uploading ? Tr("发布中…") : Tr("发表"))
+                        .font(pf(17, .semibold))
+                        .foregroundColor(canPublish ? C.green : C.subLabel)
+                        .frame(height: L.navH)
+                        .padding(.trailing, 16)
                 }
-                Button {
-                    composerPick = true
-                } label: {
-                    Label(Tr("添加图片"), systemImage: "photo.on.rectangle")
-                        .font(pf(15))
-                }
-                /* 谁可以看（对应功能清单里的「好友公开 / 私密 / 部分可见 / 不给谁看」） */
-                Button {
-                    showVisibility = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "eye")
-                        Text("谁可以看：\(visibilityName)")
-                        Spacer()
-                        Chevron(size: 9, line: 1.6)
-                    }
-                    .font(pf(15))
-                    .foregroundColor(C.label)
-                    .padding(.horizontal, 12)
-                    .frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(C.cardBg))
-                }
-                if visibility == "partial" || visibility == "exclude" {
-                    Text(visibility == "partial"
-                         ? "只给这 \(visibleTo.count) 个人看"
-                         : "不给这 \(hiddenFrom.count) 个人看")
-                        .font(pf(12.5))
-                        .foregroundColor(C.subLabel)
-                }
-                Spacer()
+                .buttonStyle(.plain)
+                .disabled(!canPublish)
             }
-            .padding(16)
-            .navigationTitle(Tr("发表"))
-            .navigationBarTitleDisplayMode(.inline)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    /* 文字 + 「这一刻的想法…」占位 */
+                    ZStack(alignment: .topLeading) {
+                        if draft.isEmpty {
+                            Text(Tr("这一刻的想法…"))
+                                .font(pf(17))
+                                .foregroundColor(C.subLabel)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $draft)
+                            .font(pf(17))
+                            .frame(minHeight: 104)
+                            .scrollContentBackground(.hidden)
+                    }
+                    .padding(.horizontal, 12)
+                    .background(C.cardBg)
+
+                    /* 九宫格：＋ 永远在第一个空位，图上有 ✕，长按拖动换顺序 */
+                    composerGrid
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+
+                    /* 微信那三行 */
+                    VStack(spacing: 0) {
+                        HairLine(inset: 16)
+                        composerRow(icon: "location", title: Tr("所在位置"),
+                                    value: draftLocation.isEmpty ? Tr("不显示位置") : draftLocation) {
+                            showLocation = true
+                        }
+                        HairLine(inset: 16)
+                        composerRow(icon: "eye", title: Tr("谁可以看"), value: visibilityName) {
+                            showVisibility = true
+                        }
+                        HairLine(inset: 16)
+                        composerRow(icon: "at", title: Tr("提醒谁看"),
+                                    value: remindIds.isEmpty ? "" : "\(remindIds.count) 个人") {
+                            pickMode = "at"
+                            showPick = true
+                        }
+                    }
+                    .background(C.cardBg)
+                    .padding(.top, 18)
+                }
+                .padding(.bottom, 30)
+            }
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { posting = false }
+        .hidesTabBar()
             .sheet(isPresented: $composerPick) {
                 PhotosPicker(limit: max(1, 9 - picked.count)) { images in
                     let room = 9 - picked.count
@@ -666,16 +715,82 @@ struct MomentsView: View {
                 Button(Tr("取消"), role: .cancel) { }
             }
             .sheet(isPresented: $showPick) { friendPickSheet }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(Tr("取消")) { posting = false }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(Tr("发表")) { publish() }
-                        .disabled(uploading || (draft.isEmpty && picked.isEmpty))
+            .sheet(isPresented: $showLocation) {
+                PlacePickerSheet(text: $draftLocation)
+            }
+    }
+
+    private var canPublish: Bool {
+        !uploading && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !picked.isEmpty)
+    }
+
+    /* 九宫格（微信发表页那一块） */
+    private var composerGrid: some View {
+        let gap: CGFloat = 6
+        let side = (L.width - 32 - gap * 2) / 3
+        return LazyVGrid(columns: Array(repeating: GridItem(.fixed(side), spacing: gap), count: 3),
+                         alignment: .leading, spacing: gap) {
+            ForEach(picked.indices, id: \.self) { i in
+                ZStack(alignment: .topTrailing) {
+                    RemoteImage(path: picked[i])
+                        .frame(width: side, height: side)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .contentShape(Rectangle())
+                        .onDrag {
+                            dragIndex = i
+                            return NSItemProvider(object: String(i) as NSString)
+                        }
+                        .onDrop(of: [UTType.text],
+                                delegate: MomentGridDrop(index: i, items: $picked, dragIndex: $dragIndex))
+                    Button {
+                        picked.remove(at: i)
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 18, height: 18)
+                            .background(Circle().fill(Color.black.opacity(0.6)))
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 6, y: -6)
                 }
             }
+            if picked.count < 9 {
+                Button { composerPick = true } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(C.searchBg)
+                        Image(systemName: "plus")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundColor(C.subLabel)
+                    }
+                    .frame(width: side, height: side)
+                }
+                .buttonStyle(.plain)
+            }
         }
+    }
+
+    private func composerRow(icon: String, title: String, value: String,
+                             tap: @escaping () -> Void) -> some View {
+        Button(action: tap) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 15))
+                    .foregroundColor(C.label)
+                    .frame(width: 20)
+                Text(title).font(pf(16)).foregroundColor(C.label)
+                Spacer(minLength: 8)
+                if !value.isEmpty {
+                    Text(value).font(pf(15)).foregroundColor(C.subLabel).lineLimit(1)
+                }
+                Chevron(size: 9, line: 1.6)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 50)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var visibilityName: String {
@@ -692,7 +807,9 @@ struct MomentsView: View {
             List {
                 ForEach(app.contacts) { u in
                     Button {
-                        if pickMode == "partial" {
+                        if pickMode == "at" {
+                            if remindIds.contains(u.id) { remindIds.remove(u.id) } else { remindIds.insert(u.id) }
+                        } else if pickMode == "partial" {
                             if visibleTo.contains(u.id) { visibleTo.remove(u.id) } else { visibleTo.insert(u.id) }
                         } else {
                             if hiddenFrom.contains(u.id) { hiddenFrom.remove(u.id) } else { hiddenFrom.insert(u.id) }
@@ -702,7 +819,8 @@ struct MomentsView: View {
                             Avatar(path: u.avatarPath, size: 38, radius: 6)
                             Text(u.name).font(pf(16)).foregroundColor(C.label)
                             Spacer()
-                            let on = pickMode == "partial" ? visibleTo.contains(u.id) : hiddenFrom.contains(u.id)
+                            let on = pickMode == "at" ? remindIds.contains(u.id)
+                                : (pickMode == "partial" ? visibleTo.contains(u.id) : hiddenFrom.contains(u.id))
                             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(on ? C.green : C.subLabel)
                         }
@@ -710,7 +828,8 @@ struct MomentsView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .navigationTitle(pickMode == "partial" ? "选择可见的好友" : "选择不看的好友")
+            .navigationTitle(pickMode == "at" ? "提醒谁看"
+                             : (pickMode == "partial" ? "选择可见的好友" : "选择不看的好友"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button(Tr("好了")) { showPick = false } } }
         }
@@ -789,7 +908,19 @@ struct MomentsView: View {
                 try await API.shared.postMoment(content: draft, images: urls,
                                                 visibility: visibility,
                                                 visibleTo: Array(visibleTo),
-                                                hiddenFrom: Array(hiddenFrom))
+                                                hiddenFrom: Array(hiddenFrom),
+                                                location: draftLocation)
+                /* 「提醒谁看」：给选中的好友各发一条消息，让他们点进来（微信也是这么提醒的） */
+                if !remindIds.isEmpty {
+                    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let tip = "我在朋友圈提到了你" + (text.isEmpty ? "" : "：" + String(text.prefix(30)))
+                    for fid in remindIds {
+                        if let chat = try? await API.shared.openDirect(userId: fid) {
+                            _ = try? await API.shared.send(chatId: chat.id, text: tip)
+                        }
+                    }
+                    await app.loadChats()
+                }
                 app.show(Tr("已发表"))
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发表失败")
@@ -799,6 +930,8 @@ struct MomentsView: View {
             visibility = "public"
             visibleTo = []
             hiddenFrom = []
+            draftLocation = ""
+            remindIds = []
             uploading = false
             posting = false
             await reload()
@@ -1052,6 +1185,226 @@ struct MomentImageGrid: View {
 }
 
 /// 单张图：等原图加载出来，按它的宽高比摆（极端比例裁切，小图不放大）
+/* ============================================================
+   发表页的九宫格拖动排序（微信：按住一张图拖到别的位置就换顺序）
+   ============================================================ */
+/* ============================================================
+   换封面第二步：「拖动调整」
+   上下左右拖、双指缩放，框住的那一块就是新封面 —— 点「完成」才保存。
+   （微信也是这个流程：选完图不会立刻换，要你拖一下位置）
+   ============================================================ */
+struct CoverAdjustSheet: View {
+    let image: UIImage
+    let frameSize: CGSize
+    var onDone: (UIImage) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var offset: CGSize = .zero
+    @State private var baseOffset: CGSize = .zero
+    @State private var scale: CGFloat = 1
+    @State private var baseScale: CGFloat = 1
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("拖动调整"), back: { dismiss() }) {
+                Button {
+                    render()
+                } label: {
+                    Text(Tr("完成"))
+                        .font(pf(17, .semibold))
+                        .foregroundColor(C.green)
+                        .frame(height: L.navH)
+                        .padding(.trailing, 16)
+                }
+                .buttonStyle(.plain)
+            }
+
+            ZStack {
+                Color.black
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: frameSize.width, height: frameSize.height)
+                    .scaleEffect(scale)
+                    .offset(offset)
+            }
+            .frame(width: frameSize.width, height: frameSize.height)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onChanged { v in
+                        offset = CGSize(width: baseOffset.width + v.translation.width,
+                                        height: baseOffset.height + v.translation.height)
+                    }
+                    .onEnded { _ in baseOffset = offset }
+            )
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onChanged { m in scale = max(1, min(3, baseScale * m)) }
+                    .onEnded { _ in baseScale = scale }
+            )
+
+            Text(Tr("拖动挪位置，双指缩放，点「完成」保存"))
+                .font(pf(12.5))
+                .foregroundColor(C.subLabel)
+                .padding(.top, 14)
+            Spacer()
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .hidesTabBar()
+    }
+
+    /// 把「框住的那一块」画成一张图交给服务器
+    private func render() {
+        let view = Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: frameSize.width, height: frameSize.height)
+            .scaleEffect(scale)
+            .offset(offset)
+            .frame(width: frameSize.width, height: frameSize.height)
+            .clipped()
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        if let out = renderer.uiImage { onDone(out) }
+        dismiss()
+    }
+}
+
+struct MomentGridDrop: DropDelegate {
+    let index: Int
+    @Binding var items: [UIImage]
+    @Binding var dragIndex: Int?
+
+    func dropEntered(info: DropInfo) {
+        guard let from = dragIndex, from != index,
+              items.indices.contains(from), items.indices.contains(index) else { return }
+        withAnimation(.easeInOut(duration: 0.16)) {
+            items.move(fromOffsets: IndexSet(integer: from), toOffset: index > from ? index + 1 : index)
+        }
+        dragIndex = index
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragIndex = nil
+        return true
+    }
+}
+
+/* ============================================================
+   发表页「所在位置」：定位一次，反查出位置名（微信就是让你选一个地点）
+   ============================================================ */
+
+final class OneShotLocation: NSObject, CLLocationManagerDelegate {
+    static let shared = OneShotLocation()
+    private let mgr = CLLocationManager()
+    private var cont: CheckedContinuation<CLLocation?, Never>?
+
+    func current() async -> CLLocation? {
+        await withCheckedContinuation { c in
+            cont = c
+            mgr.delegate = self
+            mgr.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            mgr.requestWhenInUseAuthorization()
+            mgr.requestLocation()
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        cont?.resume(returning: locations.last)
+        cont = nil
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        cont?.resume(returning: nil)
+        cont = nil
+    }
+}
+
+struct PlacePickerSheet: View {
+    @Binding var text: String
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var places: [String] = []
+    @State private var locating = true
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("所在位置"), back: { dismiss() })
+            if locating {
+                HStack { Spacer(); ProgressView(Tr("正在定位…")); Spacer() }
+                    .frame(height: 90)
+                    .background(C.cardBg)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    Button {
+                        text = ""
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(Tr("不显示位置")).font(pf(16)).foregroundColor(C.label)
+                            Spacer()
+                            if text.isEmpty { Image(systemName: "checkmark").foregroundColor(C.green) }
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 52)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    ForEach(places, id: \.self) { p in
+                        HairLine(inset: 16)
+                        Button {
+                            text = p
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.system(size: 15)).foregroundColor(C.subLabel)
+                                Text(p).font(pf(16)).foregroundColor(C.label)
+                                Spacer()
+                                if text == p { Image(systemName: "checkmark").foregroundColor(C.green) }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 52)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(C.cardBg)
+                .padding(.top, 12)
+            }
+            Spacer()
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .task {
+            let loc = await OneShotLocation.shared.current()
+            guard let loc = loc else { locating = false; return }
+            if let marks = try? await CLGeocoder().reverseGeocodeLocation(loc), let m = marks.first {
+                var list: [String] = []
+                if let name = m.name, !name.isEmpty { list.append(name) }
+                if let city = m.locality, !city.isEmpty, !list.contains(city) { list.append(city) }
+                if let sub = m.subLocality, !sub.isEmpty, !list.contains(sub) { list.append(sub) }
+                if let prov = m.administrativeArea, !prov.isEmpty, !list.contains(prov) { list.append(prov) }
+                places = list
+            }
+            locating = false
+        }
+    }
+}
+
 /// 发表页里已经选好的图：和发出去以后一模一样的摆法（点一下删掉）
 struct PickedGrid: View {
     let images: [UIImage]

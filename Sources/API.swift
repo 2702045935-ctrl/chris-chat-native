@@ -250,6 +250,8 @@ struct Moment: Decodable, Identifiable, Hashable {
     var author: User?
     var content: String?
     var images: [String]?
+    /// 发表时选的「所在位置」（微信发表页那一行，不填就是空）
+    var location: String?
     var createdAt: String?
     var likes: [MomentLike]?
     var likedByMe: Bool?
@@ -1984,10 +1986,12 @@ final class API {
     /// 发朋友圈：谁可以看（public 公开 / private 仅自己 / partial 部分可见 / exclude 不给谁看）
     func postMoment(content: String, images: [String],
                     visibility: String = "public",
-                    visibleTo: [String] = [], hiddenFrom: [String] = []) async throws {
+                    visibleTo: [String] = [], hiddenFrom: [String] = [],
+                    location: String = "") async throws {
         _ = try await request("POST", "/api/moments", body: [
             "content": content, "images": images,
-            "visibility": visibility, "visibleTo": visibleTo, "hiddenFrom": hiddenFrom
+            "visibility": visibility, "visibleTo": visibleTo, "hiddenFrom": hiddenFrom,
+            "location": location
         ])
     }
 

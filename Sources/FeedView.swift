@@ -622,7 +622,10 @@ struct FeedCell: View {
                 let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.isMuted = false
                 p.actionAtItemEnd = .none
-                p.automaticallyWaitsToMinimizeStalling = false
+                /* 先缓冲再播：以前设成 false（几乎不缓冲就开播），网速一般时视频会一顿一顿。
+                   缓存 3 秒 + 让系统自己判断，起播只慢零点几秒，但基本不会卡顿。 */
+                p.automaticallyWaitsToMinimizeStalling = true
+                p.currentItem?.preferredForwardBufferDuration = 3
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero)
@@ -749,7 +752,8 @@ struct FeedPlayerSheet: View {
                 let asset = API.shared.streamingAsset(w.video ?? "") ?? AVURLAsset(url: url)
                 let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.actionAtItemEnd = .none
-                p.automaticallyWaitsToMinimizeStalling = false
+                p.automaticallyWaitsToMinimizeStalling = true
+                p.currentItem?.preferredForwardBufferDuration = 3
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero); p.play()

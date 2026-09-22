@@ -22,6 +22,9 @@ struct BalancePageView: View {
     @State private var rechargeAmount = ""
     @State private var showWithdraw = false
     @State private var showFaq = false
+    /// 常见问题 / 账户升级服务：微信那两页（整页打开，不是一个弹框）
+    @State private var showFaqPage = false
+    @State private var showUpgrade = false
     @State private var faqAnswer: String?
 
     private var st: BalanceStyle { cfg?.style ?? BalanceStyle() }
@@ -58,6 +61,12 @@ struct BalancePageView: View {
                 Button(cfg!.faq![i].q) { faqAnswer = cfg!.faq![i].a }
             }
             Button(Tr("关闭"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showFaqPage) {
+            FAQView().environmentObject(app)
+        }
+        .sheet(isPresented: $showUpgrade) {
+            WalletUpgradeView().environmentObject(app)
         }
         .alert("常见问题", isPresented: Binding(get: { faqAnswer != nil }, set: { if !$0 { faqAnswer = nil } })) {
             Button(Tr("知道了"), role: .cancel) { faqAnswer = nil }
@@ -161,7 +170,9 @@ struct BalancePageView: View {
         case "recharge": rechargeAmount = ""; showRecharge = true
         case "bills": showBills = true
         case "withdraw": showWithdraw = true
-        case "faq": showFaq = true
+        /* 常见问题 / 账户升级服务：微信那两页，整页打开 */
+        case "faq": showFaqPage = true
+        case "upgrade": showUpgrade = true
         default: app.show("「\(label)」还没接后端，先把页面做出来")
         }
     }

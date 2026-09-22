@@ -1570,14 +1570,196 @@ final class API {
     struct RedPacketMineResult: Decodable {
         var redpackets: [RedPacketRecord]?
     }
+    /* 红包封面（后台配的封面库） */
+    struct RedPacketCoverRaw: Decodable, Identifiable {
+        var id: String
+        var name: String?
+        var image: String?
+        var thumb: String?
+        var color: String?
+    }
+    struct RedPacketCoversResult: Decodable {
+        var covers: [RedPacketCoverRaw]?
+        var defaultId: String?
+        var mine: String?
+    }
+    struct RedPacketCoverPick: Decodable {
+        var coverId: String?
+        var name: String?
+    }
+    /* 常见问题（内容来自后台客服中心里配的问答） */
+    struct FAQPayload: Decodable {
+        var title: String?
+        var searchHint: String?
+        var categories: [SupportCategory]?
+        var hot: [SupportItem]?
+    }
+    /* 账户升级服务：等级 / 额度 / 还差哪一步 */
+    struct WalletLevelStep: Decodable {
+        var key: String?
+        var name: String?
+        var done: Bool?
+        var hint: String?
+    }
+    struct WalletLevelRow: Decodable {
+        var level: Int?
+        var name: String?
+        var single: Double?
+        var day: Double?
+        var current: Bool?
+        var done: Bool?
+    }
+    struct WalletLevel: Decodable {
+        var level: Int?
+        var levelName: String?
+        var tip: String?
+        var single: Double?
+        var day: Double?
+        var receive: Double?
+        var usedToday: Double?
+        var leftToday: Double?
+        var realName: Bool?
+        var bankCount: Int?
+        var upgradedAt: String?
+        var levels: [WalletLevelRow]?
+        var steps: [WalletLevelStep]?
+    }
+    struct WalletUpgradeResult: Decodable {
+        var level: Int?
+        var levelName: String?
+        var single: Double?
+        var day: Double?
+    }
+    /* 经营账户（收款记录 / 经营设置 / 提现到零钱 / 开票信息） */
+    struct BizRecordRaw: Decodable, Identifiable {
+        var id: String
+        var kind: String?
+        var amount: Double?
+        var fromName: String?
+        var fromId: String?
+        var method: String?
+        var note: String?
+        var orderNo: String?
+        var status: String?
+        var settled: Bool?
+        var createdAt: String?
+    }
+    struct BizInvoiceRaw: Decodable, Identifiable {
+        var id: String
+        var amount: Double?
+        var status: String?
+        var title: String?
+        var taxNo: String?
+        var kind: String?
+        var note: String?
+        var createdAt: String?
+        var handledAt: String?
+    }
+    struct BizSettingsRaw: Decodable {
+        var arrival: String?
+        var notify: Bool?
+        var autoWithdraw: Bool?
+        var settle: String?
+        var feeRate: Double?
+        var shopName: String?
+        var remark: String?
+    }
+    struct BizInvoiceInfoRaw: Decodable {
+        var title: String?
+        var taxNo: String?
+        var address: String?
+        var phone: String?
+        var bankName: String?
+        var bankAccount: String?
+    }
+    struct BizTotals: Decodable {
+        var today: Double?
+        var month: Double?
+        var all: Double?
+        var count: Int?
+        var withdrawn: Double?
+    }
+    struct BizPayload: Decodable {
+        var enabled: Bool?
+        var balance: Double?
+        var settings: BizSettingsRaw?
+        var invoice: BizInvoiceInfoRaw?
+        var records: [BizRecordRaw]?
+        var invoices: [BizInvoiceRaw]?
+        var totals: BizTotals?
+        var invoiceReady: Bool?
+    }
+    struct BizWithdrawResult: Decodable {
+        var balance: Double?
+        var bizBalance: Double?
+        var amount: Double?
+    }
+    struct BizInvoiceResult: Decodable {
+        var invoice: BizInvoiceRaw?
+        var invoices: [BizInvoiceRaw]?
+    }
+
+    func biz() async throws -> BizPayload {
+        try await get("/api/biz", as: BizPayload.self)
+    }
+    func bizSave(enabled: Bool, arrival: String, notify: Bool, autoWithdraw: Bool,
+                 shopName: String, remark: String) async throws {
+        let _: BizSettingsRaw = try await post("/api/biz/settings", [
+            "enabled": enabled, "arrival": arrival, "notify": notify,
+            "autoWithdraw": autoWithdraw, "shopName": shopName, "remark": remark
+        ], as: BizSettingsRaw.self)
+    }
+    func bizSaveInvoice(title: String, taxNo: String, address: String, phone: String,
+                        bankName: String, bankAccount: String) async throws {
+        let _: BizInvoiceInfoRaw = try await post("/api/biz/invoice", [
+            "title": title, "taxNo": taxNo, "address": address, "phone": phone,
+            "bankName": bankName, "bankAccount": bankAccount
+        ], as: BizInvoiceInfoRaw.self)
+    }
+    func bizApplyInvoice(amount: Double, kind: String, note: String) async throws -> [BizInvoiceRaw] {
+        let r: BizInvoiceResult = try await post("/api/biz/invoice/apply",
+            ["amount": amount, "kind": kind, "note": note], as: BizInvoiceResult.self)
+        return r.invoices ?? []
+    }
+    func bizWithdraw(amount: Double, all: Bool, password: String, face: Bool) async throws -> BizWithdrawResult {
+        try await post("/api/biz/withdraw",
+            ["amount": amount, "all": all, "password": password, "face": face], as: BizWithdrawResult.self)
+    }
+
+    /// 常见问题（独立页面用）
+    func faq() async throws -> FAQPayload {
+        try await get("/api/faq", as: FAQPayload.self)
+    }
+
+    /// 我的账户等级 + 额度 + 还差哪几步
+    func walletLevel() async throws -> WalletLevel {
+        try await get("/api/me/wallet", as: WalletLevel.self)
+    }
+
+    /// 升级账户（服务器会检查实名 + 绑卡）
+    func walletUpgrade() async throws -> WalletUpgradeResult {
+        try await post("/api/me/wallet-upgrade", [:], as: WalletUpgradeResult.self)
+    }
 
     /// 发红包：单聊只能 1 个；群聊传 count(1~100) 和 type（lucky 拼手气 / normal 普通）
     func sendRedPacket(chatId: String, amount: Double, count: Int, type: String,
-                       note: String, password: String = "", face: Bool = false) async throws -> RedPacketSendResult {
+                       note: String, password: String = "", face: Bool = false,
+                       coverId: String = "") async throws -> RedPacketSendResult {
         try await post("/api/pay/redpacket", [
             "chatId": chatId, "amount": amount, "count": count, "type": type,
-            "note": note, "password": password, "face": face
+            "note": note, "password": password, "face": face, "coverId": coverId
         ], as: RedPacketSendResult.self)
+    }
+
+    /// 红包封面列表 + 我自己选的那张
+    func redPacketCovers() async throws -> (covers: [RedPacketCoverRaw], defaultId: String, mine: String) {
+        let r: RedPacketCoversResult = try await get("/api/redpacket/covers", as: RedPacketCoversResult.self)
+        return (r.covers ?? [], r.defaultId ?? "", r.mine ?? "")
+    }
+
+    /// 选一张我自己的红包封面
+    func chooseRedPacketCover(id: String) async throws {
+        let _: RedPacketCoverPick = try await post("/api/redpacket/cover", ["id": id], as: RedPacketCoverPick.self)
     }
 
     /// 拆红包：返回这次抢到多少、余额、红包最新状态

@@ -22,6 +22,12 @@ struct RedPacketInfo: Identifiable {
     var fromName = ""
     var expiresAt: Double = 0
     var refundAmount: Double = 0
+    /* 封面（微信那套：发红包时挑一张，卡片和拆红包页都按它画） */
+    var coverId = ""
+    var coverName = ""
+    var cover = ""
+    var coverThumb = ""
+    var coverColor = "#B3241C"
 
     init?(json: String) {
         guard let data = json.data(using: .utf8),
@@ -43,6 +49,11 @@ struct RedPacketInfo: Identifiable {
         fromName = (o["fromName"] as? String) ?? ""
         expiresAt = num(o["expiresAt"])
         refundAmount = num(o["refundAmount"])
+        coverId = (o["coverId"] as? String) ?? ""
+        coverName = (o["coverName"] as? String) ?? ""
+        cover = (o["cover"] as? String) ?? ""
+        coverThumb = (o["coverThumb"] as? String) ?? ""
+        coverColor = (o["coverColor"] as? String) ?? "#B3241C"
     }
 
     init(raw: API.RedPacketRaw) {
@@ -59,6 +70,11 @@ struct RedPacketInfo: Identifiable {
         fromName = raw.fromName ?? ""
         expiresAt = raw.expiresAt ?? 0
         refundAmount = raw.refundAmount ?? 0
+        coverId = raw.coverId ?? ""
+        coverName = raw.coverName ?? ""
+        cover = raw.cover ?? ""
+        coverThumb = raw.coverThumb ?? ""
+        coverColor = raw.coverColor ?? "#B3241C"
     }
 
     private func num(_ v: Any?, _ fallback: Double = 0) -> Double {
@@ -142,12 +158,132 @@ struct RedPacketCard: View {
         }
         .frame(width: 236, alignment: .leading)
         .background(
-            LinearGradient(colors: pale
-                           ? [Color(hex: 0xF7BE8F), Color(hex: 0xF0AE79)]
-                           : [Color(hex: 0xFA9D3C), Color(hex: 0xF2882A)],
-                           startPoint: .top, endPoint: .bottom)
+            Group {
+                if !info.cover.isEmpty {
+                    /* 有封面：直接用封面图当底（微信就是这么好看的） */
+                    ZStack {
+                        RPCoverView(path: info.cover, colorHex: info.coverColor)
+                        LinearGradient(colors: [Color.black.opacity(0.02), Color.black.opacity(0.42)],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
+                } else {
+                    LinearGradient(colors: pale
+                                   ? [Color(hex: 0xF7BE8F), Color(hex: 0xF0AE79)]
+                                   : [Color(hex: 0xFA9D3C), Color(hex: 0xF2882A)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+            }
+            .opacity(pale ? 0.86 : 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+/* ============================================================ 封面图（后台配的图，按网址加载） */
+struct RPCoverView: View {
+    let path: String
+    var colorHex: String = "#B3241C"
+    var contentMode: ContentMode = .fill
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(hexString: colorHex, fallback: 0xB3241C),
+                                    Color(hexString: colorHex, fallback: 0xB3241C).opacity(0.75)],
+                           startPoint: .top, endPoint: .bottom)
+            if let image = image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode)
+            }
+        }
+        .clipped()
+        .task(id: path) {
+            guard !path.isEmpty, let url = API.shared.assetURL(path) else { return }
+            if let data = try? await API.shared.assetData(url) { image = UIImage(data: data) }
+        }
+    }
+}
+
+/* ============================================================ 选封面（微信那种左右滑着挑） */
+struct RedPacketCoverPicker: View {
+    @ObservedObject private var lang = LangStore.shared
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    /// 选好之后回调
+    var onPick: (API.RedPacketCoverRaw) -> Void
+
+    @State private var covers: [API.RedPacketCoverRaw] = []
+    @State private var index = 0
+    @State private var loading = true
+    @State private var busy = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("选择红包封面"), back: { dismiss() })
+            if loading {
+                ProgressView().padding(.top, 60)
+                Spacer()
+            } else if covers.isEmpty {
+                Text(Tr("还没有可选封面，去后台「红包封面」里加几张"))
+                    .font(pf(14)).foregroundColor(C.subLabel)
+                    .padding(.top, 60)
+                Spacer()
+            } else {
+                TabView(selection: $index) {
+                    ForEach(Array(covers.enumerated()), id: \.element.id) { i, c in
+                        VStack(spacing: 10) {
+                            RPCoverView(path: c.image ?? "", colorHex: c.color ?? "#B3241C")
+                                .frame(width: 236, height: 314)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .shadow(color: Color.black.opacity(0.18), radius: 10, y: 4)
+                            Text(c.name ?? "")
+                                .font(pf(15, .medium))
+                                .foregroundColor(C.label)
+                        }
+                        .tag(i)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
+
+                Button {
+                    pick()
+                } label: {
+                    Text(busy ? Tr("设置中…") : Tr("使用该封面"))
+                        .font(pf(17, .medium))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.green))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+                .disabled(busy)
+            }
+        }
+        .background(C.pageBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .task {
+            if let r = try? await API.shared.redPacketCovers() {
+                covers = r.covers
+                if let i = covers.firstIndex(where: { $0.id == r.mine }) { index = i }
+            }
+            loading = false
+        }
+    }
+
+    private func pick() {
+        guard index < covers.count else { return }
+        let c = covers[index]
+        busy = true
+        Task {
+            try? await API.shared.chooseRedPacketCover(id: c.id)
+            busy = false
+            onPick(c)
+            dismiss()
+        }
     }
 }
 
@@ -201,6 +337,12 @@ struct RedPacketSendView: View {
     @State private var myBalance: Double = 0
     /// 余额有没有从服务器拿到（没拿到就别用 0 去拦人，交给服务器判断）
     @State private var balanceLoaded = false
+    /* 封面：默认用我在服务器上选的那张 */
+    @State private var coverId = ""
+    @State private var coverImage = ""
+    @State private var coverColor = "#B3241C"
+    @State private var coverName = ""
+    @State private var showCoverPicker = false
 
     private var isGroup: Bool { chat.type == "group" }
     private var amount: Double { Double(amountText) ?? 0 }
@@ -217,7 +359,7 @@ struct RedPacketSendView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    /* 顶部：红包那种红黄渐变条（微信发红包页顶部是红的） */
+                    /* 顶部：封面（微信发红包页上面就是封面，点一下能换） */
                     VStack(spacing: 10) {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("¥").font(pf(22, .medium)).foregroundColor(.white)
@@ -233,8 +375,31 @@ struct RedPacketSendView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 22)
-                    .background(LinearGradient(colors: [Color(hex: 0xF0563C), Color(hex: 0xE23B2E)],
-                                               startPoint: .top, endPoint: .bottom))
+                    .background(
+                        ZStack {
+                            if coverImage.isEmpty {
+                                LinearGradient(colors: [Color(hex: 0xF0563C), Color(hex: 0xE23B2E)],
+                                               startPoint: .top, endPoint: .bottom)
+                            } else {
+                                RPCoverView(path: coverImage, colorHex: coverColor)
+                                LinearGradient(colors: [Color.black.opacity(0.15), Color.black.opacity(0.35)],
+                                               startPoint: .top, endPoint: .bottom)
+                            }
+                        }
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture { showCoverPicker = true }
+                    .overlay(alignment: .bottomTrailing) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.2.swap").font(.system(size: 11, weight: .semibold))
+                            Text(coverName.isEmpty ? Tr("选择封面") : coverName).font(pf(12))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.black.opacity(0.28)))
+                        .padding(10)
+                    }
 
                     GroupCard {
                         HStack(spacing: 12) {
@@ -328,6 +493,25 @@ struct RedPacketSendView: View {
                 myBalance = m.balance ?? 0
                 balanceLoaded = true
             }
+            /* 我上次选的封面 */
+            if let r = try? await API.shared.redPacketCovers() {
+                let mine = r.covers.first(where: { $0.id == r.mine }) ?? r.covers.first
+                if let mine = mine {
+                    coverId = mine.id
+                    coverImage = mine.image ?? ""
+                    coverColor = mine.color ?? "#B3241C"
+                    coverName = mine.name ?? ""
+                }
+            }
+        }
+        .sheet(isPresented: $showCoverPicker) {
+            RedPacketCoverPicker { c in
+                coverId = c.id
+                coverImage = c.image ?? ""
+                coverColor = c.color ?? "#B3241C"
+                coverName = c.name ?? ""
+            }
+            .environmentObject(app)
         }
         .sheet(isPresented: $showPay) {
             PayPasswordSheet(amount: amount, purpose: "发红包") { pwd, face in
@@ -378,7 +562,7 @@ struct RedPacketSendView: View {
             chatId: chat.id, amount: amount, count: n,
             type: (isGroup && lucky) ? "lucky" : "normal",
             note: note.isEmpty ? "恭喜发财，大吉大利" : note,
-            password: password, face: face)
+            password: password, face: face, coverId: coverId)
         myBalance = r.balance
         if var me = app.me { me.balance = r.balance; app.me = me }
         return RedPacketInfo(raw: r.redpacket)
@@ -578,9 +762,18 @@ struct RedPacketOpenView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: 0xE4553C), Color(hex: 0xB8381F)],
-                           startPoint: .top, endPoint: .bottom)
+            if info.cover.isEmpty {
+                LinearGradient(colors: [Color(hex: 0xE4553C), Color(hex: 0xB8381F)],
+                               startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+            } else {
+                ZStack {
+                    RPCoverView(path: info.cover, colorHex: info.coverColor)
+                    LinearGradient(colors: [Color.black.opacity(0.18), Color.black.opacity(0.5)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
                 .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 HStack {

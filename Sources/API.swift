@@ -1286,6 +1286,36 @@ final class API {
         _ = try await request("POST", "/api/friends/request", body: body)
     }
 
+    /* ---------------------------------------------------------- 推送通知（苹果 APNs） */
+
+    /// 把苹果给的 device token 交给服务器：手机没连实时通道时它就用这个推通知
+    func registerPushToken(_ token: String, sandbox: Bool) async {
+        _ = try? await request("POST", "/api/push/register", body: [
+            "token": token,
+            "platform": "ios",
+            "env": sandbox ? "sandbox" : "prod",
+            "bundleId": Bundle.main.bundleIdentifier ?? ""
+        ])
+    }
+
+    /// 退出登录：这台手机别再收这个账号的推送
+    func unregisterPushToken(_ token: String) async {
+        guard !token.isEmpty else { return }
+        _ = try? await request("POST", "/api/push/unregister", body: ["token": token])
+    }
+
+    struct PushStatus: Decodable {
+        var configured: Bool?
+        var enabled: Bool?
+        var sandbox: Bool?
+        var devices: Int?
+    }
+
+    /// 自检：服务器那边推送配好了没、这台手机登记过没（「关于」页显示用）
+    func pushStatus() async -> PushStatus? {
+        try? await get("/api/push/status", as: PushStatus.self)
+    }
+
     /// 拿一对一会话（转账需要 chatId）；不是好友会报错
     func directChat(userId: String) async throws -> Chat {
         let payload: ChatPayload = try await post("/api/chats/direct", ["userId": userId], as: ChatPayload.self)

@@ -333,6 +333,18 @@ struct ChatsView: View {
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
             }
         }
+        /* 点了推送通知 → 直接进那个人的聊天（服务器在通知里带了 chatId） */
+        .onReceive(NotificationCenter.default.publisher(for: .chrisOpenChat)) { note in
+            guard let chatId = note.userInfo?["chatId"] as? String, !chatId.isEmpty else { return }
+            Task {
+                await app.loadChats()
+                if let c = app.chats.first(where: { $0.id == chatId }) {
+                    path.append(c)
+                } else {
+                    app.show(Tr("找不到这个会话"))
+                }
+            }
+        }
     }
 
     private var emptyView: some View {

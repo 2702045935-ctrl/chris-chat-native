@@ -38,7 +38,7 @@ enum LocalNotify {
     }
 
     /// 收到一条不属于当前会话的新消息
-    static func incoming(title: String, body: String) {
+    static func incoming(title: String, body: String, chatId: String = "") {
         guard settings.on else { return }
         guard !mutedNow() else { return }
         if settings.sound { AudioServicesPlaySystemSound(1007) }
@@ -47,6 +47,8 @@ enum LocalNotify {
         c.title = title
         c.body = settings.showDetail ? body : "你收到一条新消息"
         if settings.sound { c.sound = .default }
+        /* 带上 chatId：点通知直接进那个聊天（和服务器推的 APNs 通知一个规矩） */
+        if !chatId.isEmpty { c.userInfo = ["chatId": chatId] }
         let req = UNNotificationRequest(identifier: UUID().uuidString, content: c, trigger: nil)
         UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
     }

@@ -115,7 +115,8 @@ final class AppState: ObservableObject {
                 if !cid.isEmpty, let c = self.chats.first(where: { $0.id == cid }) {
                     if c.muted == true { return }              // 这个会话自己开了免打扰
                     LocalNotify.incoming(title: c.name,
-                                         body: c.lastMessage?.preview ?? "你收到一条新消息")
+                                         body: c.lastMessage?.preview ?? "你收到一条新消息",
+                                         chatId: c.id)
                 } else {
                     LocalNotify.incoming(title: "新消息", body: "你收到一条新消息")
                 }
@@ -269,6 +270,8 @@ final class AppState: ObservableObject {
     func refreshAll() async {
         CrashCatcher.install()              // 装上崩溃上报：崩了会把调用栈发到服务器
         LocalNotify.prepare()               // 先要通知权限，之后新消息才会真响真震
+        PushCenter.shared.start()           // 苹果推送：要权限 + 拿 device token 交给服务器
+        PushCenter.shared.uploadIfPossible()
         await LocalNotify.refresh()
         await loadChats()
         await loadContacts()
@@ -301,6 +304,8 @@ final class AppState: ObservableObject {
     }
 
     func logout() async {
+        /* 退出登录：这台手机不再收这个账号的推送 */
+        await API.shared.unregisterPushToken(PushCenter.shared.token)
         await API.shared.logout()
         Realtime.shared.stop()
         me = nil
@@ -335,6 +340,8 @@ final class AppState: ObservableObject {
 @main
 struct CHRISApp: App {
     @StateObject private var app = AppState()
+    /* 苹果推送：拿 device token、收通知、点通知进聊天 */
+    @UIApplicationDelegateAdaptor(PushCenter.self) private var push
 
     init() {
         /* 一启动就装崩溃上报：连登录页崩都能抓到（以前放在登录之后，前面的崩抓不到） */

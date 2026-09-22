@@ -416,6 +416,7 @@ struct FeedbackView: View {
                         }
                         .padding(.horizontal, 16)
                         .frame(height: 52)
+                        HairLine(inset: 16)
                     }
                     .padding(.top, 8)
 
@@ -462,6 +463,16 @@ struct AboutView: View {
     @State private var checking = false
     @State private var latest = ""
     @State private var appName = "CHRIS 聊天"
+    @ObservedObject private var push = PushCenter.shared
+    /// 服务器那边推送配置好没（没配好就是「等服务器配置」）
+    @State private var pushServerReady = false
+
+    private var pushText: String {
+        if !push.authorized { return Tr("通知权限没开") }
+        if push.token.isEmpty { return push.lastError.isEmpty ? Tr("登记中…") : push.lastError }
+        if pushServerReady { return Tr("已开启") }
+        return Tr("等服务器配置")
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -509,11 +520,23 @@ struct AboutView: View {
                         HStack {
                             Text(Tr("服务器")).font(pf(16)).foregroundColor(C.label)
                             Spacer()
-                            Text(API.shared.base)
+                       Text(API.shared.base)
+                               .font(pf(13))
+                               .foregroundColor(C.subLabel)
+                               .lineLimit(1)
+                               .truncationMode(.middle)
+                       }
+                       .padding(.horizontal, 16)
+                       .frame(height: 52)
+                        HairLine(inset: 16)
+                        /* 推送自检：权限同意没、服务器那边配好没、这台手机登记过没 */
+                        HStack {
+                            Text(Tr("推送通知")).font(pf(16)).foregroundColor(C.label)
+                            Spacer()
+                            Text(pushText)
                                 .font(pf(13))
                                 .foregroundColor(C.subLabel)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                                .multilineTextAlignment(.trailing)
                         }
                         .padding(.horizontal, 16)
                         .frame(height: 52)
@@ -536,6 +559,7 @@ struct AboutView: View {
         .hidesTabBar()
         .task {
             if let b = await API.shared.branding(), let n = b.appName, !n.isEmpty { appName = n }
+            if let s = await API.shared.pushStatus() { pushServerReady = (s.configured == true && s.enabled == true) }
         }
     }
 

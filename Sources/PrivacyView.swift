@@ -76,14 +76,49 @@ struct NotifyView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var n = NotifySettings()
     @State private var muteOn = false
+    @ObservedObject private var push = PushCenter.shared
+
+    /// 系统那一层到底允不允许通知（微信「接收新消息通知」那一行显示的就是这个）
+    private var sysText: String { push.authorized ? Tr("已开启") : Tr("已关闭") }
 
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: Tr("新消息通知"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 8) {
+                    /* 微信那一行在最上面：点一下直接跳到 iOS 设置里的通知页 */
                     GroupCard {
-                        row(Tr("接收新消息通知"), $n.on, "on")
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(Tr("接收新消息通知")).font(pf(16)).foregroundColor(C.label)
+                                Spacer(minLength: 8)
+                                Text(sysText)
+                                    .font(pf(15))
+                                    .foregroundColor(push.authorized ? C.subLabel : C.red)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 50)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 8)
+
+                    if !push.authorized {
+                        Text(Tr("系统通知还没开：点上面那行去 iOS 设置里打开「允许通知」，不然 App 在后台收不到提醒。"))
+                            .font(pf(12.5))
+                            .foregroundColor(C.subLabel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 22)
+                    }
+
+                    GroupCard {
+                        row(Tr("App 内提醒"), $n.on, "on")
                         HairLine(inset: 16)
                         row(Tr("声音"), $n.sound, "sound")
                         HairLine(inset: 16)
@@ -135,6 +170,7 @@ struct NotifyView: View {
             n = await API.shared.notifySettings()
             muteOn = !(n.muteStart.isEmpty || n.muteEnd.isEmpty)
             if !muteOn { n.muteStart = ""; n.muteEnd = "" }
+            PushCenter.shared.start()          // 顺手问一次系统权限，那一行显示的就是最新状态
         }
         .onChange(of: muteOn) { on in
             if on { n.muteStart = "22:00"; n.muteEnd = "07:00" }

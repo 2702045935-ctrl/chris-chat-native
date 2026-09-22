@@ -14,6 +14,9 @@ struct SwipeBackModifier: ViewModifier {
         ZStack {
             content
                 .offset(x: offsetX)
+                /* 侧滑返回一旦开始，就把页面的点击关掉 ——
+                   否则手指从某一行上起滑、松手时这一行会被当成「点了一下」（用户反馈的误触）。 */
+                .allowsHitTesting(!tracking)
                 .overlay(
                     Color.black
                         .opacity(0.16 * Double(min(1, offsetX / width)))

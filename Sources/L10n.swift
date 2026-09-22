@@ -490,6 +490,8 @@ enum L10n {
         "今天": "Today",
         "昨天": "Yesterday",
         "前天": "Two days ago",
+        "App 内提醒": "In-app alerts",
+        "系统通知还没开：点上面那行去 iOS 设置里打开「允许通知」，不然 App 在后台收不到提醒。": "System notifications are off — tap the row above and allow them in iOS Settings, otherwise you won't be alerted in the background.",
         "刷新账单": "Refresh bills",
         "新的朋友": "New friends",
         "头像换好了": "Avatar updated",

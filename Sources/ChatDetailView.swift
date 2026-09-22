@@ -487,16 +487,16 @@ struct ChatDetailView: View {
                 LazyVStack(spacing: 0) {
                     /* 上面还有更早的记录时，顶部给一个「查看更早的消息」 */
                     if hasOlder {
-                        Button {
-                            Task { await loadOlder(proxy) }
-                        } label: {
+                        HStack(spacing: 6) {
+                            if loadingOlder { ProgressView().scaleEffect(0.7) }
                             Text(loadingOlder ? Tr("加载中…") : Tr("查看更早的消息"))
                                 .font(pf(13))
                                 .foregroundColor(C.subLabel)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
                         }
-                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
+                        .onTapGesture { Task { await loadOlder() } }
                     }
                     ForEach(messages) { message in
                         VStack(spacing: 0) {
@@ -1029,7 +1029,7 @@ struct ChatDetailView: View {
     }
 
     /* 往上看更早的记录：服务端支持 before 翻页（一次 40 条），加载完把更早的接在前面 */
-    private func loadOlder(_ proxy: ScrollViewProxy) async {
+    private func loadOlder() async {
         guard !loadingOlder, let first = messages.first, let seq = first.seq else { return }
         loadingOlder = true
         defer { loadingOlder = false }
@@ -1038,10 +1038,8 @@ struct ChatDetailView: View {
             hasOlder = r.hasMore
             guard !r.messages.isEmpty else { return }
             holdScroll = true
-            let anchorId = r.messages.first?.id
             messages = r.messages + messages
-            if let anchorId = anchorId { proxy.scrollTo(anchorId, anchor: .top) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { holdScroll = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { holdScroll = false }
         } catch {
             app.show(Tr("聊天记录加载失败"))
         }

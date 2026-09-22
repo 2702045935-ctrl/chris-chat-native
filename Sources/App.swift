@@ -116,9 +116,10 @@ final class AppState: ObservableObject {
                     if c.muted == true { return }              // 这个会话自己开了免打扰
                     LocalNotify.incoming(title: c.name,
                                          body: c.lastMessage?.preview ?? "你收到一条新消息",
-                                         chatId: c.id)
+                                         chatId: c.id,
+                                         badge: unreadForIcon)
                 } else {
-                    LocalNotify.incoming(title: "新消息", body: "你收到一条新消息")
+                    LocalNotify.incoming(title: "新消息", body: "你收到一条新消息", badge: unreadForIcon)
                 }
             }
         case "transfer":
@@ -287,6 +288,22 @@ final class AppState: ObservableObject {
         } catch {
             loadError = (error as? APIError)?.errorDescription ?? "加载失败"
         }
+        syncIconBadge()
+    }
+
+    /// 桌面图标右上角那个红点数字（微信也是这个数）：所有会话未读加一起。
+    /// 读完了就归零；有未读就显示。系统没给通知权限时这一句是空操作。
+    var unreadForIcon: Int {
+        var n = 0
+        for c in chats where c.muted != true { n += c.unreadCount }
+        return min(999, max(0, n))
+    }
+
+    func syncIconBadge() {
+        let v = unreadForIcon
+        DispatchQueue.main.async {
+            UIApplication.shared.applicationIconBadgeNumber = v
+        }
     }
 
     func loadContacts() async {
@@ -312,6 +329,7 @@ final class AppState: ObservableObject {
         chats = []
         contacts = []
         moments = []
+        syncIconBadge()          // 退出登录：图标上的数字清零
     }
 
     /// 一键登录：用这台设备上保存的登录令牌直接进去（登录页点头像就用这个）

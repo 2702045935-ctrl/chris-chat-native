@@ -540,6 +540,46 @@ struct MomentsView: View {
 
     /* ---------------------------------------------------------- 列表 */
 
+    private func momentRow(_ moment: Moment) -> some View {
+        MomentRow(moment: moment,
+                  onMore: { actionMoment = moment },
+                  onOpenImage: { path in openPhoto(path, in: moment) },
+                  onOpenAvatar: { u in cardUser = u },
+                  onDeleteComment: { cid in deleteComment(moment.id, cid) },
+                  myId: app.me?.id ?? "",
+                  onLike: { like(moment) },
+                  onComment: { commentText = ""; commenting = moment },
+                  onDeleteMoment: { remove(moment) },
+                  onTogglePin: { togglePin(moment) })
+    }
+
+    /// 时间轴分组标题：今天 / 昨天 / 前天 / M月d日（往年带年份）
+    private func dayLabel(_ s: String?) -> String {
+        guard let d = TimeFmt.date(s) else { return "" }
+        let cal = Calendar.current
+        if cal.isDateInToday(d) { return Tr("今天") }
+        if cal.isDateInYesterday(d) { return Tr("昨天") }
+        let days = cal.dateComponents([.day],
+                                      from: cal.startOfDay(for: d),
+                                      to: cal.startOfDay(for: Date())).day ?? 99
+        if days == 2 { return Tr("前天") }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = cal.isDate(d, equalTo: Date(), toGranularity: .year) ? "M月d日" : "yyyy年M月d日"
+        return f.string(from: d)
+    }
+
+    private func dayHeader(_ t: String) -> some View {
+        HStack {
+            Text(t)
+                .font(pf(13))
+                .foregroundColor(C.subLabel)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 14)
+        .padding(.bottom, 2)
+    }
+
     private var momentList: some View {
         // 必须用 LazyVStack：1500 条动态如果一次性全建出来（每行还有图），手机会直接崩
         LazyVStack(spacing: 0) {
@@ -554,17 +594,19 @@ struct MomentsView: View {
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 40)
             }
-            ForEach(moments) { moment in
-                MomentRow(moment: moment,
-                          onMore: { actionMoment = moment },
-                          onOpenImage: { path in openPhoto(path, in: moment) },
-                          onOpenAvatar: { u in cardUser = u },
-                          onDeleteComment: { cid in deleteComment(moment.id, cid) },
-                          myId: app.me?.id ?? "",
-                          onLike: { like(moment) },
-                          onComment: { commentText = ""; commenting = moment },
-                          onDeleteMoment: { remove(moment) },
-                          onTogglePin: { togglePin(moment) })
+            /* 置顶的那条固定在最上面（带「置顶」标），
+               其余按天分组：今天 / 昨天 / 前天 / M月d日 —— 时间轴看着清楚 */
+            let pinnedOnes = moments.filter { $0.pinned == true }
+            let timeline = moments.filter { $0.pinned != true }
+            ForEach(pinnedOnes) { moment in
+                momentRow(moment)
+            }
+            ForEach(Array(timeline.enumerated()), id: \.element.id) { i, moment in
+                let day = dayLabel(moment.createdAt)
+                if i == 0 || dayLabel(timeline[i - 1].createdAt) != day {
+                    dayHeader(day)
+                }
+                momentRow(moment)
             }
             // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
             if hasMoreMoments {

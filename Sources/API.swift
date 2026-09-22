@@ -1410,7 +1410,7 @@ final class API {
 
     /* ---------------------------------------------------------- 零钱：银行卡 / 充值 / 提现 */
 
-    struct BankCard: Decodable, Identifiable, Hashable {
+    struct WalletBankCard: Decodable, Identifiable, Hashable {
         var id: String
         var bank: String?
         var tail: String?
@@ -1419,15 +1419,15 @@ final class API {
         var addedAt: String?
         var label: String { (bank ?? "银行卡") + "（" + (tail ?? "****") + "）" }
     }
-    private struct BanksPayload: Decodable { var banks: [BankCard]? }
-    private struct BankPayload: Decodable { var bank: BankCard?; var banks: [BankCard]? }
+    private struct BanksPayload: Decodable { var banks: [WalletBankCard]? }
+    private struct BankPayload: Decodable { var bank: WalletBankCard?; var banks: [WalletBankCard]? }
 
-    func walletBanks() async throws -> [BankCard] {
+    func walletBanks() async throws -> [WalletBankCard] {
         let p: BanksPayload = try await get("/api/wallet/banks", as: BanksPayload.self)
         return p.banks ?? []
     }
 
-    func addBank(bank: String, cardNo: String, holder: String) async throws -> [BankCard] {
+    func addBank(bank: String, cardNo: String, holder: String) async throws -> [WalletBankCard] {
         let p: BankPayload = try await post("/api/wallet/banks",
                                             ["bank": bank, "cardNo": cardNo, "holder": holder],
                                             as: BankPayload.self)
@@ -2301,4 +2301,3 @@ extension UIImage {
         return out.jpegData(compressionQuality: quality)
     }
 }
-

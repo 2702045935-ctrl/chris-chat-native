@@ -12,7 +12,7 @@ struct RechargeView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountText = ""
-    @State private var banks: [API.BankCard] = []
+    @State private var banks: [API.WalletBankCard] = []
     @State private var bankId = ""
     @State private var busy = false
     @State private var showAddBank = false
@@ -149,7 +149,7 @@ struct WithdrawView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountText = ""
-    @State private var banks: [API.BankCard] = []
+    @State private var banks: [API.WalletBankCard] = []
     @State private var bankId = ""
     @State private var busy = false
     @State private var showAddBank = false
@@ -339,7 +339,7 @@ struct WithdrawView: View {
 
 /* 添加银行卡：只存银行名 + 末四位 */
 struct BankAddSheet: View {
-    var onAdded: ([API.BankCard]) -> Void
+    var onAdded: ([API.WalletBankCard]) -> Void
 
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss

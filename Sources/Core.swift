@@ -590,6 +590,15 @@ struct Avatar: View {
 
 /* ============================================================ 时间 */
 
+/// 手机号打码：138****8888（微信显示手机号就是这个样子）
+func maskPhone(_ s: String) -> String {
+    let digits = s.filter { $0.isNumber }
+    guard digits.count >= 7 else { return s }
+    let head = digits.prefix(3)
+    let tail = digits.suffix(4)
+    return "\(head)****\(tail)"
+}
+
 enum TimeFmt {
     static let isoFrac: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()

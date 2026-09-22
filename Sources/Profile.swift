@@ -125,7 +125,25 @@ struct ProfileEditView: View {
                     Rectangle().fill(C.pageBg).frame(height: 8)
 
                     GroupCard {
-                        field("手机号", $phone)
+                        /* 手机号在个人信息里只看不改、中间打码（微信也是「138****8888」），
+                           改号去「设置 → 账号与安全」 */
+                        Button {
+                            app.show(Tr("手机号要改的话去「设置 → 账号与安全」"))
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(Tr("手机号"))
+                                    .font(pf(17)).foregroundColor(C.label)
+                                    .frame(width: 76, alignment: .leading)
+                                Spacer(minLength: 0)
+                                Text(phone.isEmpty ? Tr("未绑定") : maskPhone(phone))
+                                    .font(pf(17)).foregroundColor(C.subLabel)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
 
                     GroupCard {

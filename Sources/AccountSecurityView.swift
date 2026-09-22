@@ -20,7 +20,7 @@ struct AccountSecurityView: View {
     private var me: User? { app.me }
     private var phoneText: String {
         let p = (me?.phone ?? "").trimmingCharacters(in: .whitespaces)
-        return p.isEmpty ? Tr("未绑定") : p
+        return p.isEmpty ? Tr("未绑定") : maskPhone(p)      // 中间打码：138****8888
     }
     private var usernameText: String {
         let u = (me?.username ?? "").trimmingCharacters(in: .whitespaces)

@@ -318,7 +318,7 @@ struct SettingsView: View {
     /// 「账号与安全」那一行右侧的小字：显示手机号（没绑就显示星言号）
     private var accountSubtitle: String {
         let p = (app.me?.phone ?? "").trimmingCharacters(in: .whitespaces)
-        if !p.isEmpty { return p }
+        if !p.isEmpty { return maskPhone(p) }          // 设置页也只显示打码后的手机号
         return app.me?.username ?? ""
     }
     @State private var showRealName = false

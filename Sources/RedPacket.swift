@@ -199,6 +199,8 @@ struct RedPacketSendView: View {
     @State private var showPay = false
     @State private var errorText = ""
     @State private var myBalance: Double = 0
+    /// 余额有没有从服务器拿到（没拿到就别用 0 去拦人，交给服务器判断）
+    @State private var balanceLoaded = false
 
     private var isGroup: Bool { chat.type == "group" }
     private var amount: Double { Double(amountText) ?? 0 }
@@ -320,8 +322,12 @@ struct RedPacketSendView: View {
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if let me = app.me { myBalance = me.balance ?? 0 }
-            if let m = try? await API.shared.me() { app.me = m; myBalance = m.balance ?? 0 }
+            if let me = app.me, let b = me.balance { myBalance = b; balanceLoaded = true }
+            if let m = try? await API.shared.me() {
+                app.me = m
+                myBalance = m.balance ?? 0
+                balanceLoaded = true
+            }
         }
         .sheet(isPresented: $showPay) {
             PayPasswordSheet(amount: amount, purpose: "发红包") { pwd, face in
@@ -357,8 +363,8 @@ struct RedPacketSendView: View {
                 }
             }
         }
-        if amount > myBalance {
-            app.show("余额不足（现在 ¥\(String(format: "%.2f", myBalance))），先充值再来")
+        if balanceLoaded && amount > myBalance {
+            app.show("零钱不够：这个红包要 ¥\(String(format: "%.2f", amount))，你只有 ¥\(String(format: "%.2f", myBalance))。去「我 → 服务 → 钱包 → 零钱 → 充值」")
             return
         }
         showPay = true
@@ -399,7 +405,6 @@ struct PayPasswordSheet: View {
     @State private var faceOK = false
     @State private var busy = false
     @State private var tip = ""
-    @FocusState private var focus: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -423,45 +428,53 @@ struct PayPasswordSheet: View {
                 .padding(.top, 6)
 
             if hasPwd {
-                ZStack {
-                    TextField("", text: $password)
-                        .keyboardType(.numberPad)
-                        .focused($focus)
-                        .opacity(0.02)
-                        .frame(height: 1)
-                    HStack(spacing: 0) {
-                        ForEach(0..<6, id: \.self) { i in
-                            ZStack {
-                                Rectangle().fill(C.cardBg)
-                                if password.count > i {
-                                    Circle().fill(C.label).frame(width: 8, height: 8)
-                                }
+                /* 6 个格子 + 自带数字键盘：
+                   以前用「藏起来的输入框 + 系统键盘」，在真机上经常不弹键盘，
+                   表现就是「塞钱进红包」按了没反应 —— 现在不依赖系统键盘。 */
+                HStack(spacing: 0) {
+                    ForEach(0..<6, id: \.self) { i in
+                        ZStack {
+                            Rectangle().fill(C.cardBg)
+                            if password.count > i {
+                                Circle().fill(C.label).frame(width: 8, height: 8)
                             }
-                            .frame(height: 46)
-                            .overlay(Rectangle().stroke(C.hairline, lineWidth: 0.5))
                         }
+                        .frame(height: 46)
+                        .overlay(Rectangle().stroke(C.hairline, lineWidth: 0.5))
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .padding(.horizontal, 24)
-                .padding(.top, 18)
-                .onTapGesture { focus = true }
-                .onChange(of: password) { v in
-                    let clean = String(v.filter { $0.isNumber }.prefix(6))
-                    if clean != v { password = clean; return }
-                    if clean.count == 6 && !busy { run(face: false) }
-                }
+                .padding(.top, 16)
+
+                keypad
+                    .padding(.top, 10)
             } else {
-                Text("还没有设置支付密码，去「我 → 设置 → 支付密码」设一个再来")
-                    .font(pf(14))
+                /* 没设过支付密码：直接确认就行（服务器也是这个规则） */
+                Text("你还没设支付密码，点下面就能直接付（想设密码：我 → 设置 → 账号与安全 → 支付密码）")
+                    .font(pf(13.5))
                     .foregroundColor(C.subLabel)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 30)
-                    .padding(.top, 18)
+                    .padding(.horizontal, 26)
+                    .padding(.top, 16)
+                Button { run(face: false) } label: {
+                    Text(busy ? "正在付…" : "确认支付 ¥\(String(format: "%.2f", amount))")
+                        .font(pf(17, .medium))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.green))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .disabled(busy)
             }
 
             if !tip.isEmpty {
                 Text(tip).font(pf(13)).foregroundColor(C.red).padding(.top, 10)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
             }
 
             if faceOK {
@@ -472,21 +485,62 @@ struct PayPasswordSheet: View {
                     }
                     .font(pf(15, .medium))
                     .foregroundColor(C.green)
-                    .frame(height: 44)
+                    .frame(height: 40)
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 10)
+                .padding(.top, 6)
             }
 
             Spacer(minLength: 0)
         }
         .background(C.pageBg.ignoresSafeArea())
-        .presentationDetents([.height(320)])
+        .presentationDetents([.height(hasPwd ? 452 : 300)])
         .task {
             hasPwd = await API.shared.hasPayPassword()
             faceOK = Biometrics.available
-            if hasPwd { focus = true }
         }
+    }
+
+    /// 自带数字键盘（1~9 / 0 / 删除），输满 6 位自动付
+    private var keypad: some View {
+        let rows: [[String]] = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["", "0", "⌫"]]
+        return VStack(spacing: 0) {
+            ForEach(0..<rows.count, id: \.self) { r in
+                HStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { c in
+                        let key = rows[r][c]
+                        Button {
+                            tap(key)
+                        } label: {
+                            Text(key)
+                                .font(pf(24, .medium))
+                                .foregroundColor(C.label)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 54)
+                                .background(C.cardBg)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(key.isEmpty)
+                    }
+                }
+                .overlay(Rectangle().stroke(C.hairline, lineWidth: 0.5))
+            }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private func tap(_ key: String) {
+        if busy { return }
+        if key == "⌫" {
+            if !password.isEmpty { password.removeLast() }
+            tip = ""
+            return
+        }
+        guard !key.isEmpty, password.count < 6 else { return }
+        password.append(key)
+        tip = ""
+        if password.count == 6 { run(face: false) }
     }
 
     private func run(face: Bool) {

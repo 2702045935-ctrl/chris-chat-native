@@ -1499,25 +1499,60 @@ final class OneShotLocation: NSObject, CLLocationManagerDelegate {
     static let shared = OneShotLocation()
     private let mgr = CLLocationManager()
     private var cont: CheckedContinuation<CLLocation?, Never>?
+    private var timeout: Task<Void, Never>?
 
     func current() async -> CLLocation? {
+        /* 一分钟内定位过的位置直接用，省得每次都等 */
+        if let l = mgr.location, abs(l.timestamp.timeIntervalSinceNow) < 60 { return l }
+        if cont != nil { return mgr.location }        // 已经有一次在定位了，别叠着来
         await withCheckedContinuation { c in
             cont = c
             mgr.delegate = self
             mgr.desiredAccuracy = kCLLocationAccuracyHundredMeters
-            mgr.requestWhenInUseAuthorization()
-            mgr.requestLocation()
+            let st = mgr.authorizationStatus
+            if st == .notDetermined {
+                /* 先要权限，等用户在弹窗上点了以后，授权回调里再真正请求位置。
+                   以前是「要权限 + 立刻请求位置」一起发 —— 授权还没下来时那一次请求的
+                   回调永远不会来，界面就一直卡在「正在定位」。 */
+                mgr.requestWhenInUseAuthorization()
+            } else if st == .denied || st == .restricted {
+                finish(mgr.location)
+            } else {
+                mgr.requestLocation()
+            }
+            /* 8 秒还没结果就别让界面一直转：有上次的位置就用上次的，没有就给空 */
+            timeout?.cancel()
+            timeout = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                if Task.isCancelled { return }
+                self?.finish(self?.mgr.location)
+            }
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        cont?.resume(returning: locations.last)
+    private func finish(_ loc: CLLocation?) {
+        timeout?.cancel()
+        timeout = nil
+        cont?.resume(returning: loc)
         cont = nil
     }
 
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let st = manager.authorizationStatus
+        if st == .notDetermined { return }
+        if st == .denied || st == .restricted {
+            finish(manager.location)
+            return
+        }
+        if cont != nil { manager.requestLocation() }     // 授权刚下来：现在真正请求位置
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        finish(locations.last)
+    }
+
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        cont?.resume(returning: nil)
-        cont = nil
+        finish(manager.location)
     }
 }
 

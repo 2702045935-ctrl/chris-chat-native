@@ -71,6 +71,7 @@ struct SendLocationView: View {
     @State private var places: [(String, String, Double, Double)] = []
     @State private var loading = true
     @State private var picked = 0
+    @State private var denied = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,6 +100,24 @@ struct SendLocationView: View {
             if loading {
                 HStack { Spacer(); ProgressView(Tr("正在定位…")); Spacer() }
                     .frame(height: 70)
+            } else if denied {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "location.slash").foregroundColor(C.subLabel)
+                        Text(Tr("定位没开：点这里去设置里打开「位置」"))
+                            .font(pf(14.5)).foregroundColor(C.link)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 56)
+                    .background(C.cardBg)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
             ScrollView {
@@ -152,8 +171,9 @@ struct SendLocationView: View {
 
     private func locate() async {
         guard let loc = await OneShotLocation.shared.current() else {
-            /* 没给定位权限也要能用：给一个「我的位置」条目，用户自己知道在哪 */
-            places = [(Tr("我的位置"), "", 31.2304, 121.4737)]
+            /* 定位失败 / 没给权限：直接告诉用户去开，不再瞎给一个坐标 */
+            places = []
+            denied = true
             loading = false
             return
         }
@@ -235,6 +255,21 @@ struct LiveLocationView: View {
                             }
                         }
                     }
+                }
+                if !hint.isEmpty {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "location.slash")
+                            Text(hint).font(pf(13))
+                            Text(Tr("去设置")).font(pf(13, .medium)).foregroundColor(C.link)
+                        }
+                        .foregroundColor(C.subLabel)
+                    }
+                    .buttonStyle(.plain)
                 }
                 Button { stopAndClose() } label: {
                     Text(Tr("停止共享"))

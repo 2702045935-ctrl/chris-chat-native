@@ -516,6 +516,8 @@ enum L10n {
         "我发起了共享实时位置，点＋→位置→共享实时位置就能加入": "I started sharing my live location — tap + → Location → Share live location to join",
         "我的位置": "My location",
         "手机号要改的话去「设置 → 账号与安全」": "To change your phone number, go to Settings → Account and security",
+        "定位没开：点这里去设置里打开「位置」": "Location is off — tap here and allow Location in Settings",
+        "去设置": "Settings",
         "系统通知还没开：点上面那行去 iOS 设置里打开「允许通知」，不然 App 在后台收不到提醒。": "System notifications are off — tap the row above and allow them in iOS Settings, otherwise you won't be alerted in the background.",
         "刷新账单": "Refresh bills",
         "新的朋友": "New friends",

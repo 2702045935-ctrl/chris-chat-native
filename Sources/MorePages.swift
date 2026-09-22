@@ -189,7 +189,35 @@ struct BankCardsView: View {
     @State private var holder = ""
     @State private var busy = false
 
-    private let banks = ["招商银行", "工商银行", "建设银行", "农业银行", "中国银行", "交通银行", "邮储银行", "支付宝", "其他"]
+    /// 可选银行（从服务器拉，带品牌色；拉不到就用下面这份兜底）
+    @State private var bankList: [API.BankInfo] = []
+    private var banks: [String] {
+        let names = bankList.map { $0.name }
+        return names.isEmpty
+            ? ["工商银行", "建设银行", "农业银行", "中国银行", "招商银行", "交通银行", "邮储银行", "其他银行"]
+            : names
+    }
+
+    /// 这家银行的品牌色（服务器给了就用，没给就按名字兜一个）
+    private func bankColor(_ name: String) -> Color {
+        if let c = bankList.first(where: { $0.name == name })?.color,
+           case let hex = c.replacingOccurrences(of: "#", with: ""),
+           hex.count == 6, let v = Int(hex, radix: 16) {
+            return Color(hex: v)
+        }
+        let table: [String: Int] = ["工商银行": 0xC8161D, "建设银行": 0x0B4DA2, "农业银行": 0x0E8B4A,
+                                    "中国银行": 0xB01F24, "招商银行": 0xC7000B, "交通银行": 0x1B4E9B,
+                                    "邮储银行": 0x0E7B40, "中信银行": 0xD0202F, "民生银行": 0x0E5EA8,
+                                    "浦发银行": 0x0A4C8B, "兴业银行": 0x1F4C9C, "光大银行": 0x8B1A2B,
+                                    "平安银行": 0xF36F21, "广发银行": 0xC8102E, "华夏银行": 0x0E5EA8,
+                                    "微众银行": 0x0E9C6B, "网商银行": 0x1F7BE0]
+        return Color(hex: table[name] ?? 0x8A8A8E)
+    }
+
+    private func bankShort(_ name: String) -> String {
+        if let s = bankList.first(where: { $0.name == name })?.short, !s.isEmpty { return s }
+        return String(name.prefix(1))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -230,7 +258,7 @@ struct BankCardsView: View {
                                         Text(c.bank ?? "银行卡")
                                             .font(pf(16))
                                             .foregroundColor(C.label)
-                                        Text("尾号 \(c.tail ?? "****")" + ((c.holder ?? "").isEmpty ? "" : " · \(c.holder!)"))
+                                        Text(((c.type ?? "储蓄卡") + " · 尾号 \(c.tail ?? "****")") + ((c.holder ?? "").isEmpty ? "" : " · \(c.holder!)"))
                                             .font(pf(12.5))
                                             .foregroundColor(C.subLabel)
                                     }
@@ -267,6 +295,7 @@ struct BankCardsView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .task { await reload() }
+        .task { bankList = await API.shared.banks() }
         .sheet(isPresented: $showAdd) { addSheet }
     }
 
@@ -274,13 +303,39 @@ struct BankCardsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    field("银行") {
-                        Picker("", selection: $bank) {
-                            ForEach(banks, id: \.self) { Text($0).tag($0) }
+                    /* 银行：横向摆一排名牌小方块（每家一个品牌色），跟微信一样点一下就选中 */
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(Tr("选择银行")).font(pf(15)).foregroundColor(C.label)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(banks, id: \.self) { name in
+                                    let on = (bank == name)
+                                    Button { bank = name } label: {
+                                        HStack(spacing: 6) {
+                                            Text(bankShort(name))
+                                                .font(pf(13, .semibold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 22, height: 22)
+                                                .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                                    .fill(bankColor(name)))
+                                            Text(name).font(pf(14)).foregroundColor(on ? C.label : C.subLabel)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 36)
+                                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(on ? C.searchBg : C.cardBg))
+                                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .stroke(on ? C.green : C.hairline, lineWidth: on ? 1.4 : 0.5))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 2)
                         }
-                        .pickerStyle(.menu)
-                        .tint(C.green)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    HairLine(color: C.navLine)
                     HairLine(color: C.navLine)
                     field("卡号") {
                         TextField("16~19 位卡号", text: $number)

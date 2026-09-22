@@ -16,6 +16,8 @@ struct FAQView: View {
     @State private var q = ""
     @State private var openCat: API.SupportCategory?
     @State private var showSupport = false
+    /// 「联系在线客服」进独立客服页（不再跳普通聊天）
+    @State private var showKefu = false
 
     private var cats: [API.SupportCategory] { cfg?.categories ?? [] }
 
@@ -65,6 +67,9 @@ struct FAQView: View {
         .sheet(isPresented: $showSupport) {
             SupportView().environmentObject(app)
         }
+        .sheet(isPresented: $showKefu) {
+            KefuPage().environmentObject(app)
+        }
     }
 
     private var searchBar: some View {
@@ -96,8 +101,8 @@ struct FAQView: View {
                     .font(.system(size: 34, weight: .light))
                     .foregroundColor(C.subLabel)
                 Text(Tr("没找到相关的，换个说法试试")).font(pf(14)).foregroundColor(C.subLabel)
-                Button { showSupport = true } label: {
-                    Text(Tr("联系在线客服"))
+                    Button { showKefu = true } label: {
+                        Text(Tr("联系在线客服"))
                         .font(pf(15, .medium))
                         .foregroundColor(.white)
                         .padding(.horizontal, 22)
@@ -179,7 +184,7 @@ struct FAQView: View {
         VStack(spacing: 10) {
             Text(Tr("还有问题？找在线客服"))
                 .font(pf(13)).foregroundColor(C.subLabel)
-            Button { showSupport = true } label: {
+            Button { showKefu = true } label: {
                 Text(Tr("联系在线客服"))
                     .font(pf(15, .medium))
                     .foregroundColor(.white)

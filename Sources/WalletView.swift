@@ -207,7 +207,7 @@ struct WalletView: View {
         case "settings":
             app.show(Tr("支付设置：还没接后端，先把页面做出来"))
         case "service":
-            showSupport = true            // 客服中心（常见问题 + 在线客服 + 工单）
+            showSupport = true            // 先到客服中心（常见问题页），里面的「联系在线客服」进独立客服页
         default:
             /* 后台把动作写成 soon（或者没写）时，按名字兜底 —— 这几个页面其实都做好了，
                不能让用户点进去看到「还没开发」 */

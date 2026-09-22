@@ -289,7 +289,13 @@ private struct BankCardsPayload: Decodable { var cards: [BankCard]? }
 private struct SendPayload: Decodable { var sent: Bool?; var id: String? }
 
 /// 银行卡（卡号只回后四位）
-struct BankCard: Decodable, Identifiable, Hashable {
+    struct BankCard: Decodable, Identifiable, Hashable {
+        /* 微信银行卡那页要的：卡类型、免密支付、限额、脱敏手机号 */
+        var type: String?
+        var noPin: Bool?
+        var single: Double?
+        var day: Double?
+        var phoneMask: String?
     var id: String
     var bank: String?
     var holder: String?

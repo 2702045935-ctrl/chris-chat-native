@@ -54,35 +54,46 @@ final class CallAudioPipe {
         var inFormat = input.inputFormat(forBus: 0)
         /* 有时候会话刚激活，输入格式还是 0：等一小会儿再来一次 */
         var tries = 0
-        while inFormat.sampleRate <= 0 && tries < 5 {
+        while (inFormat.sampleRate <= 0 || inFormat.channelCount == 0) && tries < 8 {
             Thread.sleep(forTimeInterval: 0.15)
             inFormat = input.inputFormat(forBus: 0)
             tries += 1
         }
-        guard inFormat.sampleRate > 0 else {
-            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "输入格式为 0（麦克风没就绪）"
+        guard inFormat.sampleRate > 0, inFormat.channelCount > 0 else {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ")
+                + "输入没就绪 fmt=\(Int(inFormat.sampleRate))/\(inFormat.channelCount)ch"
             return
         }
 
         engine.attach(player)
         if let f = playFormat { engine.connect(player, to: engine.mainMixerNode, format: f) }
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buf, _ in
-            self?.feed(buf, from: inFormat)
+        /* tap 用 nil（让引擎用它自己的原生格式）—— 指定格式时真机上经常直接起不来 */
+        input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buf, _ in
+            self?.feed(buf, from: buf.format)
         }
-        /* 引擎启动失败重试 3 次（iOS 上音频会话刚切换时第一次经常失败） */
+        /* 引擎启动：失败或者「起来了但没在跑」都重试（iOS 上很常见，重试几次就好了） */
         var lastStartError: Error? = nil
-        for _ in 0..<3 {
+        for attempt in 0..<4 {
+            if attempt > 0 {
+                Thread.sleep(forTimeInterval: 0.3)
+                try? session.setActive(true, options: [])
+            }
             engine.prepare()
-            do { try engine.start(); started = true; lastStartError = nil; break }
+            do {
+                try engine.start()
+                if engine.isRunning { started = true; lastStartError = nil; break }
+                lastStartError = NSError(domain: "CallAudio", code: 1,
+                                         userInfo: [NSLocalizedDescriptionKey: "start 了但没运行"])
+            }
             catch {
                 lastStartError = error
-                Thread.sleep(forTimeInterval: 0.2)
             }
         }
         guard started else {
             lastError = (lastError.isEmpty ? "" : lastError + " / ")
-                + "engine.start 失败: \((lastStartError as NSError?)?.localizedDescription ?? "未知")"
+                + "engine 起不来: \((lastStartError as NSError?)?.localizedDescription ?? "未知")"
+                + " fmt=\(Int(inFormat.sampleRate))/\(inFormat.channelCount)ch"
             try? input.removeTap(onBus: 0)
             return
         }

@@ -539,10 +539,8 @@ final class CallCenter: NSObject, ObservableObject {
         cameraOff = false
         if !wasIdle {
             phase = .idle
-            /* 挂断原因弹一个对话框（和聊天那个框一样的颜色/圆角）：
-               接通过的把时长写在下面，没接通就只写原因，点「确定」关掉。 */
-            let dur = secs > 0 ? String(format: "通话时长 %02d:%02d", secs / 60, secs % 60) : ""
-            showDialog(tip.isEmpty ? "通话已结束" : tip, detail: dur.isEmpty ? peerName : dur, auto: 8)
+            /* 按最新要求：挂断以后不再弹「通话已结束」那种小卡片了。
+               通话结果本来就会在聊天里留一条记录（已取消 / 对方无应答 / 通话时长 …）。 */
         }
     }
 

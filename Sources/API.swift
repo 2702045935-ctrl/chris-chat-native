@@ -446,6 +446,21 @@ struct DiscoverItem: Decodable, Identifiable, Hashable {
 }
 
 private struct StickersPayload: Decodable { var packs: [StickerPack]? }
+/// 「我的表情」（微信「我 → 表情」那套）：我添加的表情包 + 我自己添加的单个表情 + 最近使用
+struct StickerMine: Decodable, Hashable {
+    var packs: [StickerPack]?
+    var singles: [String]?
+    var recent: [String]?
+    var packList: [StickerPack] { packs ?? [] }
+    var singleList: [String] { singles ?? [] }
+    var recentList: [String] { recent ?? [] }
+}
+private struct StickerShopPayload: Decodable {
+    var packs: [StickerPack]?
+    var mine: StickerMine?
+    var thirdParty: ThirdParty?
+    struct ThirdParty: Decodable { var provider: String?; var enabled: Bool?; var limit: Int? }
+}
 private struct StatusesPayload: Decodable { var categories: [StatusCategory]? }
 private struct DiscoverPayload: Decodable { var items: [DiscoverItem] }
 
@@ -1830,6 +1845,38 @@ final class API {
     func stickerPacks() async throws -> [StickerPack] {
         let payload: StickersPayload = try await get("/api/stickers", as: StickersPayload.self)
         return payload.packs ?? []
+    }
+
+    /* ---------------------------------------------------------- 表情（微信「我 → 表情」） */
+
+    /// 表情商店 + 我的表情一次拿全
+    func stickerShop() async throws -> (shop: [StickerPack], mine: StickerMine) {
+        let p: StickerShopPayload = try await get("/api/stickers", as: StickerShopPayload.self)
+        return (p.packs ?? [], p.mine ?? StickerMine())
+    }
+
+    /// 添加表情包（商店里点「添加」）
+    func addStickerPack(_ packId: String) async {
+        _ = try? await request("POST", "/api/stickers/add", body: ["packId": packId])
+    }
+
+    /// 移除表情包（我的表情里点「移除」）
+    func removeStickerPack(_ packId: String) async {
+        _ = try? await request("POST", "/api/stickers/remove", body: ["packId": packId])
+    }
+
+    /// 添加单个表情（从相册选一张图上传后加进「我添加的表情」）
+    func addSingleSticker(_ sticker: String) async {
+        _ = try? await request("POST", "/api/stickers/add", body: ["sticker": sticker])
+    }
+
+    func removeSingleSticker(_ sticker: String) async {
+        _ = try? await request("POST", "/api/stickers/remove", body: ["sticker": sticker])
+    }
+
+    /// 用过的表情记一笔（表情面板第一格「最近使用」）
+    func markStickerUsed(_ sticker: String) async {
+        _ = try? await request("POST", "/api/stickers/recent", body: ["sticker": sticker])
     }
 
     func statusCategories() async throws -> [StatusCategory] {

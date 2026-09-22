@@ -637,7 +637,7 @@ struct AsyncAvatar: View {
 
     var body: some View {
         Group {
-            if let url = assetURL(path), !path.isEmpty {
+            if !path.isEmpty, let url = API.shared.assetURL(path) {
                 AsyncImage(url: url) { img in
                     img.resizable().scaledToFill()
                 } placeholder: {

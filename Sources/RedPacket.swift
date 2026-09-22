@@ -320,8 +320,8 @@ struct RedPacketSendView: View {
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            if let me = app.me { myBalance = me.balance }
-            if let m = try? await API.shared.me() { app.me = m; myBalance = m.balance }
+            if let me = app.me { myBalance = me.balance ?? 0 }
+            if let m = try? await API.shared.me() { app.me = m; myBalance = m.balance ?? 0 }
         }
         .sheet(isPresented: $showPay) {
             PayPasswordSheet(amount: amount, purpose: "发红包") { pwd, face in
@@ -446,7 +446,7 @@ struct PayPasswordSheet: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 18)
                 .onTapGesture { focus = true }
-                .onChange(of: password) { _, v in
+                .onChange(of: password) { v in
                     let clean = String(v.filter { $0.isNumber }.prefix(6))
                     if clean != v { password = clean; return }
                     if clean.count == 6 && !busy { run(face: false) }
@@ -769,7 +769,7 @@ struct RPAvatar: View {
 
     var body: some View {
         Group {
-            if !path.isEmpty, let url = assetURL(path) {
+            if !path.isEmpty, let url = API.shared.assetURL(path) {
                 AsyncImageLoad(url: url)
             } else {
                 Circle().fill(Color(hex: 0xE2A03C)).overlay(

@@ -402,11 +402,10 @@ struct SupportView: View {
         if busyHuman { return }
         busyHuman = true
         Task {
+            /* 服务器那边已经把这个会话建好了（没建也会自动建 + 补好友关系），
+               这里用「打开和在线客服的单聊」把它拿到手，然后直接进聊天页 */
             if let r = try? await API.shared.supportHuman() {
-                closeCfg()
-                if let chat = try? await API.shared.chat(id: r.chatId) {
-                    nextChat = chat
-                } else if let chat = try? await API.shared.openDirect(userId: r.agent?.id ?? "") {
+                if let chat = try? await API.shared.openDirect(userId: r.agent?.id ?? "") {
                     nextChat = chat
                 } else {
                     app.show(Tr("打不开客服会话，稍后再试"))
@@ -416,10 +415,6 @@ struct SupportView: View {
             }
             busyHuman = false
         }
-    }
-
-    private func closeCfg() {
-        /* 转人工以后不再刷新配置：进聊天页了 */
     }
 
     private func catSymbol(_ title: String) -> String {

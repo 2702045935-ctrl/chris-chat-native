@@ -269,6 +269,9 @@ struct MomentsView: View {
     @State private var showLocation = false
     /* 九宫格拖动排序：正在拖的那一格 */
     @State private var dragIndex: Int?
+    /// 「别误触」的锁：发表完 / 关掉大图后的 0.6 秒里不响应「点图看大图」
+    /// （iOS 上弹层收起时手指那一下会漏到下面列表上 —— 用户反馈的「莫名其妙点到一张」就是它）
+    @State private var tapLockUntil = Date(timeIntervalSince1970: 0)
     @State private var loadingMore = false
     @State private var momentTotal = 0
     /// 下拉刷新：拉出来的距离 / 正在刷新 / 彩球自转角度
@@ -378,7 +381,10 @@ struct MomentsView: View {
             }
 
             if let i = viewerIndex, !viewerPaths.isEmpty {
-                PhotoPager(paths: viewerPaths, startIndex: i) { viewerIndex = nil }
+                PhotoPager(paths: viewerPaths, startIndex: i) {
+                    viewerIndex = nil
+                    tapLockUntil = Date().addingTimeInterval(0.6)      // 关大图那一下别又点开一张
+                }
                     .zIndex(40)
             }
         }
@@ -625,6 +631,7 @@ struct MomentsView: View {
     /* ---------------------------------------------------------- 发表 / 评论 / 点赞 */
 
     private func openPhoto(_ path: String, in moment: Moment) {
+        guard Date() >= tapLockUntil else { return }      // 刚发表完 / 刚关掉大图：这一下不算
         let all = moment.images ?? []
         guard !all.isEmpty else { return }
         viewerPaths = all
@@ -941,6 +948,7 @@ struct MomentsView: View {
             remindIds = []
             uploading = false
             posting = false
+            tapLockUntil = Date().addingTimeInterval(0.6)          // 发表弹层收起那一下别误触到图
             await reload()
             await app.loadMoments()
         }
@@ -1139,8 +1147,6 @@ struct MomentRow: View {
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { if showActions { withAnimation(.easeOut(duration: 0.12)) { showActions = false } } }
         /* 点自己发的评论 → 删除（微信就是这样） */
         .confirmationDialog(Tr("删除这条评论？"), isPresented: Binding(
             get: { deletingComment != nil },

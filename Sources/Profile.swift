@@ -66,21 +66,6 @@ struct ProfileEditView: View {
                         }
                         .padding(.horizontal, 16)
                         .frame(height: 56)
-                        HairLine(inset: 16)
-                        Button {
-                            showMyQR = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                Text(Tr("我的二维码")).font(pf(17)).foregroundColor(C.label)
-                                Spacer()
-                                SVGIcon(markup: I.qr, size: 18, color: C.arrow)
-                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 56)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
                     }
 
                     Rectangle().fill(C.pageBg).frame(height: 8)

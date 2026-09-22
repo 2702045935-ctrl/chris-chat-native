@@ -44,6 +44,9 @@ struct MeView: View {
             .background(C.pageBg)
             .ignoresSafeArea(edges: .top)
             .toolbar(.hidden, for: .navigationBar)
+            /* 「我」页右上角那个二维码图标点开就是这一页（以前这个弹层只挂在设置页，
+               所以在「我」页点二维码只把标志位置成了 true、什么都不会弹出来） */
+            .sheet(isPresented: $showMyQR) { MyQRView() }
             .navigationDestination(for: String.self) { key in
                 if key == "settings" {
                     SettingsView()

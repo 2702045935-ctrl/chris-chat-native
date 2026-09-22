@@ -63,6 +63,8 @@ struct MeView: View {
                     StatusView()
                 } else if key == "paypwd" {
                     PayPasswordView()
+                } else if key == "gesture" {
+                    GestureSetupView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -307,6 +309,9 @@ struct SettingsView: View {
                         HairLine(inset: 16)
                         /* 支付密码：点进去设置 / 修改（转账付款时要输它） */
                         settingLink(Tr("支付密码"), hasPay ? "已设置" : "未设置", key: "paypwd")
+                        HairLine(inset: 16)
+                        /* 安全锁（手势密码）：开了以后进「零钱 / 经营账户」要先画一遍（微信那种） */
+                        settingLink(Tr("安全锁（手势密码）"), GestureStore.enabled ? Tr("已开启") : Tr("未开启"), key: "gesture")
                         HairLine(inset: 16)
                         settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)

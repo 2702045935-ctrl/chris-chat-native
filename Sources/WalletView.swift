@@ -19,8 +19,12 @@ struct WalletView: View {
     @State private var showBills = false
     @State private var showCoin = false
     @State private var showCards = false
+    @State private var showBiz = false
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
     @State private var revealed: Set<String> = []
+    /// 手势密码（安全锁）：开了以后进「零钱 / 经营账户」要先画一遍
+    @State private var needGesture = false
+    @State private var pendingAction = ""
 
     private var st: WalletStyle { cfg?.style ?? WalletStyle() }
 
@@ -69,6 +73,10 @@ struct WalletView: View {
         .navigationDestination(isPresented: $showBills) { BillsView() }
         .navigationDestination(isPresented: $showCoin) { BalancePageView() }
         .navigationDestination(isPresented: $showCards) { BankCardsView() }
+        .navigationDestination(isPresented: $showBiz) { BizAccountView() }
+        .sheet(isPresented: $needGesture) {
+            GestureLockView { openAfterLock(pendingAction) }
+        }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" || ev.type == "ui" { Task { await load() } }
@@ -165,9 +173,22 @@ struct WalletView: View {
     /* ---------------------------------------------------------- 动作 */
 
     private func run(_ action: String, _ label: String) {
+        /* 零钱 / 经营账户：设了手势密码就先验一遍（微信那种安全锁） */
+        if GestureStore.enabled, action == "balance" || label == "经营账户" {
+            pendingAction = label == "经营账户" ? "biz" : action
+            needGesture = true
+            return
+        }
+        openAfterLock(label == "经营账户" ? "biz" : action)
+    }
+
+    /// 验过手势（或本来就没开锁）之后真正打开
+    private func openAfterLock(_ action: String) {
         switch action {
         case "balance":
             showCoin = true               // 进「零钱」页（照参考图做的那一页）
+        case "biz":
+            showBiz = true                // 经营账户
         case "bills":
             showBills = true            // 进「账单」页（真实转账记录）
         case "card":

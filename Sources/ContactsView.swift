@@ -310,10 +310,20 @@ struct ContactCardView: View {
     @State private var showInfo = false
     @State private var showPhone = false
     @State private var showApply = false
+    /* 朋友资料（微信「设置备注和标签」那套） */
+    @State private var meta: API.FriendMeta?
+    @State private var showRemark = false
+    @State private var showPerm = false
+    @State private var confirmDelete = false
     /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
     @State private var aiCall: Chat?
 
     private var u: User { full ?? user }
+    /// 名片上显示的名字：有备注用备注，没有用昵称
+    private var displayName: String {
+        if let r = meta?.remark, !r.trimmingCharacters(in: .whitespaces).isEmpty { return r }
+        return u.name
+    }
     private var phone: String { (u.phone ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
     private var isBot: Bool { u.bot == true }
     /// 顶栏那只小眼睛对应的 AI（管家）—— 名片上也用会动的眼睛当头像
@@ -361,10 +371,27 @@ struct ContactCardView: View {
                 Button(Tr("发消息")) { openChat() }
                 Button(Tr("语音通话")) { startAICall() }
             } else {
-                Button(Tr("设置备注和标签")) { app.show(Tr("备注和标签还没开，先看下面的资料")) }
-                Button(Tr("朋友圈权限")) { app.show(Tr("默认：能看他的朋友圈")) }
+                /* 和微信那一列一样：设置备注和标签 / 朋友权限 / 星标 / 黑名单 / 删除 / 投诉 */
+                Button(Tr("设置备注和标签")) { showRemark = true }
+                Button(Tr("朋友权限")) { showPerm = true }
+                Button(meta?.star == true ? Tr("取消星标朋友") : Tr("设为星标朋友")) { toggleStar() }
+                Button(meta?.block == true ? Tr("移出黑名单") : Tr("加入黑名单")) { toggleBlock() }
+                Button(Tr("删除好友"), role: .destructive) { confirmDelete = true }
+                Button(Tr("投诉")) { app.show(Tr("已收到你的投诉，我们会尽快处理")) }
             }
             Button(Tr("取消"), role: .cancel) { }
+        }
+        .confirmationDialog(Tr("删除好友？"), isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(Tr("删除"), role: .destructive) { removeFriend() }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .sheet(isPresented: $showRemark) {
+            FriendRemarkSheet(user: u, meta: meta) { await load() }
+                .environmentObject(app)
+        }
+        .sheet(isPresented: $showPerm) {
+            FriendPermSheet(user: u, meta: meta) { await load() }
+                .environmentObject(app)
         }
         .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
             if isBot {
@@ -430,7 +457,8 @@ struct ContactCardView: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
-                    Text(u.name)
+                    /* 设了备注名就显示备注（微信就是这样），真昵称挪到下面一行 */
+                    Text(displayName)
                         .font(pf(L.cdNameSize))
                         .foregroundColor(ink)
                         .lineLimit(1)
@@ -440,7 +468,7 @@ struct ContactCardView: View {
                 .frame(height: L.cdNameRowH)
 
                 cardLine(isBot ? ("账号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
-                               : ("昵称：" + u.name))
+                               : ("昵称：" + ((u.realNickname?.isEmpty == false) ? u.realNickname! : u.name)))
                     .padding(.top, L.cdLineGap)
                 if isBot {
                     cardLine("简介：" + ((u.bio?.isEmpty == false) ? u.bio! : "您的私人助理"))
@@ -501,6 +529,71 @@ struct ContactCardView: View {
                             .foregroundColor(link)
                             .lineLimit(1)
                         Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, L.cdPadH)
+                    .frame(height: L.cdRowH)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !isBot && relation == "friend" {
+                /* 标签（微信在这一栏显示你给他打的标签） */
+                Spacer().frame(height: L.cdRowGap)
+                Button { showRemark = true } label: {
+                    HStack(spacing: 0) {
+                        Text(Tr("标签"))
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(ink)
+                            .frame(width: L.cdLabelW, alignment: .leading)
+                        Text(tagText)
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(gray)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        cardArrow
+                    }
+                    .padding(.horizontal, L.cdPadH)
+                    .frame(height: L.cdRowH)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                /* 朋友权限（聊天 / 朋友圈 / 黑名单） */
+                Spacer().frame(height: L.cdRowGap)
+                Button { showPerm = true } label: {
+                    HStack(spacing: 0) {
+                        Text(Tr("朋友权限"))
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(ink)
+                            .frame(width: L.cdLabelW, alignment: .leading)
+                        Text(permText)
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(gray)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        cardArrow
+                    }
+                    .padding(.horizontal, L.cdPadH)
+                    .frame(height: L.cdRowH)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                /* 更多信息：共同群聊 / 来源 / 添加时间（微信在「朋友资料」里给这几行） */
+                Spacer().frame(height: L.cdRowGap)
+                Button { showInfo = true } label: {
+                    HStack(spacing: 0) {
+                        Text(Tr("更多信息"))
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(ink)
+                            .frame(width: L.cdLabelW, alignment: .leading)
+                        Text(moreText)
+                            .font(pf(L.cdLineSize))
+                            .foregroundColor(gray)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        cardArrow
                     }
                     .padding(.horizontal, L.cdPadH)
                     .frame(height: L.cdRowH)
@@ -673,6 +766,33 @@ struct ContactCardView: View {
         }
     }
 
+    private var tagText: String {
+        let tags = (meta?.tags ?? []).filter { !$0.isEmpty }
+        return tags.isEmpty ? Tr("未设置") : tags.joined(separator: "、")
+    }
+
+    private var permText: String {
+        if meta?.block == true { return Tr("已加入黑名单") }
+        if meta?.noMoments == true { return Tr("不看他的朋友圈") }
+        if meta?.hideMyMoments == true { return Tr("不让他看我的朋友圈") }
+        return Tr("聊天、朋友圈")
+    }
+
+    private var moreText: String {
+        var bits: [String] = []
+        if let g = u.mutualGroups, g > 0 { bits.append("共同群聊 \(g) 个") }
+        if let s = meta?.source, !s.isEmpty { bits.append(s == "me" ? "我添加的" : "他添加的我") }
+        bits.append("添加时间 " + (addedText.isEmpty ? "—" : addedText))
+        return bits.joined(separator: " · ")
+    }
+
+    /// 添加时间：2026-09-22T05:50:45.320Z → 2026年9月22日
+    private var addedText: String {
+        guard let s = meta?.addedAt, s.count >= 10 else { return "" }
+        let y = s.prefix(4), m = s.dropFirst(5).prefix(2), d = s.dropFirst(8).prefix(2)
+        return "\(Int(y) ?? 0)年\(Int(m) ?? 0)月\(Int(d) ?? 0)日"
+    }
+
     /// 跟机器人打电话：先找到（或建好）和它的会话，再打开 AI 通话界面
     private func startAICall() {
         busy = true
@@ -694,6 +814,10 @@ struct ContactCardView: View {
 
     private func load() async {
         if let fresh = try? await API.shared.user(id: user.id) { full = fresh }
+        /* 朋友资料：备注名 / 标签 / 星标 / 朋友权限（微信「设置备注和标签」那套） */
+        if relation == "friend" || relation == "self" {
+            if let m = try? await API.shared.friendMeta(userId: user.id) { meta = m }
+        }
         if let list = try? await API.shared.moments(limit: 6, userId: user.id) {
             var images: [String] = []
             for m in list {
@@ -703,6 +827,38 @@ struct ContactCardView: View {
             }
             thumbs = images
             hasMoments = !list.isEmpty
+        }
+    }
+
+    /* ---------------------------------------------------------- 朋友资料的几个动作 */
+
+    private func toggleStar() {
+        let next = !(meta?.star == true)
+        Task {
+            await API.shared.setFriendMeta(userId: u.id, star: next)
+            await load()
+            app.show(next ? Tr("已设为星标朋友") : Tr("已取消星标"))
+        }
+    }
+
+    private func toggleBlock() {
+        let next = !(meta?.block == true)
+        Task {
+            await API.shared.setFriendMeta(userId: u.id, block: next)
+            await load()
+            app.show(next ? Tr("已加入黑名单，他发不了消息给你") : Tr("已移出黑名单"))
+        }
+    }
+
+    private func removeFriend() {
+        Task {
+            if let err = await API.shared.removeFriend(userId: u.id) {
+                app.show(err)
+                return
+            }
+            await app.loadContacts()
+            dismiss()
+            app.show(Tr("已删除好友"))
         }
     }
 }

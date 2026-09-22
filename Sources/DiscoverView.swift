@@ -505,7 +505,9 @@ struct MomentsView: View {
                 MomentRow(moment: moment,
                           onMore: { actionMoment = moment },
                           onOpenImage: { path in openPhoto(path, in: moment) },
-                          onOpenAvatar: { u in cardUser = u })
+                          onOpenAvatar: { u in cardUser = u },
+                          onDeleteComment: { cid in deleteComment(moment.id, cid) },
+                          myId: app.me?.id ?? "")
             }
             // 滑到底自动接着拉：3000 条也能一直往下翻（微信就是这样）
             if hasMoreMoments {
@@ -825,6 +827,18 @@ struct MomentsView: View {
         }
     }
 
+    /// 删自己发的评论（微信：点一下自己的评论 → 删除）
+    private func deleteComment(_ momentId: String, _ commentId: String) {
+        Task {
+            if let err = await API.shared.deleteMomentComment(momentId: momentId, commentId: commentId) {
+                app.show(err)
+            } else {
+                app.show(Tr("评论已删除"))
+            }
+            await reload()
+        }
+    }
+
     private func submitComment() {
         guard let moment = commenting else { return }
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -853,6 +867,12 @@ struct MomentRow: View {
     var onOpenImage: ((String) -> Void)? = nil
     /// 点头像 → 名片
     var onOpenAvatar: ((User) -> Void)? = nil
+    /// 点自己发的评论 → 删除（微信那样）
+    var onDeleteComment: ((String) -> Void)? = nil
+    /// 我的用户 id（判断哪条评论是我自己发的）
+    var myId: String = ""
+
+    @State private var deletingComment: String?
 
     private var images: [String] { moment.images ?? [] }
     var body: some View {
@@ -908,26 +928,51 @@ struct MomentRow: View {
                 let comments = moment.comments ?? []
                 if !likes.isEmpty || !comments.isEmpty {
                     VStack(alignment: .leading, spacing: 3) {
-                        if !likes.isEmpty {
-                            Text(likes.compactMap { $0.nickname }.joined(separator: "、"))
-                                .font(pf(15))
-                                .foregroundColor(C.link)
-                        }
-                        ForEach(comments.indices, id: \.self) { i in
-                            let c = comments[i]
-                            Text((c.nickname ?? "") + "：" + (c.content ?? ""))
-                                .font(pf(15))
-                                .foregroundColor(C.label)
-                        }
+                if !likes.isEmpty {
+                    /* 微信那套：一个红心 + 名字列表 */
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("♥")
+                            .font(pf(13))
+                            .foregroundColor(Color(hex: 0xFF6B6B))
+                        Text(likes.compactMap { $0.nickname }.joined(separator: "、"))
+                            .font(pf(15))
+                            .foregroundColor(C.link)
                     }
-                    .padding(.top, 9)
                 }
+                ForEach(comments.indices, id: \.self) { i in
+                    let c = comments[i]
+                    Text((c.nickname ?? "") + "：" + (c.content ?? ""))
+                        .font(pf(15))
+                        .foregroundColor(C.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        /* 微信：点自己发的评论 → 问你要不要删除 */
+                        .onTapGesture {
+                            if onDeleteComment != nil, !myId.isEmpty, c.userId == myId {
+                                deletingComment = c.id
+                            }
+                        }
+                }
+            }
+            .padding(.top, 9)
+        }
             }
 
             Spacer(minLength: 0)
         }
         .padding(.top, 15)
         .padding(.bottom, 12)
+        /* 点自己发的评论 → 删除（微信就是这样） */
+        .confirmationDialog(Tr("删除这条评论？"), isPresented: Binding(
+            get: { deletingComment != nil },
+            set: { if !$0 { deletingComment = nil } }
+        ), titleVisibility: .visible) {
+            Button(Tr("删除"), role: .destructive) {
+                if let id = deletingComment { onDeleteComment?(id) }
+                deletingComment = nil
+            }
+            Button(Tr("取消"), role: .cancel) { deletingComment = nil }
+        }
     }
 
     private var grid: some View {

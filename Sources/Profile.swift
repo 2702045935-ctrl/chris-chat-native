@@ -828,6 +828,181 @@ struct FriendApplySheet: View {
     }
 }
 
+/* ============================================================ 设置备注和标签（微信那一页）
+   备注名（设了以后通讯录、会话标题都显示它）+ 标签（多个，用顿号分开）。
+   标签是「我这个好友」的属性，存服务器 data/friendmeta.json。 */
+
+struct FriendRemarkSheet: View {
+    let user: User
+    var meta: API.FriendMeta?
+    var onSaved: () async -> Void
+
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var remark = ""
+    @State private var tags = ""
+    @State private var saving = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("设置备注和标签"), back: { dismiss() }) {
+                Button { save() } label: {
+                    Text(saving ? Tr("保存中…") : Tr("完成"))
+                        .font(pf(17))
+                        .foregroundColor(C.green)
+                        .frame(height: L.navH)
+                        .padding(.trailing, 16)
+                }
+                .buttonStyle(.plain)
+                .disabled(saving)
+            }
+
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text(Tr("备注名")).font(pf(16)).foregroundColor(C.label)
+                        .frame(width: 76, alignment: .leading)
+                    TextField(Tr("填写备注名"), text: $remark)
+                        .font(pf(16)).foregroundColor(C.label)
+                    if !remark.isEmpty {
+                        Button { remark = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15)).foregroundColor(C.searchIcon)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(C.cardBg)
+
+                HairLine(inset: 16)
+                HStack(spacing: 12) {
+                    Text(Tr("标签")).font(pf(16)).foregroundColor(C.label)
+                        .frame(width: 76, alignment: .leading)
+                    TextField(Tr("多个标签用顿号隔开"), text: $tags)
+                        .font(pf(16)).foregroundColor(C.label)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(C.cardBg)
+            }
+            .padding(.top, 12)
+
+            Text(Tr("备注名只你自己看得见：设了以后通讯录和会话列表都显示备注。"))
+                .font(pf(12.5))
+                .foregroundColor(C.subLabel)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+            Spacer()
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .onAppear {
+            remark = meta?.remark ?? ""
+            tags = (meta?.tags ?? []).joined(separator: "、")
+        }
+    }
+
+    private func save() {
+        saving = true
+        let list = tags.split(whereSeparator: { "、,，;； ".contains($0) })
+            .map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        Task {
+            await API.shared.setFriendMeta(userId: user.id,
+                                           remark: remark.trimmingCharacters(in: .whitespaces),
+                                           tags: list)
+            await app.loadContacts()
+            await onSaved()
+            saving = false
+            dismiss()
+            app.show(Tr("已保存"))
+        }
+    }
+}
+
+/* ============================================================ 朋友权限（微信那一页）
+   聊天 / 看他（她）的朋友圈 / 不让他（她）看我 / 加入黑名单 */
+
+struct FriendPermSheet: View {
+    let user: User
+    var meta: API.FriendMeta?
+    var onSaved: () async -> Void
+
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var noMoments = false
+    @State private var hideMine = false
+    @State private var blocked = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("朋友权限"), back: { dismiss() })
+
+            VStack(spacing: 0) {
+                toggleRow(Tr("聊天"), true, locked: true)
+                HairLine(inset: 16)
+                toggleRow(Tr("不看他的朋友圈"), noMoments) { noMoments = $0; save() }
+                HairLine(inset: 16)
+                toggleRow(Tr("不让他看我的朋友圈"), hideMine) { hideMine = $0; save() }
+                HairLine(inset: 16)
+                toggleRow(Tr("加入黑名单"), blocked) { blocked = $0; save() }
+            }
+            .padding(.top, 12)
+            .background(C.cardBg)
+
+            Text(Tr("拉黑以后他发不了消息给你，也看不到你的朋友圈；聊天里你会看到「消息已发出，但被对方拒收了」。"))
+                .font(pf(12.5))
+                .foregroundColor(C.subLabel)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+            Spacer()
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .onAppear {
+            noMoments = meta?.noMoments == true
+            hideMine = meta?.hideMyMoments == true
+            blocked = meta?.block == true
+        }
+    }
+
+    private func toggleRow(_ title: String, _ on: Bool, locked: Bool = false,
+                           set: @escaping (Bool) -> Void = { _ in }) -> some View {
+        HStack(spacing: 10) {
+            Text(title).font(pf(16)).foregroundColor(C.label)
+            Spacer(minLength: 8)
+            if locked {
+                Text(Tr("已开启")).font(pf(14)).foregroundColor(C.subLabel)
+            } else {
+                Toggle("", isOn: Binding(get: { on }, set: { set($0) }))
+                    .labelsHidden()
+                    .tint(C.green)
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 52)
+    }
+
+    private func save() {
+        Task {
+            await API.shared.setFriendMeta(userId: user.id, block: blocked,
+                                           noMoments: noMoments, hideMyMoments: hideMine)
+            await onSaved()
+            app.show(Tr("已保存"))
+        }
+    }
+}
+
 /* ============================================================ 发起群聊 */
 
 struct GroupCreateView: View {

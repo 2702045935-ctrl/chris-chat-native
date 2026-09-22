@@ -32,6 +32,23 @@ struct User: Codable, Identifiable, Hashable {
     var momentCount: Int?
     /// 好友申请里那句验证消息（「新的朋友」里显示）
     var requestMessage: String?
+    /// 我给这个人设的备注名（设了以后列表/会话标题都显示它）
+    var remark: String?
+    /// 他的真实昵称（有备注时用它显示小字）
+    var realNickname: String?
+    /// 我给他打的标签
+    var tags: [String]?
+    /// 星标朋友
+    var star: Bool?
+    /// 我拉黑了他
+    var block: Bool?
+    /// 我不看他（她）的朋友圈
+    var noMoments: Bool?
+    /// 好友添加时间 / 来源（我加的 / 他加的我）
+    var addedAt: String?
+    var source: String?
+    /// 我和他共同在几个群里
+    var mutualGroups: Int?
 
     var name: String {
         if let n = nickname, !n.isEmpty { return n }
@@ -1286,6 +1303,66 @@ final class API {
         _ = try await request("POST", "/api/friends/request", body: body)
     }
 
+    /* ---------------------------------------------------------- 朋友资料（微信「设置备注和标签」） */
+
+    struct FriendMeta: Decodable {
+        var remark: String?
+        var tags: [String]?
+        var star: Bool?
+        var block: Bool?
+        /// 我不看他（她）的朋友圈
+        var noMoments: Bool?
+        /// 他不能看我的朋友圈
+        var hideMyMoments: Bool?
+        var chatOnly: Bool?
+        /// 好友添加时间 / 来源（我加的 / 他加的我）/ 他有没有拉黑我
+        var addedAt: String?
+        var source: String?
+        var blockedMe: Bool?
+    }
+
+    private struct FriendMetaPayload: Decodable {
+        var meta: FriendMeta?
+        var addedAt: String?
+        var source: String?
+        var blockedMe: Bool?
+    }
+
+    func friendMeta(userId: String) async throws -> FriendMeta {
+        let p: FriendMetaPayload = try await get("/api/friends/meta?userId=\(userId)", as: FriendMetaPayload.self)
+        var m = p.meta ?? FriendMeta()
+        if m.addedAt == nil { m.addedAt = p.addedAt }
+        if m.source == nil { m.source = p.source }
+        if m.blockedMe == nil { m.blockedMe = p.blockedMe }
+        return m
+    }
+
+    /// 改备注名 / 标签 / 星标 / 朋友权限 / 拉黑 —— 只传要改的那几项
+    @discardableResult
+    func setFriendMeta(userId: String, remark: String? = nil, tags: [String]? = nil,
+                       star: Bool? = nil, block: Bool? = nil,
+                       noMoments: Bool? = nil, hideMyMoments: Bool? = nil) async -> Bool {
+        var body: [String: Any] = ["userId": userId]
+        if let v = remark { body["remark"] = v }
+        if let v = tags { body["tags"] = v }
+        if let v = star { body["star"] = v }
+        if let v = block { body["block"] = v }
+        if let v = noMoments { body["noMoments"] = v }
+        if let v = hideMyMoments { body["hideMyMoments"] = v }
+        do { _ = try await request("POST", "/api/friends/meta", body: body); return true }
+        catch { return false }
+    }
+
+    /// 删除好友（只动我这边，对方通讯录不受影响 —— 微信就是这样）
+    func removeFriend(userId: String) async -> String? {
+        do {
+            _ = try await request("POST", "/api/friends/remove", body: ["userId": userId])
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "删除失败"
+        }
+    }
+
     /* ---------------------------------------------------------- 推送通知（苹果 APNs） */
 
     /// 把苹果给的 device token 交给服务器：手机没连实时通道时它就用这个推通知
@@ -1892,6 +1969,16 @@ final class API {
 
     func deleteMoment(id: String) async {
         _ = try? await request("DELETE", "/api/moments/\(id)")
+    }
+
+    /// 删朋友圈评论（微信：点自己的评论 → 删除）
+    func deleteMomentComment(momentId: String, commentId: String) async -> String? {
+        do {
+            _ = try await request("DELETE", "/api/moments/\(momentId)/comments/\(commentId)")
+            return nil
+        } catch {
+            return (error as? APIError)?.errorDescription ?? "删除失败"
+        }
     }
 
     /// 发朋友圈：谁可以看（public 公开 / private 仅自己 / partial 部分可见 / exclude 不给谁看）

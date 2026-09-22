@@ -69,6 +69,8 @@ struct MeView: View {
                     SecurityScoreView()
                 } else if key == "switch" {
                     SwitchAccountView()
+                } else if key == "realname" {
+                    RealNameView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -292,6 +294,9 @@ struct SettingsView: View {
     @State private var showLang = false
     @State private var showPairApprove = false
     @State private var showSwitchAccount = false
+    /// 实名认证状态（设置页那一行显示「已实名 / 未实名」）
+    @State private var realNameText = ""
+    @State private var showRealName = false
     @State private var showMyQR = false
     @State private var showPrivacy = false
     @State private var showNotify = false
@@ -308,6 +313,9 @@ struct SettingsView: View {
                         settingRow(Tr("个人信息"), app.me?.name ?? "") { showProfileEdit = true }
                         HairLine(inset: 16)
                         settingRow(Tr("账号与安全"), "") { app.show(Tr("账号与安全排在下一批")) }
+                        HairLine(inset: 16)
+                        /* 实名认证：填姓名 + 身份证号（安全分的「身份特质」靠它） */
+                        settingLink(Tr("实名认证"), realNameText, key: "realname")
                         HairLine(inset: 16)
                         /* 网页版「微信授权登录 / QQ 授权登录」出的 6 位数字在这里确认 */
                         settingRow(Tr("设备确认登录"), "") { showPairApprove = true }
@@ -416,7 +424,12 @@ struct SettingsView: View {
             Button("English") { setLang("en") }
             Button(Tr("取消"), role: .cancel) { }
         }
-        .task { hasPay = await API.shared.hasPayPassword() }
+        .task {
+            hasPay = await API.shared.hasPayPassword()
+            /* 实名状态：设置页那一行显示「已实名 / 未实名」 */
+            let rn = await API.shared.realNameStatus()
+            realNameText = rn.verified ? Tr("已实名") : Tr("未实名")
+        }
         .confirmationDialog(Tr("确定退出登录？"), isPresented: $confirmLogout, titleVisibility: .visible) {
             Button(Tr("退出登录"), role: .destructive) {
                 busy = true

@@ -1610,6 +1610,36 @@ final class API {
         return ok != nil
     }
 
+    /* ---------------- 实名认证 ---------------- */
+
+    struct RealNameInfo: Hashable {
+        var verified: Bool
+        var realName: String
+        var idMask: String
+        var at: String
+    }
+
+    func realNameStatus() async -> RealNameInfo {
+        guard let any = try? await request("GET", "/api/me/realname"),
+              let d = any as? [String: Any] else {
+            return RealNameInfo(verified: false, realName: "", idMask: "", at: "")
+        }
+        return RealNameInfo(verified: (d["verified"] as? Bool) ?? false,
+                            realName: (d["realName"] as? String) ?? "",
+                            idMask: (d["idMask"] as? String) ?? "",
+                            at: (d["at"] as? String) ?? "")
+    }
+
+    /// 提交实名认证（服务端校验身份证号 + 一人一证）
+    func submitRealName(name: String, idCard: String) async throws -> RealNameInfo {
+        let any = try await request("POST", "/api/me/realname", body: ["realName": name, "idCard": idCard])
+        let d = (any as? [String: Any]) ?? [:]
+        return RealNameInfo(verified: (d["verified"] as? Bool) ?? true,
+                            realName: (d["realName"] as? String) ?? name,
+                            idMask: (d["idMask"] as? String) ?? "",
+                            at: (d["at"] as? String) ?? "")
+    }
+
     func changeBackground(_ path: String) async {
         await updateMe(["chatBackground": path])
     }

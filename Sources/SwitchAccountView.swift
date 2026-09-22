@@ -79,7 +79,7 @@ struct SwitchAccountView: View {
         .hidesTabBar()
         .sheet(isPresented: $adding) {
             /* 跟登录页一样的那套（微信号/手机号 + 密码/验证码），登完就多一个账号 */
-            AccountLoginSheet(mode: .account)
+            AccountLoginSheet(mode: .password)
                 .environmentObject(app)
         }
     }

@@ -65,6 +65,8 @@ struct MeView: View {
                     PayPasswordView()
                 } else if key == "gesture" {
                     GestureSetupView()
+                } else if key == "score" {
+                    SecurityScoreView()
                 } else {
                     ComingSoonView(title: String(key.dropFirst(5)))
                 }
@@ -312,6 +314,9 @@ struct SettingsView: View {
                         HairLine(inset: 16)
                         /* 安全锁（手势密码）：开了以后进「零钱 / 经营账户」要先画一遍（微信那种） */
                         settingLink(Tr("安全锁（手势密码）"), GestureStore.enabled ? Tr("已开启") : Tr("未开启"), key: "gesture")
+                        HairLine(inset: 16)
+                        /* 安全分（微信「支付分」那套：550~850 · 身份特质/支付行为/守约历史） */
+                        settingLink(Tr("安全分"), "", key: "score")
                         HairLine(inset: 16)
                         settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)

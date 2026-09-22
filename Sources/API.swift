@@ -281,6 +281,40 @@ private struct MessagesPayload: Decodable {
     var hasMore: Bool?
 }
 private struct MessagePayload: Decodable { var message: Message? }
+private struct CreditScorePayload: Decodable { var score: CreditScore }
+
+/// 安全分（服务端按真实记录算：资料 / 登录设备 / 转账 / 记账 / 安全事件）
+struct CreditScore: Decodable, Hashable {
+    struct Item: Decodable, Hashable {
+        var label: String
+        var ok: Bool
+        var tip: String?
+    }
+    struct Dim: Decodable, Hashable, Identifiable {
+        var key: String
+        var label: String
+        var score: Int
+        var max: Int
+        var items: [Item]?
+        var id: String { key }
+    }
+    struct Stats: Decodable, Hashable {
+        var deviceCount: Int?
+        var sentCount: Int?
+        var successCount: Int?
+        var expiredCount: Int?
+        var ledgerCount: Int?
+    }
+    var score: Int
+    var level: String
+    var min: Int
+    var max: Int
+    var percent: Int
+    var updatedAt: String?
+    var dims: [Dim]
+    var tips: [String]
+    var stats: Stats?
+}
 private struct ContactsPayload: Decodable {
     var friends: [User]
     var incoming: [User]?
@@ -1632,6 +1666,11 @@ final class API {
     /// 钱包页整页配置（后台「钱包页」模块配的；零钱那一行的数值是现算的余额）
     func walletConfig() async throws -> WalletConfig {
         try await get("/api/wallet", as: WalletConfig.self)
+    }
+
+    /// 安全分（微信「支付分」那套：550~850 · 身份特质 / 支付行为 / 守约历史）
+    func securityScore() async throws -> CreditScore {
+        try await get("/api/me/score", as: CreditScorePayload.self).score
     }
 
     /// 账单：这个人所有的转账（wallet 页右上角「账单」用），可按月筛

@@ -59,7 +59,6 @@ struct MainTabView: View {
 
 struct TabBar: View {
     @ObservedObject private var lang = LangStore.shared
-    @EnvironmentObject var app: AppState
     @Binding var selection: Int
     var badge: Int
     /// 「通讯录」上那个小红点（有人加你为好友就亮，微信也是这样）
@@ -95,17 +94,6 @@ struct TabBar: View {
         UIConfig.num("tabIcon\(i)", L.tabIconBox)
     }
 
-    /* 底栏颜色（对着桌面 vx 文件夹那张参考图做的）：
-       选中的是**深色实心**图标 + 深色字，没选中的是灰色描边图标 + 灰字，不用绿色。
-       想改颜色：后台 ui.json 里加 tabSelColor / tabUnselColor（#浅色|#深色）。 */
-    private var selColor: Color { UIConfig.color("tabSelColor", 0x1A1A1A, 0xEDEDED) }
-    private var unselColor: Color { UIConfig.color("tabUnselColor", 0x6B6B6B, 0x8E8E93) }
-    /// 选中那格：图标比其它格大一点点（参考图里就是这样）
-    private func tabIconFont(_ i: Int, on: Bool) -> Font {
-        let base = UIConfig.num("tabIcon\(i)", (i == 0 || i == 1) ? L.tabIcon - 2 : L.tabIcon)
-        return pf(on ? base + 1.5 : base)
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { i in
@@ -120,19 +108,15 @@ struct TabBar: View {
                                 if custom.hasPrefix("http") || custom.hasPrefix("/uploads") || custom.hasPrefix("data:") {
                                     RemoteImage(path: custom, template: true)
                                         .frame(width: customSize(i), height: customSize(i))
-                                        .foregroundColor(selection == i ? selColor : unselColor)
+                                        .foregroundColor(selection == i ? C.green : C.tabInk)
                                 } else {
                                     FlexIcon(custom: custom, size: customSize(i),
-                                             color: selection == i ? selColor : unselColor,
+                                             color: selection == i ? C.green : C.tabInk,
                                              symbol: items[i].0)
                                 }
-                            } else if i == 3, let av = app.me?.avatarPath, !av.isEmpty {
-                                /* 「我」这一格用我自己的头像（参考图最后一格就是头像） */
-                                Avatar(path: av, size: UIConfig.num("tabAvatar", 24), radius: 0, circle: true)
-                                    .overlay(Circle().stroke(selection == i ? selColor : Color.clear, lineWidth: 1.5))
                             } else {
                                 Image(systemName: selection == i ? items[i].1 : items[i].0)
-                                    .font(tabIconFont(i, on: selection == i))
+                                    .font(iconFont(i))
                                     .frame(width: L.tabIconBox, height: L.tabIconBox)
                             }
                             if i == 0 && badge > 0 {
@@ -170,10 +154,9 @@ struct TabBar: View {
                             }
                         }
                         Text(items[i].2)
-                            .font(pf(UIConfig.num("tabLabel", L.tabLabel),
-                                     selection == i ? .medium : .regular))
+                            .font(pf(L.tabLabel))
                     }
-                    .foregroundColor(selection == i ? selColor : unselColor)
+                    .foregroundColor(selection == i ? C.green : C.tabInk)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 2)
                     .contentShape(Rectangle())
@@ -181,16 +164,20 @@ struct TabBar: View {
                 .buttonStyle(.plain)
             }
         }
-        .frame(height: L.tabH)
+        /* 药丸里那一条的高度：比原来的底栏矮 12（上下各留 6 的缝） */
+        .frame(height: max(40, L.tabH - 12))
         .background(
-            ZStack {
-                C.tabBg.ignoresSafeArea(edges: .bottom)
-                VStack(spacing: 0) {
-                    Rectangle().fill(C.navLine).frame(height: 0.5)
-                    Spacer()
-                }
-                .ignoresSafeArea(edges: .bottom)
-            }
+            /* 无边框药丸（对着 vx 参考图）：整条底栏做成一颗圆角胶囊，
+               左右留边、下面留一点缝，纯色填充 + 淡淡阴影，**不画描边、不画分隔线**。
+               左右留边 / 圆角 / 高度都能在后台 ui.json 里调：
+                 tabPillPad（左右留边，默认 14）· tabPillGap（上下留缝，默认 6）
+                 tabPillRadius（圆角，默认 = 高度的一半 → 正好是胶囊） */
+            RoundedRectangle(cornerRadius: UIConfig.num("tabPillRadius", (L.tabH - 12) / 2),
+                             style: .continuous)
+                .fill(C.tabBg)
+                .shadow(color: Color.black.opacity(0.10), radius: 9, y: 2)
+                .padding(.horizontal, UIConfig.num("tabPillPad", 14))
+                .padding(.vertical, UIConfig.num("tabPillGap", 6))
         )
     }
 }

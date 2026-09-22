@@ -20,6 +20,9 @@ struct WalletView: View {
     @State private var showCoin = false
     @State private var showCards = false
     @State private var showBiz = false
+    @State private var showScore = false
+    /// 「安全分」那一行显示真实分数（wallet.json 里加一项 action=score 就会读出来）
+    @State private var creditText = ""
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
     @State private var revealed: Set<String> = []
     /// 手势密码（安全锁）：开了以后进「零钱 / 经营账户」要先画一遍
@@ -75,6 +78,7 @@ struct WalletView: View {
         .navigationDestination(isPresented: $showCoin) { BalancePageView() }
         .navigationDestination(isPresented: $showCards) { BankCardsView() }
         .navigationDestination(isPresented: $showBiz) { BizAccountView() }
+        .navigationDestination(isPresented: $showScore) { SecurityScoreView() }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
@@ -105,7 +109,7 @@ struct WalletView: View {
 
     private func row(_ it: WalletItem) -> some View {
         let s = st
-        let rawValue = it.value ?? ""
+        let rawValue = (it.action == "score" && !creditText.isEmpty) ? creditText : (it.value ?? "")
         let masked = !rawValue.isEmpty && s.mask && (it.mask ?? true)
         let value = (masked && !revealed.contains(it.id)) ? WalletView.maskMoney(rawValue) : rawValue
         let note = it.note ?? ""
@@ -191,6 +195,8 @@ struct WalletView: View {
             showCoin = true               // 进「零钱」页（照参考图做的那一页）
         case "biz":
             showBiz = true                // 经营账户
+        case "score":
+            showScore = true              // 安全分（微信「支付分」那一页）
         case "bills":
             showBills = true            // 进「账单」页（真实转账记录）
         case "card":
@@ -211,6 +217,13 @@ struct WalletView: View {
         } else if cfg == nil {
             // 服务器连不上 / 还没升级：用内置那份兜底，别开天窗
             cfg = WalletFallback.config(balance: app.me?.balance ?? 0)
+        }
+        /* 钱包里配了「安全分」那一行的话，把真实分数读出来填上 */
+        let wantScore = (cfg?.groups ?? []).contains { g in
+            (g.items ?? []).contains { $0.action == "score" }
+        }
+        if wantScore, let s = try? await API.shared.securityScore() {
+            creditText = "\(s.score)"
         }
     }
 

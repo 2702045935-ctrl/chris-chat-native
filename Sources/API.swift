@@ -1516,6 +1516,12 @@ final class API {
         var fromName: String?
         var expiresAt: Double?
         var refundAmount: Double?
+        /* 封面（发红包时挑的那张，卡片和拆红包页按它画） */
+        var coverId: String?
+        var coverName: String?
+        var cover: String?
+        var coverThumb: String?
+        var coverColor: String?
         /* 详情接口额外给的 */
         var fromAvatar: String?
         var claimedTotal: Double?

@@ -238,74 +238,93 @@ struct ProfileEditView: View {
     }
 }
 
-/* ============================================================ 新的朋友 */
+/* ============================================================ 新的朋友（照微信那套）
+   微信这一页的样子：
+     · 顶上一个搜索框（搜的是申请记录）
+     · 第一行「添加朋友」，点进去是添加朋友页
+     · 好友申请：头像 + 昵称 + 对方写的那句验证消息（「我是XXX」）+ 接受 / 拒绝
+     · 已添加：刚通过的那几个人留着显示「已添加」（服务器留 3 天）
+     · 我添加的：我发出去的申请，右边「等待验证」
+   验证消息是服务器 friendships.json 里的 note 字段，通过 /api/contacts 带回来。*/
 
 struct NewFriendsView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var realtime = Realtime.shared
 
     @State private var incoming: [User] = []
     @State private var outgoing: [User] = []
+    @State private var added: [User] = []
     @State private var loading = true
+    @State private var keyword = ""
+    @State private var busy: Set<String> = []
+
+    private func hit(_ u: User) -> Bool {
+        if keyword.isEmpty { return true }
+        return u.name.contains(keyword)
+            || (u.username ?? "").contains(keyword)
+            || (u.requestMessage ?? "").contains(keyword)
+    }
+    private var shownIncoming: [User] { incoming.filter(hit) }
+    private var shownOutgoing: [User] { outgoing.filter(hit) }
+    private var shownAdded: [User] { added.filter(hit) }
 
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: Tr("新的朋友"), back: { dismiss() })
-            List {
-                if loading && incoming.isEmpty && outgoing.isEmpty {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                        .listRowBackground(C.cardBg)
-                }
-                if incoming.isEmpty && outgoing.isEmpty && !loading {
-                    Text(Tr("还没有好友申请"))
-                        .font(pf(15))
-                        .foregroundColor(C.subLabel)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                        .listRowBackground(C.cardBg)
-                }
-                ForEach(incoming) { user in
-                    HStack(spacing: 12) {
-                        Avatar(path: user.avatarPath, size: 48, radius: 8)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(user.name).font(pf(17)).foregroundColor(C.label)
-                            Text(Tr("请求加你为好友")).font(pf(13)).foregroundColor(C.subLabel)
-                        }
-                        Spacer()
-                        Button(Tr("同意")) { respond(user, true) }
-                            .font(pf(15))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .frame(height: 30)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(C.green))
-                        Button(Tr("拒绝")) { respond(user, false) }
+            SearchBoxCenter(text: $keyword).padding(L.searchPad)
+                .background(C.pageBg)
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    NavigationLink(value: "addFriend") { addFriendRow }
+                        .buttonStyle(MenuPressStyle())
+
+                    if loading && incoming.isEmpty && outgoing.isEmpty && added.isEmpty {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                            .frame(height: 76).background(C.cardBg)
+                    } else if !loading && shownIncoming.isEmpty && shownOutgoing.isEmpty && shownAdded.isEmpty {
+                        Text(Tr("还没有好友申请"))
                             .font(pf(15))
                             .foregroundColor(C.subLabel)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 36)
+                            .background(C.cardBg)
                     }
-                    .padding(.horizontal, 16)
-                    .frame(height: 72)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(C.cardBg)
-                }
-                ForEach(outgoing) { user in
-                    HStack(spacing: 12) {
-                        Avatar(path: user.avatarPath, size: 48, radius: 8)
-                        Text(user.name).font(pf(17)).foregroundColor(C.label)
-                        Spacer()
-                        Text(Tr("等待验证")).font(pf(14)).foregroundColor(C.subLabel)
+
+                    if !shownIncoming.isEmpty {
+                        sectionHeader(Tr("好友申请"))
+                        ForEach(shownIncoming) { user in
+                            VStack(spacing: 0) {
+                                HairLine(inset: 68)
+                                requestRow(user)
+                            }
+                            .background(C.cardBg)
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .frame(height: 72)
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(C.cardBg)
+                    if !shownAdded.isEmpty {
+                        sectionHeader(Tr("已添加"))
+                        ForEach(shownAdded) { user in
+                            VStack(spacing: 0) {
+                                HairLine(inset: 68)
+                                doneRow(user)
+                            }
+                            .background(C.cardBg)
+                        }
+                    }
+                    if !shownOutgoing.isEmpty {
+                        sectionHeader(Tr("我添加的"))
+                        ForEach(shownOutgoing) { user in
+                            VStack(spacing: 0) {
+                                HairLine(inset: 68)
+                                waitingRow(user)
+                            }
+                            .background(C.cardBg)
+                        }
+                    }
                 }
+                .padding(.bottom, 30)
             }
-            .listStyle(.plain)
-            .environment(\.defaultMinListRowHeight, 0)
-            .scrollContentBackground(.hidden)
-            .background(C.cardBg)
             .refreshable { await load() }
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
@@ -314,94 +333,497 @@ struct NewFriendsView: View {
         .swipeBack { dismiss() }
         .hidesTabBar()
         .task { await load() }
+        /* 对方通过我的申请 / 又有人加我 → 这一页自己刷新，不用手动下拉 */
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "friend" { Task { await load() } }
+        }
     }
 
+    /* ---------------------------------------------------------- 行 */
+
+    private var addFriendRow: some View {
+        HStack(spacing: L.ctGap) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(hex: 0x4C93DD))
+                Image(systemName: "person.badge.plus").font(.system(size: 18)).foregroundColor(.white)
+            }
+            .frame(width: L.ctIcon, height: L.ctIcon)
+            Text(Tr("添加朋友")).font(pf(L.ctNameSize)).foregroundColor(C.label)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.system(size: 13)).foregroundColor(C.subLabel)
+        }
+        .padding(.leading, L.ctPadL)
+        .padding(.trailing, 16)
+        .frame(height: L.ctRowH)
+        .background(C.cardBg)
+        .contentShape(Rectangle())
+    }
+
+    private func sectionHeader(_ t: String) -> some View {
+        HStack(spacing: 0) {
+            Text(t).font(pf(13)).foregroundColor(C.subLabel)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 16)
+        .frame(height: 30)
+        .background(C.pageBg)
+    }
+
+    private func requestRow(_ user: User) -> some View {
+        HStack(spacing: L.ctGap) {
+            Avatar(path: user.avatarPath, size: L.ctAvatar, radius: 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(user.name).font(pf(L.ctNameSize)).foregroundColor(C.label).lineLimit(1)
+                Text(noteOf(user)).font(pf(13)).foregroundColor(C.subLabel).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button { respond(user, true) } label: {
+                Text(Tr("接受"))
+                    .font(pf(14, .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 13)
+                    .frame(height: 28)
+                    .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(C.green))
+            }
+            .buttonStyle(MenuPressStyle())
+            .disabled(busy.contains(user.id))
+
+            Button { respond(user, false) } label: {
+                Text(Tr("拒绝")).font(pf(14)).foregroundColor(C.subLabel)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 8)
+            .disabled(busy.contains(user.id))
+        }
+        .padding(.leading, L.ctPadL)
+        .padding(.trailing, 16)
+        .frame(height: 68)
+        .contentShape(Rectangle())
+    }
+
+    private func doneRow(_ user: User) -> some View {
+        HStack(spacing: L.ctGap) {
+            Avatar(path: user.avatarPath, size: L.ctAvatar, radius: 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(user.name).font(pf(L.ctNameSize)).foregroundColor(C.label).lineLimit(1)
+                Text(noteOf(user)).font(pf(13)).foregroundColor(C.subLabel).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(Tr("已添加")).font(pf(14)).foregroundColor(C.subLabel)
+        }
+        .padding(.leading, L.ctPadL)
+        .padding(.trailing, 16)
+        .frame(height: 68)
+        .contentShape(Rectangle())
+    }
+
+    private func waitingRow(_ user: User) -> some View {
+        HStack(spacing: L.ctGap) {
+            Avatar(path: user.avatarPath, size: L.ctAvatar, radius: 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(user.name).font(pf(L.ctNameSize)).foregroundColor(C.label).lineLimit(1)
+                let n = (user.requestMessage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !n.isEmpty {
+                    Text(n).font(pf(13)).foregroundColor(C.subLabel).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(Tr("等待验证")).font(pf(14)).foregroundColor(C.subLabel)
+        }
+        .padding(.leading, L.ctPadL)
+        .padding(.trailing, 16)
+        .frame(height: 68)
+        .contentShape(Rectangle())
+    }
+
+    private func noteOf(_ user: User) -> String {
+        let n = (user.requestMessage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? Tr("请求加你为好友") : n
+    }
+
+    /* ---------------------------------------------------------- 干活 */
+
     private func load() async {
-        if let data = try? await API.shared.contactsFull() {
-            incoming = data.incoming
-            app.contacts = data.friends
+        if let d = try? await API.shared.friendRequests() {
+            incoming = d.incoming
+            outgoing = d.outgoing
+            added = d.added
+            app.contacts = d.friends
+            app.friendRequests = d.incoming.count
         }
         loading = false
     }
 
     private func respond(_ user: User, _ accept: Bool) {
         guard let id = user.requestId else { return }
+        busy.insert(user.id)
         Task {
             await API.shared.respondFriend(id, accept: accept)
             await load()
-            app.show(accept ? "已添加好友" : "已拒绝")
+            busy.remove(user.id)
+            app.show(accept ? Tr("已添加到通讯录") : Tr("已拒绝"))
         }
     }
 }
 
-/* ============================================================ 加好友 */
+/* ============================================================ 添加朋友（照微信那套）
+   微信「添加朋友」页：
+     · 顶上一个搜索框：输入微信号 / 手机号，右边一个「搜索」
+     · 搜出来的人是一张卡片：头像 + 昵称 + 微信号，右边按钮随关系变：
+         none → 「添加到通讯录」   requested → 「等待验证」
+         incoming → 「接受」       friend → 「已添加」
+     · 点「添加到通讯录」弹出申请页：头像昵称 + 验证消息（默认「我是XXX」）+ 发送
+     · 下面还有「扫一扫」「我的二维码」两行（微信也有） */
 
 struct AddFriendView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var realtime = Realtime.shared
 
-    @State private var username = ""
-    @State private var message: String?
-    @State private var busy = false
+    @State private var keyword = ""
+    @State private var results: [User] = []
+    @State private var searching = false
+    @State private var searched = false
+    @State private var errorText: String?
+    @State private var target: User?
+    @State private var sentTo: Set<String> = []
+    @State private var showScan = false
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: Tr("加好友"), back: { dismiss() })
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass").foregroundColor(C.subLabel)
-                    TextField("输入对方的用户名（星言号）", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
-                        .font(pf(16))
-                        .foregroundColor(C.label)
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 44)
-                .background(RoundedRectangle(cornerRadius: 8).fill(C.searchBg))
+            NavBar(title: Tr("添加朋友"), back: { dismiss() })
 
-                Button {
-                    add()
-                } label: {
-                    Text(busy ? "发送中…" : "添加到通讯录")
-                        .font(pf(17))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(C.green))
-                }
-                .disabled(busy)
+            ScrollView {
+                VStack(spacing: 0) {
+                    searchRow
+                        .padding(L.searchPad)
 
-                if let message = message {
-                    Text(message).font(pf(14)).foregroundColor(C.subLabel)
+                    if let errorText = errorText {
+                        Text(errorText)
+                            .font(pf(14))
+                            .foregroundColor(C.subLabel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                    }
+
+                    if searching {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                            .frame(height: 76).background(C.cardBg)
+                    } else if searched && results.isEmpty {
+                        Text(Tr("未找到相关用户"))
+                            .font(pf(15))
+                            .foregroundColor(C.subLabel)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 30)
+                            .background(C.cardBg)
+                    }
+
+                    if !results.isEmpty {
+                        Text(Tr("搜索结果"))
+                            .font(pf(13)).foregroundColor(C.subLabel)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 16)
+                            .frame(height: 30)
+                            .background(C.pageBg)
+                        ForEach(results) { u in
+                            VStack(spacing: 0) {
+                                HairLine(inset: 72)
+                                resultRow(u)
+                            }
+                            .background(C.cardBg)
+                        }
+                    }
+
+                    /* 微信这一页下面那两行 */
+                    VStack(spacing: 0) {
+                        HairLine(inset: 56)
+                        otherRow(icon: "qrcode.viewfinder", title: Tr("扫一扫")) { showScan = true }
+                        HairLine(inset: 56)
+                        NavigationLink(value: "myQR") {
+                            otherRowLabel(icon: "qrcode", title: Tr("我的二维码"))
+                        }
+                        .buttonStyle(MenuPressStyle())
+                    }
+                    .background(C.cardBg)
+                    .padding(.top, 24)
                 }
-                Text(Tr("对方用户名可以在他的名片里看到。"))
-                    .font(pf(12.5))
-                    .foregroundColor(C.subLabel)
-                Spacer()
+                .padding(.bottom, 30)
             }
-            .padding(16)
         }
         .background(C.pageBg.ignoresSafeArea(edges: .bottom))
         .background(C.pageBg.ignoresSafeArea(edges: .top))
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
+        .fullScreenCover(isPresented: $showScan) {
+            ScannerView { text in handleScanned(text, app: app) }
+        }
+        .sheet(item: $target) { u in
+            FriendApplySheet(user: u) {
+                sentTo.insert(u.id)
+                Task { await app.loadContacts() }
+            }
+            .environmentObject(app)
+        }
+        .onChange(of: realtime.event) { ev in
+            if ev.type == "friend" && !results.isEmpty { search() }
+        }
     }
 
-    private func add() {
-        let name = username.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty else { message = "先填个用户名"; return }
-        busy = true
+    /* ---------------------------------------------------------- 搜索框 */
+
+    private var searchRow: some View {
+        HStack(spacing: 8) {
+            SVGIcon(markup: I.searchSmall, size: 16, color: C.searchIcon)
+            TextField(Tr("星言号/手机号"), text: $keyword)
+                .font(pf(16))
+                .foregroundColor(C.label)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .submitLabel(.search)
+                .onSubmit { search() }
+            if !keyword.isEmpty {
+                Button {
+                    keyword = ""
+                    results = []
+                    searched = false
+                    errorText = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(C.searchIcon)
+                }
+                .buttonStyle(.plain)
+            }
+            Button { search() } label: {
+                Text(searching ? Tr("搜索中…") : Tr("搜索"))
+                    .font(pf(15, .medium))
+                    .foregroundColor(keyword.isEmpty ? C.subLabel : .white)
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(keyword.isEmpty ? Color.clear : C.green))
+            }
+            .buttonStyle(.plain)
+            .disabled(keyword.isEmpty || searching)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.searchBg))
+    }
+
+    /* ---------------------------------------------------------- 结果卡片 */
+
+    private func resultRow(_ u: User) -> some View {
+        HStack(spacing: L.ctGap) {
+            Avatar(path: u.avatarPath, size: 52, radius: 7)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(u.name).font(pf(17)).foregroundColor(C.label).lineLimit(1)
+                if let un = u.username, !un.isEmpty {
+                    Text(Tr("星言号") + "：" + un)
+                        .font(pf(13)).foregroundColor(C.subLabel).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            resultAction(u)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 76)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func resultAction(_ u: User) -> some View {
+        let rel = u.relation ?? "none"
+        if sentTo.contains(u.id) || rel == "requested" {
+            Text(Tr("等待验证")).font(pf(14)).foregroundColor(C.subLabel)
+        } else if rel == "friend" || rel == "self" {
+            Text(Tr("已添加")).font(pf(14)).foregroundColor(C.subLabel)
+        } else if rel == "incoming" {
+            Button { accept(u) } label: {
+                greenChip(Tr("接受"))
+            }
+            .buttonStyle(MenuPressStyle())
+        } else {
+            Button { openApply(u) } label: {
+                greenChip(Tr("添加到通讯录"))
+            }
+            .buttonStyle(MenuPressStyle())
+        }
+    }
+
+    private func greenChip(_ t: String) -> some View {
+        Text(t)
+            .font(pf(14, .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(C.green))
+    }
+
+    /* ---------------------------------------------------------- 下面两行 */
+
+    private func otherRow(icon: String, title: String, tap: @escaping () -> Void) -> some View {
+        Button(action: tap) { otherRowLabel(icon: icon, title: title) }
+            .buttonStyle(MenuPressStyle())
+    }
+
+    private func otherRowLabel(icon: String, title: String) -> some View {
+        HStack(spacing: L.ctGap) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(hex: 0x4C93DD))
+                Image(systemName: icon).font(.system(size: 17)).foregroundColor(.white)
+            }
+            .frame(width: L.ctIcon, height: L.ctIcon)
+            Text(title).font(pf(L.ctNameSize)).foregroundColor(C.label)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.system(size: 13)).foregroundColor(C.subLabel)
+        }
+        .padding(.leading, L.ctPadL)
+        .padding(.trailing, 16)
+        .frame(height: L.ctRowH)
+        .background(C.cardBg)
+        .contentShape(Rectangle())
+    }
+
+    /* ---------------------------------------------------------- 干活 */
+
+    private func search() {
+        let q = keyword.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return }
+        searching = true
+        errorText = nil
         Task {
             do {
-                try await API.shared.addFriend(username: name)
-                message = "已发送好友申请，等对方同意"
-                await app.loadContacts()
+                let list = try await API.shared.searchUsers(q)
+                results = list
+                searched = true
             } catch {
-                message = (error as? APIError)?.errorDescription ?? "发送失败"
+                results = []
+                searched = true
+                errorText = (error as? APIError)?.errorDescription ?? Tr("未找到相关用户")
             }
-            busy = false
+            searching = false
+        }
+    }
+
+    private func openApply(_ u: User) {
+        target = u
+    }
+
+    private func accept(_ u: User) {
+        Task {
+            guard let all = try? await API.shared.friendRequests(),
+                  let req = all.incoming.first(where: { $0.id == u.id }),
+                  let rid = req.requestId else {
+                app.show(Tr("到「通讯录 → 新的朋友」里同意"))
+                return
+            }
+            await API.shared.respondFriend(rid, accept: true)
+            app.show(Tr("已添加到通讯录"))
+            await app.loadContacts()
+            search()
+        }
+    }
+}
+
+/* ============================================================ 申请加好友（验证消息）
+   微信那个「发送添加朋友申请」页：上面是被加的人（头像/昵称/星言号），
+   下面一行验证消息，默认填「我是XXX」，右上角「发送」。
+   添加朋友页和名片页上的「添加到通讯录」都弹这一页。 */
+
+struct FriendApplySheet: View {
+    let user: User
+    var onSent: () -> Void = {}
+
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var note = ""
+    @State private var sending = false
+
+    private var trimmed: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("发送添加朋友申请"), back: { dismiss() }) {
+                Button { send() } label: {
+                    Text(sending ? Tr("发送中…") : Tr("发送"))
+                        .font(pf(17))
+                        .foregroundColor(trimmed.isEmpty ? C.subLabel : C.green)
+                        .frame(height: L.navH)
+                        .padding(.trailing, 16)
+                }
+                .buttonStyle(.plain)
+                .disabled(sending || trimmed.isEmpty)
+            }
+
+            VStack(spacing: 0) {
+                HStack(spacing: L.ctGap) {
+                    Avatar(path: user.avatarPath, size: 52, radius: 7)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(user.name).font(pf(17)).foregroundColor(C.label)
+                        if let un = user.username, !un.isEmpty {
+                            Text(Tr("星言号") + "：" + un).font(pf(13)).foregroundColor(C.subLabel)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 76)
+                .background(C.cardBg)
+
+                HStack(spacing: 12) {
+                    Text(Tr("验证消息")).font(pf(15)).foregroundColor(C.subLabel)
+                    TextField(Tr("验证消息"), text: $note)
+                        .font(pf(16))
+                        .foregroundColor(C.label)
+                    if !note.isEmpty {
+                        Button { note = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15)).foregroundColor(C.searchIcon)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(C.cardBg)
+                .padding(.top, 12)
+            }
+            Spacer()
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .onAppear {
+            if note.isEmpty { note = defaultNote() }
+        }
+    }
+
+    private func defaultNote() -> String {
+        let me = (app.me?.name ?? "").trimmingCharacters(in: .whitespaces)
+        let u = (app.me?.username ?? "").trimmingCharacters(in: .whitespaces)
+        let who = me.isEmpty ? u : me
+        return who.isEmpty ? Tr("我是") : Tr("我是") + who
+    }
+
+    private func send() {
+        sending = true
+        Task {
+            do {
+                if let un = user.username, !un.isEmpty {
+                    try await API.shared.addFriend(username: un, note: trimmed)
+                } else {
+                    try await API.shared.addFriend(userId: user.id, note: trimmed)
+                }
+                app.show(Tr("好友申请已发出"))
+                onSent()
+                dismiss()
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? Tr("发送失败"))
+            }
+            sending = false
         }
     }
 }

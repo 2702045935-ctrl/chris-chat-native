@@ -30,6 +30,8 @@ struct User: Codable, Identifiable, Hashable {
     var relation: String?
     /// 他发过几条朋友圈（名片上朋友圈那一行有没有）
     var momentCount: Int?
+    /// 好友申请里那句验证消息（「新的朋友」里显示）
+    var requestMessage: String?
 
     var name: String {
         if let n = nickname, !n.isEmpty { return n }
@@ -319,6 +321,8 @@ private struct ContactsPayload: Decodable {
     var friends: [User]
     var incoming: [User]?
     var outgoing: [User]?
+    /// 刚通过、还留在「新的朋友」里显示「已添加」的人
+    var added: [User]?
 }
 private struct MePayload: Decodable { var user: User? }
 private struct UserPayload: Decodable { var user: User? }
@@ -1262,6 +1266,26 @@ final class API {
         return payload.users.first
     }
 
+    /// 搜人（微信「添加朋友」那种）：返回列表，带 relation 字段（friend / requested / incoming / none）
+    func searchUsers(_ q: String) async throws -> [User] {
+        let payload: UsersPayload = try await get("/api/users?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)", as: UsersPayload.self)
+        return payload.users
+    }
+
+    /// 发好友申请时可以带一句验证消息
+    func addFriend(username: String, note: String) async throws {
+        var body: [String: Any] = ["username": username]
+        if !note.isEmpty { body["message"] = note }
+        _ = try await request("POST", "/api/friends/request", body: body)
+    }
+
+    /// 搜到的人没有星言号时用 userId 发申请（同样能带验证消息）
+    func addFriend(userId: String, note: String = "") async throws {
+        var body: [String: Any] = ["userId": userId]
+        if !note.isEmpty { body["message"] = note }
+        _ = try await request("POST", "/api/friends/request", body: body)
+    }
+
     /// 拿一对一会话（转账需要 chatId）；不是好友会报错
     func directChat(userId: String) async throws -> Chat {
         let payload: ChatPayload = try await post("/api/chats/direct", ["userId": userId], as: ChatPayload.self)
@@ -1563,6 +1587,12 @@ final class API {
     func contactsFull() async throws -> (friends: [User], incoming: [User]) {
         let payload: ContactsPayload = try await get("/api/contacts", as: ContactsPayload.self)
         return (payload.friends, payload.incoming ?? [])
+    }
+
+    /// 「新的朋友」页要的全部东西：好友 / 别人加我的 / 我加别人的 / 刚通过的（显示「已添加」）
+    func friendRequests() async throws -> (friends: [User], incoming: [User], outgoing: [User], added: [User]) {
+        let p: ContactsPayload = try await get("/api/contacts", as: ContactsPayload.self)
+        return (p.friends, p.incoming ?? [], p.outgoing ?? [], p.added ?? [])
     }
 
     private struct BadgeCountsPayload: Decodable { var friendRequests: Int?; var momentUnread: Int? }

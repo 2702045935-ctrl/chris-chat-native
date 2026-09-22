@@ -307,6 +307,8 @@ struct ChatsView: View {
                     }
                 } else if key == "addFriend" {
                     AddFriendView()
+                } else if key == "myQR" {
+                    MyQRView()
                 } else {
                     ComingSoonView(title: key)
                 }
@@ -314,7 +316,7 @@ struct ChatsView: View {
         }
         .confirmationDialog("", isPresented: $plusMenu, titleVisibility: .hidden) {
             Button(Tr("发起群聊")) { path.append("newGroup") }
-            Button(Tr("加好友")) { path.append("addFriend") }
+            Button(Tr("添加朋友")) { path.append("addFriend") }
             Button(Tr("扫一扫")) { showScan = true }
             Button(Tr("取消"), role: .cancel) { }
         }

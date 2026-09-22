@@ -14,6 +14,8 @@ struct ContactsView: View {
     @State private var path = NavigationPath()
     @State private var bubble: String?
     @State private var bubbleTask: Task<Void, Never>?
+    @State private var plusMenu = false
+    @State private var showScan = false
     @FocusState private var searchFocused: Bool
     @ObservedObject private var realtime = Realtime.shared
 
@@ -58,7 +60,7 @@ private var funcs: [(String, String, Color, String)] {
             VStack(spacing: 0) {
                 NavBar(title: C.tabText1) {
                     Button {
-                        path.append("addFriend")
+                        plusMenu = true
                     } label: {
                         Text("＋")
                             .font(pf(19))
@@ -166,12 +168,28 @@ private var funcs: [(String, String, Color, String)] {
                     NewFriendsView()
                 } else if key == "addFriend" {
                     AddFriendView()
+                } else if key == "newGroup" {
+                    GroupCreateView { chat in
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { path.append(chat) }
+                    }
+                } else if key == "myQR" {
+                    MyQRView()
                 } else if key == "groupList" {
                     GroupListView(onOpenChat: { chat in path.append(chat) })
                 } else {
                     ComingSoonView(title: key)
                 }
             }
+        }
+        /* 右上角那个「＋」：微信点开是这个菜单（发起群聊 / 添加朋友 / 扫一扫） */
+        .confirmationDialog("", isPresented: $plusMenu, titleVisibility: .hidden) {
+            Button(Tr("发起群聊")) { path.append("newGroup") }
+            Button(Tr("添加朋友")) { path.append("addFriend") }
+            Button(Tr("扫一扫")) { showScan = true }
+            Button(Tr("取消"), role: .cancel) { }
+        }
+        .fullScreenCover(isPresented: $showScan) {
+            ScannerView { text in handleScanned(text, app: app) }
         }
         .task { await app.loadContacts() }
         // 有人加你 / 改资料 / 上下线 → 通讯录立刻刷新
@@ -291,6 +309,7 @@ struct ContactCardView: View {
     @State private var showMore = false
     @State private var showInfo = false
     @State private var showPhone = false
+    @State private var showApply = false
     @State private var viewer: Int?
     /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
     @State private var aiCall: Chat?
@@ -372,6 +391,16 @@ struct ContactCardView: View {
         .task { await load() }
         .fullScreenCover(item: $aiCall) { c in
             AICallView(chat: c).environmentObject(app)
+        }
+        /* 「添加到通讯录」→ 微信那个申请页（可以写验证消息，默认「我是XXX」） */
+        .sheet(isPresented: $showApply) {
+            FriendApplySheet(user: u) {
+                Task {
+                    await app.loadContacts()
+                    await load()
+                }
+            }
+            .environmentObject(app)
         }
     }
 
@@ -619,18 +648,7 @@ struct ContactCardView: View {
                                         avatar: u.avatar ?? "", video: false)
             }
         case "add":
-            busy = true
-            Task {
-                do {
-                    try await API.shared.addFriend(username: u.username ?? "")
-                    app.show(Tr("好友申请已发出"))
-                    await app.loadContacts()
-                    await load()
-                } catch {
-                    app.show((error as? APIError)?.errorDescription ?? "加好友失败")
-                }
-                busy = false
-            }
+            showApply = true
         case "agree":
             busy = true
             Task {

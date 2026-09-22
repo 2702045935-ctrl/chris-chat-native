@@ -50,6 +50,7 @@ jobs:
           PY
 
       - name: 编译原生 App
+        id: build
         run: |
           set -e
           # 把这次的构建号和打包时间写进 Info.plist：
@@ -83,7 +84,13 @@ jobs:
             -framework SwiftUI -framework UIKit -framework Foundation \
             -framework LocalAuthentication -framework AVFoundation \
             -framework WebRTC \
-            -Xlinker -rpath -Xlinker @executable_path/Frameworks
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks 2>&1 | tee /tmp/build.log
+          if grep -q "error:" /tmp/build.log; then
+            grep -E "error:" /tmp/build.log | head -40 > build-error.txt
+            echo "==== 编译错误（已存成 artifact）===="
+            cat build-error.txt
+            exit 1
+          fi
           echo "编译完成，体积："
           ls -lh "$APP/CHRIS"
           echo "依赖了哪些动态库："
@@ -104,3 +111,12 @@ jobs:
           name: CHRISChat-unsigned-ipa
           path: Luchat.ipa.enc
           if-no-files-found: error
+
+      # 编译失败时，把错误信息存成 artifact，方便在电脑上排查
+      - name: 上传编译错误
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-error
+          path: build-error.txt
+          if-no-files-found: ignore

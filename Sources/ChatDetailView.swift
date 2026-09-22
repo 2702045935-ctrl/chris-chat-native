@@ -45,6 +45,14 @@ struct ChatDetailView: View {
     @State private var web: WebURL?
     /// 已经自动跳过的卡片（同一条只跳一次）
     @State private var autoOpened: Set<String> = []
+    /* 长按消息的那套（和微信一样）：动作条 / 转发 / 多选 / 引用 */
+    @State private var actionMessage: Message?
+    @State private var forwardKind = ""
+    @State private var forwardBody = ""
+    @State private var showForward = false
+    @State private var selectMode = false
+    @State private var selected: Set<String> = []
+    @State private var quote: Message?
 
     @State private var showPhoto = false
     @State private var showCamera = false
@@ -63,6 +71,110 @@ struct ChatDetailView: View {
     @State private var cardUser: User?
     /// 点机器人（AI 助手 / 腾讯新闻）的头像 → 弹它的名片
     @State private var botCard = false
+
+    /* ---------------------------------------------------------- 长按消息的动作 */
+
+    private func openActions(_ m: Message) {
+        if selectMode { toggleSelect(m); return }
+        actionMessage = m
+    }
+
+    private func actionTitle(_ m: Message) -> String {
+        let t = m.kindName == "text" ? m.body : "[" + (m.kindName == "image" ? "图片" : m.kindName) + "]"
+        return String(t.prefix(40))
+    }
+
+    private func actions(for m: Message) -> [MsgAction] {
+        var list: [MsgAction] = [
+            MsgAction(key: "copy", label: "复制", icon: "doc.on.doc"),
+            MsgAction(key: "forward", label: "转发", icon: "arrowshape.turn.up.right")
+        ]
+        if !m.isRecalled {
+            list.append(MsgAction(key: "fav", label: "收藏", icon: "star"))
+            list.append(MsgAction(key: "quote", label: "引用", icon: "text.quote"))
+        }
+        if m.senderId == myId, !m.isRecalled {
+            list.append(MsgAction(key: "recall", label: "撤回", icon: "arrow.uturn.backward", danger: true))
+        }
+        list.append(MsgAction(key: "multi", label: "多选", icon: "checkmark.circle"))
+        list.append(MsgAction(key: "del", label: "删除", icon: "trash", danger: true))
+        if m.senderId != myId {
+            list.append(MsgAction(key: "report", label: "举报", icon: "exclamationmark.bubble"))
+        }
+        return list
+    }
+
+    private func run(_ a: MsgAction, on m: Message) {
+        switch a.key {
+        case "copy":
+            UIPasteboard.general.string = m.kindName == "text" ? m.body : "[" + m.kindName + "]"
+            app.show(Tr("已复制"))
+        case "forward":
+            forwardKind = (m.kindName == "image") ? "image" : "text"
+            forwardBody = m.body
+            showForward = true
+        case "fav":
+            Task {
+                let ok = await API.shared.addFavorite(kind: m.kindName == "image" ? "image" : "text",
+                                                      content: m.body,
+                                                      title: chat.name,
+                                                      from: displayName(m))
+                app.show(ok ? Tr("已收藏") : Tr("收藏失败"))
+            }
+        case "quote":
+            quote = m
+        case "recall":
+            recall(m)
+        case "multi":
+            selectMode = true
+            selected = [m.id]
+        case "del":
+            messages.removeAll { $0.id == m.id }
+            app.show(Tr("已删除"))
+        case "report":
+            report(m)
+        default:
+            break
+        }
+    }
+
+    private func toggleSelect(_ m: Message) {
+        if selected.contains(m.id) { selected.remove(m.id) } else { selected.insert(m.id) }
+    }
+
+    private func mySelected() -> [Message] {
+        messages.filter { selected.contains($0.id) }
+    }
+
+    private func multiForward() {
+        guard let first = mySelected().first else { return }
+        forwardKind = (first.kindName == "image") ? "image" : "text"
+        forwardBody = first.body
+        showForward = true
+    }
+
+    private func multiFavorite() {
+        let picked = mySelected()
+        guard !picked.isEmpty else { return }
+        Task {
+            var n = 0
+            for m in picked {
+                if await API.shared.addFavorite(kind: m.kindName == "image" ? "image" : "text",
+                                                content: m.body, title: chat.name, from: displayName(m)) { n += 1 }
+            }
+            app.show(Tr("已收藏") + " \(n) " + Tr("条"))
+            selectMode = false
+            selected = []
+        }
+    }
+
+    private func multiDelete() {
+        let ids = selected
+        messages.removeAll { ids.contains($0.id) }
+        app.show(Tr("已删除"))
+        selectMode = false
+        selected = []
+    }
 
     @FocusState private var focused: Bool
     @ObservedObject private var realtime = Realtime.shared
@@ -224,7 +336,33 @@ struct ChatDetailView: View {
                 .buttonStyle(.plain)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if selectMode {
+                MultiSelectBar(count: selected.count,
+                               onForward: { multiForward() },
+                               onFavorite: { multiFavorite() },
+                               onDelete: { multiDelete() },
+                               onCancel: { selectMode = false; selected = [] })
+            } else {
+                composer
+            }
+        }
+        /* 长按弹出来的动作条 */
+        .overlay {
+            if let m = actionMessage {
+                MsgActionSheet(title: actionTitle(m), actions: actions(for: m)) { a in
+                    actionMessage = nil
+                    run(a, on: m)
+                } onCancel: {
+                    actionMessage = nil
+                }
+                .zIndex(30)
+            }
+        }
+        .sheet(isPresented: $showForward) {
+            ForwardPickerView(kind: forwardKind, content: forwardBody) { }
+                .environmentObject(app)
+        }
         /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */
         .confirmationDialog(Tr("聊天"), isPresented: $showChatMenu, titleVisibility: .hidden) {
             if isGroup {
@@ -344,24 +482,22 @@ struct ChatDetailView: View {
                                        onOpenAvatar: { id in openAvatar(id) },
                                        onOpenWeb: { url in web = WebURL(url: url) })
                                 .padding(.bottom, 15)
-                                .contextMenu {
-                                    if message.senderId == myId {
-                                        Button(role: .destructive) {
-                                            recall(message)
-                                        } label: {
-                                            Label(Tr("撤回"), systemImage: "arrow.uturn.backward")
-                                        }
+                                /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
+                                .onLongPressGesture { openActions(message) }
+                                .overlay(alignment: .leading) {
+                                    if selectMode {
+                                        Image(systemName: selected.contains(message.id)
+                                              ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 21))
+                                            .foregroundColor(selected.contains(message.id) ? C.green : C.subLabel)
+                                            .padding(.leading, 10)
                                     }
-                                    Button {
-                                        UIPasteboard.general.string = message.body
-                                        app.show(Tr("已复制"))
-                                    } label: {
-                                        Label(Tr("复制"), systemImage: "doc.on.doc")
-                                    }
-                                    Button(role: .destructive) {
-                                        report(message)
-                                    } label: {
-                                        Label(Tr("举报"), systemImage: "exclamationmark.bubble")
+                                }
+                                .overlay {
+                                    if selectMode {
+                                        Color.clear
+                                            .contentShape(Rectangle())
+                                            .onTapGesture { toggleSelect(message) }
                                     }
                                 }
                             }
@@ -427,6 +563,31 @@ struct ChatDetailView: View {
 
     private var composer: some View {
         VStack(spacing: 0) {
+            /* 引用了某条消息：上面挂一条引用条（点 ✕ 取消） */
+            if let q = quote {
+                HStack(spacing: 8) {
+                    Rectangle().fill(C.green).frame(width: 3, height: 30)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(q.senderId == myId ? Tr("我") : displayName(q))
+                            .font(pf(11.5))
+                            .foregroundColor(C.green)
+                        Text(q.kindName == "text" ? String(q.body.prefix(40)) : "[" + q.kindName + "]")
+                            .font(pf(12.5))
+                            .foregroundColor(C.subLabel)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Button { quote = nil } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundColor(C.subLabel)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .background(C.tabBg)
+            }
             HStack(spacing: 6) {
                 Button {
                     /* 点一下 = 语音转文字（说的字直接进输入框）；
@@ -632,9 +793,16 @@ struct ChatDetailView: View {
     }
 
     private func sendText() {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty { return }
+        /* 引用：把被引的那条放在前面（像微信那样带一条引用） */
+        if let q = quote {
+            let who = q.senderId == myId ? Tr("我") : displayName(q)
+            let snip = q.kindName == "text" ? String(q.body.prefix(30)) : "[" + q.kindName + "]"
+            text = "「" + who + "：" + snip + "」\n" + text
+        }
         input = ""
+        quote = nil
         send(kind: "text", content: text)
     }
 

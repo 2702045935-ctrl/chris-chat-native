@@ -1601,6 +1601,15 @@ final class API {
         return list
     }
 
+    /// 收藏一条聊天内容（长按消息 → 收藏）
+    @discardableResult
+    func addFavorite(kind: String, content: String, title: String = "", from: String = "") async -> Bool {
+        let ok = try? await request("POST", "/api/favorites", body: [
+            "kind": kind, "content": content, "title": title, "from": from
+        ])
+        return ok != nil
+    }
+
     func changeBackground(_ path: String) async {
         await updateMe(["chatBackground": path])
     }

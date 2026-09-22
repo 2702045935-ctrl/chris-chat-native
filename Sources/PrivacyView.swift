@@ -217,6 +217,7 @@ struct GeneralView: View {
     @State private var showLang = false
     @State private var showBg = false
     @State private var showBgPick = false
+    @State private var showStorage = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -232,6 +233,9 @@ struct GeneralView: View {
                         HairLine(inset: 16)
                         row(Tr("聊天背景"),
                             (app.me?.chatBackground ?? "auto") == "auto" ? Tr("恢复默认") : Tr("自定义")) { showBg = true }
+                        HairLine(inset: 16)
+                        /* 微信「通用 → 存储空间」：看占用 + 清缓存 + 清某个会话的记录 */
+                        row(Tr("存储空间"), "") { showStorage = true }
                     }
                     .padding(.top, 8)
                     Spacer().frame(height: 30)
@@ -267,6 +271,9 @@ struct GeneralView: View {
         }
         .sheet(isPresented: $showBgPick) {
             PhotoPicker { image in changeBg(image) }
+        }
+        .sheet(isPresented: $showStorage) {
+            StorageView().environmentObject(app)
         }
     }
 

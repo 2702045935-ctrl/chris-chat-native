@@ -1386,6 +1386,31 @@ final class API {
 
     /* ---------------------------------------------------------- 共享实时位置 */
 
+    /* ---------------------------------------------------------- 存储空间 */
+    struct StorageChat: Decodable, Identifiable {
+        var chatId: String
+        var title: String
+        var avatar: String?
+        var messages: Int
+        var bytes: Int
+        var id: String { chatId }
+    }
+    struct StorageInfo: Decodable {
+        struct Kinds: Decodable {
+            var image: Int
+            var video: Int
+            var file: Int
+            var audio: Int
+        }
+        var total: Int
+        var chats: [StorageChat]
+        var kinds: Kinds
+        var uploads: Int
+    }
+    func storage() async throws -> StorageInfo {
+        try await get("/api/storage", as: StorageInfo.self)
+    }
+
     struct LiveStart: Decodable { var sessionId: String; var joined: Bool? }
     struct LiveMember: Decodable {
         var userId: String

@@ -462,6 +462,11 @@ final class ImageStore {
         lock.lock(); defer { lock.unlock() }
         cache[key] = img
     }
+    /// 清空图片缓存（设置 → 通用 → 存储空间 里「清理缓存」用）
+    func clear() {
+        lock.lock(); defer { lock.unlock() }
+        cache.removeAll(keepingCapacity: false)
+    }
 }
 
 struct RemoteImage: View {

@@ -1499,6 +1499,174 @@ final class API {
         try await get("/api/storage", as: StorageInfo.self)
     }
 
+    /* ------------------------------------------------ 红包（微信那套） ----------------------------------
+       拼手气 / 普通、群红包、每人限领一次、24 小时没抢完退回发红包的人。
+       卡片上要的信息、拆红包、详情、红包记录都在下面这几个调用里。 */
+    struct RedPacketRaw: Decodable {
+        var id: String
+        var total: Double?
+        var count: Int?
+        var claimedCount: Int?
+        var claimedIds: [String]?
+        var type: String?
+        var note: String?
+        var status: String?
+        var expired: Bool?
+        var fromId: String?
+        var fromName: String?
+        var expiresAt: Double?
+        var refundAmount: Double?
+        /* 详情接口额外给的 */
+        var fromAvatar: String?
+        var claimedTotal: Double?
+        var leftAmount: Double?
+        var leftCount: Int?
+        var bestUserId: String?
+        var bestAmount: Double?
+        var claims: [RedPacketClaimRaw]?
+    }
+    struct RedPacketClaimRaw: Decodable {
+        var userId: String
+        var name: String?
+        var avatar: String?
+        var amount: Double
+        var at: String?
+        var fromId: String?
+        var fromName: String?
+    }
+    struct RedPacketSendResult: Decodable {
+        var balance: Double
+        var amount: Double?
+        var count: Int?
+        var type: String?
+        var redpacket: RedPacketRaw
+    }
+    struct RedPacketClaimResult: Decodable {
+        var balance: Double
+        var amount: Double
+        var redpacket: RedPacketRaw
+        var leftCount: Int?
+    }
+    struct RedPacketDetailResult: Decodable {
+        var redpacket: RedPacketRaw
+    }
+    struct RedPacketRecord: Decodable, Identifiable {
+        var id: String
+        var chatId: String?
+        var direction: String?
+        var total: Double?
+        var count: Int?
+        var type: String?
+        var note: String?
+        var status: String?
+        var expired: Bool?
+        var claimedCount: Int?
+        var fromName: String?
+        var fromAvatar: String?
+        var mineAmount: Double?
+        var createdAt: String?
+        var expiresAt: Double?
+    }
+    struct RedPacketMineResult: Decodable {
+        var redpackets: [RedPacketRecord]?
+    }
+
+    /// 发红包：单聊只能 1 个；群聊传 count(1~100) 和 type（lucky 拼手气 / normal 普通）
+    func sendRedPacket(chatId: String, amount: Double, count: Int, type: String,
+                       note: String, password: String = "", face: Bool = false) async throws -> RedPacketSendResult {
+        try await post("/api/pay/redpacket", [
+            "chatId": chatId, "amount": amount, "count": count, "type": type,
+            "note": note, "password": password, "face": face
+        ], as: RedPacketSendResult.self)
+    }
+
+    /// 拆红包：返回这次抢到多少、余额、红包最新状态
+    func claimRedPacket(id: String) async throws -> RedPacketClaimResult {
+        try await post("/api/redpackets/\(id)/claim", [:], as: RedPacketClaimResult.self)
+    }
+
+    /// 红包详情：谁抢了多少、手气最佳
+    func redPacketDetail(id: String) async throws -> RedPacketRaw {
+        let payload: RedPacketDetailResult = try await get("/api/redpackets/\(id)", as: RedPacketDetailResult.self)
+        return payload.redpacket
+    }
+
+    /// 我收到 / 我发出的红包记录
+    func myRedPackets() async throws -> [RedPacketRecord] {
+        let payload: RedPacketMineResult = try await get("/api/redpackets/mine", as: RedPacketMineResult.self)
+        return payload.redpackets ?? []
+    }
+
+    /* ------------------------------------------------ 客服中心（腾讯/微信那套） ---------------
+       常见问题（后台配）+ 在线客服（转人工 = 和「在线客服」开一个会话）+ 我的工单
+       配置全在后台「客服中心」页，改完 App 里立刻生效，不用装包。 */
+    struct SupportItem: Decodable, Identifiable {
+        var q: String
+        var a: String
+        var id: String { q }
+    }
+    struct SupportCategory: Decodable, Identifiable {
+        var id: String
+        var title: String
+        var icon: String?
+        var items: [SupportItem]?
+    }
+    struct SupportAgent: Decodable {
+        var id: String
+        var nickname: String?
+        var avatar: String?
+    }
+    struct SupportTicket: Decodable, Identifiable {
+        var id: String
+        var category: String?
+        var title: String?
+        var content: String?
+        var status: String?
+        var reply: String?
+        var createdAt: String?
+        var repliedAt: String?
+        var doneAt: String?
+    }
+    struct SupportPayload: Decodable {
+        var title: String?
+        var searchHint: String?
+        var human: Int?              // 服务器下发 1/0
+        var ticketOn: Int?
+        var phone: String?
+        var email: String?
+        var workTime: String?
+        var greet: String?
+        var ticketHint: String?
+        var categories: [SupportCategory]?
+        var agent: SupportAgent?
+        var tickets: [SupportTicket]?
+    }
+    struct SupportHuman: Decodable {
+        var chatId: String
+        var agent: SupportAgent?
+    }
+    struct SupportTicketResult: Decodable {
+        var ticket: SupportTicket?
+        var tickets: [SupportTicket]?
+    }
+
+    func support() async throws -> SupportPayload {
+        try await get("/api/support", as: SupportPayload.self)
+    }
+
+    /// 转人工：和「在线客服」开一个会话（已有就用原来那个），返回会话 id
+    func supportHuman() async throws -> SupportHuman {
+        try await post("/api/support/human", [:], as: SupportHuman.self)
+    }
+
+    /// 提交问题 → 生成一张工单（后台「客服中心 → 工单」里能看到）
+    func supportTicket(category: String, content: String, contact: String = "") async throws -> [SupportTicket] {
+        let payload: SupportTicketResult = try await post("/api/support/ticket",
+            ["category": category, "content": content, "contact": contact],
+            as: SupportTicketResult.self)
+        return payload.tickets ?? []
+    }
+
     struct LiveStart: Decodable { var sessionId: String; var joined: Bool? }
     struct LiveMember: Decodable {
         var userId: String

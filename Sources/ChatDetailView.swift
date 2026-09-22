@@ -65,6 +65,10 @@ struct ChatDetailView: View {
     /// 发送位置：用新的地图选点页（微信那种），不再用那个手填经纬度的表单
     @State private var showSendLocation = false
     @State private var showTransfer = false
+    /// 红包：发红包页 / 拆红包 / 详情
+    @State private var showSendRedPacket = false
+    @State private var openRedPacket: RedPacketInfo? = nil
+    @State private var redPacketDetail: String? = nil
     @State private var showGroupInfo = false
     @State private var showSearch = false
     @State private var showChatInfo = false
@@ -430,6 +434,27 @@ struct ChatDetailView: View {
                转账页 + 支付面板 + 付款方式面板 + 结果页，颜色/尺寸和网页版一致 */
             TransferView(chat: chat)
         }
+        /* 红包：发红包（半屏）→ 塞钱进红包要支付密码；抢 / 看详情各自一套 */
+        .sheet(isPresented: $showSendRedPacket) {
+            RedPacketSendView(chat: chat) { _ in
+                Task { await load(initial: false); await app.loadChats() }
+            }
+            .environmentObject(app)
+        }
+        .fullScreenCover(item: $openRedPacket) { info in
+            RedPacketOpenView(info: info, myId: myId) { id in
+                redPacketDetail = id
+            }
+            .environmentObject(app)
+        }
+        .sheet(isPresented: Binding(
+            get: { redPacketDetail != nil },
+            set: { if !$0 { redPacketDetail = nil } }
+        )) {
+            if let id = redPacketDetail {
+                RedPacketDetailView(id: id, myId: myId).environmentObject(app)
+            }
+        }
         .fullScreenCover(isPresented: $showCall) {
             AICallView(chat: chat)
         }
@@ -520,12 +545,14 @@ struct ChatDetailView: View {
                             } else {
                             MessageRow(message: message,
                                        mine: message.senderId == myId,
+                                       myId: myId,
                                        senderName: (!isGroup || message.senderId == myId)
                                            ? "" : displayName(message),
                                        onTapTransfer: { info in billInfo = info },
                                        onOpenImage: { path in openImage(path) },
                                        onOpenAvatar: { id in openAvatar(id) },
-                                       onOpenWeb: { url in web = WebURL(url: url) })
+                                       onOpenWeb: { url in web = WebURL(url: url) },
+                                       onTapRedPacket: { info in tapRedPacket(info) })
                                 .padding(.bottom, 15)
                                 /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
                                 .onLongPressGesture { openActions(message) }
@@ -823,7 +850,7 @@ struct ChatDetailView: View {
             app.show(Tr("按住输入框左边的麦克风说话：松开发送，上滑取消"))
         case "redpacket":
             panel = .none
-            send(kind: "text", content: "🧧 恭喜发财，大吉大利")
+            showSendRedPacket = true
         case "favorite":
             panel = .none
             app.show(Tr("收藏夹还是空的"))
@@ -889,6 +916,15 @@ struct ChatDetailView: View {
                 app.show((error as? APIError)?.errorDescription ?? "发送失败")
             }
             await app.loadChats()
+        }
+    }
+
+    /// 点红包卡片：还能抢就直接拆红包；自己发的 / 已领过 / 领完 / 过期 → 看详情
+    private func tapRedPacket(_ info: RedPacketInfo) {
+        if info.fromId != myId && info.stillOpen && !info.claimed(by: myId) {
+            openRedPacket = info
+        } else {
+            redPacketDetail = info.id
         }
     }
 
@@ -1091,6 +1127,8 @@ struct SystemLine: View {
 struct MessageRow: View {
     let message: Message
     let mine: Bool
+    /// 我自己的 id：红包卡片要判断「我抢过没有」
+    var myId: String = ""
     var senderName: String = ""
     /// 点转账卡片 → 打开账单详情
     var onTapTransfer: ((TransferInfo) -> Void)? = nil
@@ -1100,6 +1138,8 @@ struct MessageRow: View {
     var onOpenAvatar: ((String) -> Void)? = nil
     /// 点 AI 的「点外卖 / 买东西」卡片 → 打开（没装淘宝就用 App 内网页）
     var onOpenWeb: ((URL) -> Void)? = nil
+    /// 点红包卡片 → 拆红包 / 看详情
+    var onTapRedPacket: ((RedPacketInfo) -> Void)? = nil
 
     @EnvironmentObject var app: AppState
     /// 语音消息播放状态（哪条在播）
@@ -1173,6 +1213,12 @@ struct MessageRow: View {
             transferBubble
                 .onTapGesture {
                     if let info = TransferInfo(json: message.body) { onTapTransfer?(info) }
+                }
+
+        case "redpacket":
+            redPacketBubble
+                .onTapGesture {
+                    if let info = RedPacketInfo(json: message.body) { onTapRedPacket?(info) }
                 }
 
         case "gift":
@@ -1316,6 +1362,23 @@ struct MessageRow: View {
         .frame(width: 216, alignment: .leading)
         .background(card)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    /// 红包气泡：橙色卡片（领过 / 领完 / 过期都变淡）
+    @ViewBuilder
+    private var redPacketBubble: some View {
+        if let info = RedPacketInfo(json: message.body) {
+            RedPacketCard(info: info, mine: mine, myId: myId)
+        } else {
+            /* 老版本留下来的、结构对不上的红包消息（服务端已经删掉那套逻辑了）：
+               不显示一堆 JSON，给一句人话 */
+            Text("[红包] 这条记录是旧版本的，已经失效")
+                .font(pf(14))
+                .foregroundColor(C.subLabel)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.hairLine))
+        }
     }
 
     /// 语音消息气泡：喇叭 + 秒数，点一下播放（再点一下停）

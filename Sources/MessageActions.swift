@@ -78,15 +78,19 @@ struct MsgMenuBox: View {
     }
 }
 
+struct ForwardItem: Hashable {
+    var kind: String
+    var content: String
+}
+
 /* 转发：先选一个聊天（微信也是先选人） */
 struct ForwardPickerView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
 
-    /// 要转发的内容
-    let kind: String
-    let content: String
+    /// 要转发的内容（可能一次转好几条）
+    let items: [ForwardItem]
     var onSent: () -> Void
 
     @State private var keyword = ""
@@ -149,9 +153,13 @@ struct ForwardPickerView: View {
     private func send(to chat: Chat) {
         busy = chat.id
         Task {
-            _ = try? await API.shared.send(chatId: chat.id, kind: kind, content: content)
+            for it in items {
+                _ = try? await API.shared.send(chatId: chat.id, kind: it.kind, content: it.content)
+            }
             busy = ""
-            app.show(Tr("已转发给") + "「" + chat.name + "」")
+            app.show(items.count > 1
+                     ? (Tr("已转发") + " \(items.count) " + Tr("条给") + "「" + chat.name + "」")
+                     : (Tr("已转发给") + "「" + chat.name + "」"))
             onSent()
             dismiss()
         }

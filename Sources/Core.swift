@@ -4,8 +4,13 @@ import ImageIO          // 解码时缩小图片（防解压炸弹）
 
 /// 打包时间：在「我 → 设置 → 关于」里能看到，用来确认手机上装的是哪一版
 enum AppInfo {
-    static let version = "1.0"
-    static let build = "B309 崩溃修复版（切语言重开后生效 / 聊天背景原图）"
+    /// 版本号 / 构建号直接读打包时写进 Info.plist 的值（CI 每次打包都会写）
+    static let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0"
+    static let build: String = {
+        let n = (Bundle.main.infoDictionary?["CFBundleVersion"] as? String) ?? "1"
+        let d = (Bundle.main.infoDictionary?["BuildDate"] as? String) ?? ""
+        return d.isEmpty ? ("B" + n) : ("B" + n + " · " + d)
+    }()
 }
 
 /* ============================================================

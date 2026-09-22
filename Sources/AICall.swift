@@ -44,6 +44,12 @@ final class VoiceEngine: NSObject, ObservableObject, AVSpeechSynthesizerDelegate
 
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        /* 采样率是 0 时不能硬装 tap：ObjC 异常 Swift 抓不住，会直接闪退 */
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            status = "麦克风还没准备好，再点一次"
+            return
+        }
+        input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { buf, _ in
             req.append(buf)
         }

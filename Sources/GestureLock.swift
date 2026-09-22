@@ -214,12 +214,17 @@ struct GestureSetupView: View {
                     }
                     PatternPad(picked: $picked) { done() }
                     Button {
-                        GestureStore.clear()
-                        on = false
-                        app.show(Tr("手势密码已关闭"))
-                        dismiss()
+                        /* 已经设过手势的：这颗只是「取消」，别手一滑把锁清了 */
+                        if GestureStore.enabled {
+                            dismiss()
+                        } else {
+                            GestureStore.clear()
+                            on = false
+                            app.show(Tr("手势密码已关闭"))
+                            dismiss()
+                        }
                     } label: {
-                        Text(Tr("先不设置"))
+                        Text(Tr(GestureStore.enabled ? "取消" : "先不设置"))
                             .font(pf(14))
                             .foregroundColor(C.subLabel)
                             .padding(.top, 18)

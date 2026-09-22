@@ -57,8 +57,13 @@ final class Dictation: NSObject, ObservableObject {
 
     private func begin() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try? session.setActive(true, options: [])
+        try? session.setCategory(.record, mode: .default, options: [.duckOthers])
+        do {
+            try session.setActive(true, options: [])
+        } catch {
+            self.error = "麦克风被别的 App 占着，等一下再点一次"
+            return
+        }
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
@@ -67,6 +72,12 @@ final class Dictation: NSObject, ObservableObject {
 
         let node = engine.inputNode
         let fmt = node.outputFormat(forBus: 0)
+        /* 格式没准备好（采样率 0）时千万别硬装 tap —— 系统会抛 ObjC 异常，
+           那个异常 Swift 的 do/catch 抓不住，直接闪退（线上崩过）。 */
+        guard fmt.sampleRate > 0, fmt.channelCount > 0 else {
+            self.error = "麦克风还没准备好，再点一次话筒"
+            return
+        }
         node.removeTap(onBus: 0)
         node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { buf, _ in req.append(buf) }
         engine.prepare()

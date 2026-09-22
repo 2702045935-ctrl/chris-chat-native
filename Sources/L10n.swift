@@ -67,6 +67,8 @@ enum L10n {
         "已移除": "Removed",
         "转发给": "Forward to",
         "已转发给": "Forwarded to ",
+        "已转发": "Forwarded ",
+        "条给": "item(s) to ",
         "转发": "Forward",
         "已收藏": "Added to favorites",
         "收藏失败": "Could not add to favorites",

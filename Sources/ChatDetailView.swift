@@ -47,8 +47,7 @@ struct ChatDetailView: View {
     @State private var autoOpened: Set<String> = []
     /* 长按消息的那套（和微信一样）：动作条 / 转发 / 多选 / 引用 */
     @State private var actionMessage: Message?
-    @State private var forwardKind = ""
-    @State private var forwardBody = ""
+    @State private var forwardItems: [ForwardItem] = []
     @State private var showForward = false
     @State private var selectMode = false
     @State private var selected: Set<String> = []
@@ -114,8 +113,7 @@ struct ChatDetailView: View {
             UIPasteboard.general.string = m.kindName == "text" ? m.body : "[" + m.kindName + "]"
             app.show(Tr("已复制"))
         case "forward":
-            forwardKind = (m.kindName == "image") ? "image" : "text"
-            forwardBody = m.body
+            forwardItems = [ForwardItem(kind: (m.kindName == "image") ? "image" : "text", content: m.body)]
             showForward = true
         case "fav":
             Task {
@@ -151,9 +149,9 @@ struct ChatDetailView: View {
     }
 
     private func multiForward() {
-        guard let first = mySelected().first else { return }
-        forwardKind = (first.kindName == "image") ? "image" : "text"
-        forwardBody = first.body
+        let picked = mySelected()
+        guard !picked.isEmpty else { return }
+        forwardItems = picked.map { ForwardItem(kind: ($0.kindName == "image") ? "image" : "text", content: $0.body) }
         showForward = true
     }
 
@@ -381,7 +379,7 @@ struct ChatDetailView: View {
         }
         .onPreferenceChange(MsgFrameKey.self) { msgFrames = $0 }
         .sheet(isPresented: $showForward) {
-            ForwardPickerView(kind: forwardKind, content: forwardBody) { }
+            ForwardPickerView(items: forwardItems) { }
                 .environmentObject(app)
         }
         /* 右上「⋯」：真人聊天可以直接打语音/视频（机器人还是走 AI 通话） */

@@ -36,9 +36,28 @@ jobs:
           ls WebRTCKit/WebRTC.xcframework
           ls WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework
 
+      # 英文词典里有重复 key 的话，Swift 的字典字面量会在启动时直接崩（以前线上崩过好几次）。
+      # 这里打包前先查一遍，有问题就让这次构建失败，别把崩溃版发出去。
+      - name: 检查英文词典有没有重复 key
+        run: |
+          python3 - <<'PY'
+          import re, collections, sys
+          t = open('Sources/L10n.swift', encoding='utf-8').read()
+          keys = re.findall(r'^\s{8}"((?:[^"\\]|\\.)*)":', t, re.M)
+          dups = [k for k, v in collections.Counter(keys).items() if v > 1]
+          print('L10n keys =', len(keys), ' duplicates =', dups)
+          sys.exit(1 if dups else 0)
+          PY
+
       - name: 编译原生 App
         run: |
           set -e
+          # 把这次的构建号和打包时间写进 Info.plist：
+          # 手机上「我 → 设置 → 关于」和崩溃上报里都能对上到底是哪一版
+          BUILDDATE="$(date -u '+%m-%d %H:%M')"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :BuildDate string $BUILDDATE" Info.plist \
+            || /usr/libexec/PlistBuddy -c "Set :BuildDate $BUILDDATE" Info.plist || true
           SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
           APP="Payload/CHRISChat.app"
           rm -rf Payload

@@ -314,13 +314,13 @@ final class AppState: ObservableObject {
     /// 预取的最近消息：chatId -> 最近 N 条
     var prefetched: [String: [Message]] = [:]
 
-    func syncRecentMessages(chats: Int = 10, limit: Int = 30) async {
+    func syncRecentMessages(chatCount: Int = 10, limit: Int = 30) async {
         syncing = true
         syncText = "正在同步最近的聊天记录…"
         defer { syncing = false }
         do {
-            let r = try await API.shared.chatsWithRecentMessages(chats: chats, limit: limit)
-            chats = r.chats
+            let r = try await API.shared.chatsWithRecentMessages(chats: chatCount, limit: limit)
+            chats = r.chats          // 这里的 chats 是 AppState 自己那份列表
             var total = 0
             for c in r.synced {
                 if let msgs = c.messages, !msgs.isEmpty {

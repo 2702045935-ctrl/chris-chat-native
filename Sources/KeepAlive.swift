@@ -14,6 +14,7 @@ import AVFoundation
    注意：**通话中不保活** —— 通话自己管音频会话，这里不去抢。
    ============================================================ */
 
+@MainActor
 final class KeepAlive {
     static let shared = KeepAlive()
     private init() {}

@@ -737,15 +737,25 @@ struct FeedCell: View {
             .padding(.horizontal, 16)
             .padding(.bottom, max(style.padBottom ?? 28, L.safeBottom + 10))
         }
-        .onAppear { setup() }
-        .onDisappear {
-            if let obs = timeObserver, let p = player { p.removeTimeObserver(obs) }
-            timeObserver = nil
-        }
-        .onDisappear { player?.pause() }
+        /* 只有「当前这一条」才建播放器并下载：
+           视频号一次显示上一条/当前/下一条三个格子，以前三条一起建 AVPlayer、
+           一起下整条视频，同一条带宽被三份分掉，手机上就是「一直在加载」。
+           现在滑到哪条才下哪条，滑走立刻停掉（抖音也是这么干的）。 */
+        .onAppear { if active { setup() } }
+        .onDisappear { teardown() }
         .onChange(of: active) { on in
-            if on { player?.play() } else { player?.pause(); player?.seek(to: .zero) }
+            if on { setup(); player?.play() } else { teardown() }
         }
+    }
+
+    /// 滑走/离开：停掉播放和下载，把内存里的播放器放掉
+    private func teardown() {
+        if let obs = timeObserver, let p = player { p.removeTimeObserver(obs) }
+        timeObserver = nil
+        player?.pause()
+        player = nil
+        loadingVideo = true
+        progress = 0
     }
 
     private var rightRail: some View {
@@ -830,6 +840,7 @@ struct FeedCell: View {
         favorited = item.favorited ?? false
         favorites = item.favorites ?? 0
         guard player == nil, let url = API.shared.assetURL(item.video ?? "") else { return }
+        loadingVideo = true
         /* 边下边播：把鉴权头交给 AVPlayer，它自己用 Range 分片拉流。
            以前是「先整包下载到本地再播」，一条 5MB 视频要等 20 多秒才出画面。 */
         Task { @MainActor in
@@ -857,8 +868,16 @@ struct FeedCell: View {
                     p.play()
                 }
                 player = p
-                loadingVideo = false
                 if active { p.play() }
+                /* 等真的能播了再把转圈收掉（以前一建播放器就收，其实画面还没出来，
+                   用户看到的是黑屏 + 没有任何提示）。最多等 16 秒。 */
+                for _ in 0..<80 {
+                    if p.currentItem?.status == .readyToPlay { break }
+                    if p.currentItem?.status == .failed { break }
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    if player == nil || !active { return }
+                }
+                if player === p { loadingVideo = false }
             } catch {
                 loadingVideo = false
             }

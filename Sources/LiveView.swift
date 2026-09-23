@@ -183,41 +183,12 @@ struct LiveRoomView: View {
             }
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                navBar
-                Spacer(minLength: 0)
-                danmakuList
-                bottomBar
-            }
+            controlsLayer
 
             /* 抖音那种：右侧竖排（点赞 / 礼物 / 分享），贴在输入栏上方 */
             rightOverlay
 
-            /* 真视频层：观众看到主播画面；主播看到自己的预览（右下小窗） */
-            if live.watching, live.remoteVideo != nil {
-                VideoSurface(track: live.remoteVideo)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            } else if live.publishing, live.localVideo != nil {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        VideoSurface(track: live.localVideo)
-                            .frame(width: 104, height: 148)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .padding(.trailing, 14)
-                            .padding(.bottom, 120)
-                    }
-                }
-                .allowsHitTesting(false)
-            }
-            if live.watching, live.remoteVideo == nil {
-                VStack(spacing: 8) {
-                    ProgressView().tint(.white)
-                    Text(Tr("正在连主播的画面…")).font(pf(14)).foregroundColor(.white.opacity(0.8))
-                }
-            }
+            videoLayer
 
             /* 点赞飘心 */
             ForEach(hearts, id: \.self) { id in
@@ -393,6 +364,44 @@ struct LiveRoomView: View {
     }
 
     /// 右侧竖排那一层（单独拎出来，免得整段 body 的类型推断超时）
+    private var controlsLayer: some View {
+        VStack(spacing: 0) {
+            navBar
+            Spacer(minLength: 0)
+            danmakuList
+            bottomBar
+        }
+    }
+
+    /// 视频层（观众看主播 / 主播看自己的小窗 / 还没连上时的提示）
+    @ViewBuilder
+    private var videoLayer: some View {
+        if live.watching, live.remoteVideo != nil {
+            VideoSurface(track: live.remoteVideo)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        } else if live.publishing, live.localVideo != nil {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    VideoSurface(track: live.localVideo)
+                        .frame(width: 104, height: 148)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.trailing, 14)
+                        .padding(.bottom, 120)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+        if live.watching, live.remoteVideo == nil {
+            VStack(spacing: 8) {
+                ProgressView().tint(.white)
+                Text(Tr("正在连主播的画面…")).font(pf(14)).foregroundColor(.white.opacity(0.8))
+            }
+        }
+    }
+
     private var rightOverlay: some View {
         VStack {
             Spacer(minLength: 0)

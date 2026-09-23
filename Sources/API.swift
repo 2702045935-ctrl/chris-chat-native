@@ -1166,11 +1166,47 @@ final class API {
     }
 
     func login(username: String, password: String) async throws -> User {
-        let payload: LoginPayload = try await post("/api/login",
-                                                   ["username": username, "password": password],
-                                                   as: LoginPayload.self)
+        try await login(username: username, password: password, sliderTicket: "")
+    }
+
+    /// 登录。服务器开了「登录滑动验证」时必须带上滑块换来的一次性通行证。
+    func login(username: String, password: String, sliderTicket: String) async throws -> User {
+        var body: [String: Any] = ["username": username, "password": password]
+        if !sliderTicket.isEmpty { body["sliderTicket"] = sliderTicket }
+        let payload: LoginPayload = try await post("/api/login", body, as: LoginPayload.self)
         guard let user = payload.user else { throw APIError.message("登录失败") }
         return user
+    }
+
+    /* ---------------- 登录滑动验证（拖滑块拼图） ---------------- */
+
+    /// 服务端出的一道题：缺口在哪、坐标系多大、背景用什么种子画
+    struct SliderChallenge: Decodable {
+        var id: String
+        var width: Double
+        var height: Double
+        var piece: Double
+        var targetX: Double
+        var targetY: Double
+        var tolerance: Double?
+        var seed: Int?
+        var expiresIn: Int?
+    }
+
+    private struct SliderTicketPayload: Decodable { var ticket: String?; var expiresIn: Int? }
+
+    /// 领题（同一个 IP 10 分钟最多 40 次）
+    func sliderChallenge() async throws -> SliderChallenge {
+        try await get("/api/slider", as: SliderChallenge.self)
+    }
+
+    /// 交卷：位置对了，服务端给一张一次性通行证（3 分钟有效、用掉即废）
+    func verifySlider(id: String, x: Double, y: Double) async throws -> String {
+        let payload: SliderTicketPayload = try await post("/api/slider/verify",
+                                                          ["id": id, "x": x, "y": y],
+                                                          as: SliderTicketPayload.self)
+        guard let t = payload.ticket, !t.isEmpty else { throw APIError.message("滑动验证失败") }
+        return t
     }
 
     /// 账号被禁用后的「身份证自助解封」：服务器校验 18 位身份证（含校验位），

@@ -201,7 +201,23 @@ final class AppState: ObservableObject {
     }
 
     func login(username: String, password: String) async throws {
-        me = try await API.shared.login(username: username, password: password)
+        me = try await API.shared.login(username: username, password: password, sliderTicket: "")
+        rememberLastUser()
+        await refreshAll()
+        Realtime.shared.start()
+    }
+
+    /// 账号密码登录：服务器开着滑动验证时，要带上滑块换来的一次性通行证
+    func login(username: String, password: String, sliderTicket: String) async throws {
+        me = try await API.shared.login(username: username, password: password, sliderTicket: sliderTicket)
+        rememberLastUser()
+        await refreshAll()
+        Realtime.shared.start()
+    }
+
+    /// 注册成功后直接用返回的用户进去（注册接口已经把登录态发下来了，不用再走一次登录）
+    func adoptRegistered(_ user: User) async {
+        me = user
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
@@ -1188,6 +1204,9 @@ struct AccountLoginSheet: View {
     @State private var showReg = false
     @State private var showUnban = false
     @State private var showReset = false
+    /// 登录滑动验证换来的一次性通行证 + 换题用的 key
+    @State private var sliderTicket = ""
+    @State private var captchaKey = 0
 
     var body: some View {
         NavigationStack {
@@ -1215,6 +1234,23 @@ struct AccountLoginSheet: View {
                         Text(e).font(.system(size: 13)).foregroundColor(C.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 12)
+                    }
+                    /* 登录滑动验证：只有账号密码登录要过这一关（手机号登录已经有短信验证码了） */
+                    if mode == .password {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(Tr("安全验证"))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(LoginTheme.ink(colorScheme))
+                            SliderCaptchaView(onTicket: { t in
+                                sliderTicket = t
+                                error = nil
+                            }, onFail: { msg in
+                                sliderTicket = ""
+                                error = msg
+                            })
+                            .id(captchaKey)
+                        }
+                        .padding(.top, 16)
                     }
                     // 账号被禁用：直接给一个自助解封入口（填身份证号，服务器校验合法就解开）
                     if isBanned {
@@ -1310,10 +1346,19 @@ struct AccountLoginSheet: View {
                 } else {
                     let u = username.trimmingCharacters(in: .whitespaces)
                     if u.isEmpty || password.isEmpty { throw APIError.message("请填写账号和密码") }
-                    try await app.login(username: u, password: password)
+                    if sliderTicket.isEmpty { throw APIError.message("请先拖动滑块完成安全验证") }
+                    try await app.login(username: u, password: password, sliderTicket: sliderTicket)
                 }
                 dismiss()
-            } catch { self.error = (error as? APIError)?.errorDescription ?? "登录失败" }
+            } catch {
+                let msg = (error as? APIError)?.errorDescription ?? "登录失败"
+                self.error = msg
+                /* 通行证是一次性的：这次没用上/过期了，就换一道新题重新滑 */
+                if msg.contains("滑动验证") {
+                    sliderTicket = ""
+                    captchaKey += 1
+                }
+            }
             busy = false
         }
     }
@@ -1483,9 +1528,11 @@ struct RegisterSheet: View {
         busy = true; error = nil
         Task {
             do {
-                _ = try await API.shared.register(username: username, nickname: nickname.isEmpty ? username : nickname,
-                                                 password: password, captchaId: capId, captcha: cap)
-                try await app.login(username: username, password: password)
+                let u = try await API.shared.register(username: username, nickname: nickname.isEmpty ? username : nickname,
+                                                     password: password, captchaId: capId, captcha: cap)
+                /* 注册接口已经把登录态发下来了（Set-Cookie → App 收进 token），
+                   直接把自己的资料挂上就行，不用再走一次登录（那条路要过滑动验证）。 */
+                await app.adoptRegistered(u)
                 app.show(Tr("注册成功"))
                 dismiss()
             } catch {

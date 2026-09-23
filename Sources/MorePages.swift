@@ -777,7 +777,10 @@ struct ResetPasswordSheet: View {
                 return
             }
             do {
-                try await app.login(username: r.username, password: newPassword)
+                /* 重置接口已经把登录态发下来了（Set-Cookie → App 收进 token），
+                   这里只要把自己的资料拉回来就行；不用再走一次登录，
+                   也就不会被登录滑动验证挡住。 */
+                app.me = try? await API.shared.me()
                 dismiss()
             } catch {
                 self.error = (error as? APIError)?.errorDescription ?? "重置成功，但自动登录失败，请用新密码登录"

@@ -7,6 +7,8 @@ import UIKit
 @MainActor
 final class AppState: ObservableObject {
     @Published var booting = true
+    /// 服务器有没有开「登录滑动验证」（登录页配置里一起下发；默认开着更安全）
+    @Published var sliderLogin = true
     @Published var me: User? {
         didSet {
             rememberLastUser()               // 谁登录（或改了头像）就记住谁，登录页圆圈用它
@@ -1018,6 +1020,8 @@ struct LoginView: View {
         for attempt in 0..<4 {
             if let b = await API.shared.branding() {
                 LoginTheme.apply(b)
+                /* 服务器关了滑动验证（security.json 里 sliderLogin: 0）就不显示那一块 */
+                app.sliderLogin = b.sliderLogin ?? true
                 if let n = b.login?.appName ?? b.appName, !n.isEmpty { appName = n }
                 if let lg = b.login?.logo ?? b.logo, !lg.isEmpty { logoPath = lg }
                 bgImage = b.login?.bgImage ?? ""      // 背景图（用状态存，才能刷新生效）
@@ -1236,7 +1240,7 @@ struct AccountLoginSheet: View {
                             .padding(.top, 12)
                     }
                     /* 登录滑动验证：只有账号密码登录要过这一关（手机号登录已经有短信验证码了） */
-                    if mode == .password {
+                    if mode == .password && app.sliderLogin {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(Tr("安全验证"))
                                 .font(.system(size: 13, weight: .medium))
@@ -1346,7 +1350,9 @@ struct AccountLoginSheet: View {
                 } else {
                     let u = username.trimmingCharacters(in: .whitespaces)
                     if u.isEmpty || password.isEmpty { throw APIError.message("请填写账号和密码") }
-                    if sliderTicket.isEmpty { throw APIError.message("请先拖动滑块完成安全验证") }
+                    if app.sliderLogin && sliderTicket.isEmpty {
+                        throw APIError.message("请先拖动滑块完成安全验证")
+                    }
                     try await app.login(username: u, password: password, sliderTicket: sliderTicket)
                 }
                 dismiss()

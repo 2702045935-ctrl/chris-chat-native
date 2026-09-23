@@ -398,6 +398,8 @@ struct BrandInfo: Decodable, Hashable {
     var iceServers: String?
     /// 登录页外观（后台「🎨 登录页」里配的）
     var login: LoginBrand?
+    /// 服务器有没有开「登录滑动验证」（安全验证那一块显不显示由它决定）
+    var sliderLogin: Bool?
 }
 
 struct LoginBrand: Decodable, Hashable {

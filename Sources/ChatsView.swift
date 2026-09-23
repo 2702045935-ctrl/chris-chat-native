@@ -253,20 +253,22 @@ struct ChatsView: View {
     /// 拉开多少才算是「要停在二楼」（微信也是拉过一半就翻过去）
     private let floorOpenAt: CGFloat = 58
 
+    /// 手指把二楼拉出来多少（点）—— 二楼是「从屏幕顶上往下让出来」，
+    /// 手指拉多少就露多少，松手拉够了才整页翻过去（微信的手感）
+    private var floorPull: CGFloat {
+        let byOffset = max(0, topOffset)
+        let byDrag = (topOffset <= 0.5) ? max(0, dragPull) : 0
+        return max(byOffset, byDrag)
+    }
     /// 二楼露出多少：0 = 完全收起，1 = 全部露出。跟着手指走（拉的越多露的越多）
     private var floorProgress: CGFloat {
         if floorOpen { return 1 }
-        /* 两个来源取大的：
-           ① 滚动偏移（滚到顶还继续下拉时的橡皮筋）；
-           ② 手指拖动量（更稳，不再依赖橡皮筋一定能读到） */
-        let byOffset = max(0, topOffset)
-        let byDrag = (topOffset <= 0.5) ? max(0, dragPull) : 0
-        return min(1, max(byOffset, byDrag) / 130)
+        return min(1, floorPull / 130)
     }
     /// 二楼收起（上滑 / 点完里面的项都走这里）
     private func closeFloor() {
         dragPull = 0
-        floorOpen = false
+        withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = false }
     }
     /// 「搜索」整页
     @State private var showSearch = false
@@ -276,25 +278,11 @@ struct ChatsView: View {
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
     }
 
-    /// 二楼：微信那种面板（搜索框 + 最近使用的小程序 + 我的小程序）。
+    /// 二楼：微信那种面板（顶上一块空白页 + 最近使用的小程序 + 我的小程序）。
     /// 面板高度 = 会话列表这一块的高度（底部 4 个 tab 还在，微信就是这样，不是盖满整屏）
     private func secondFloorView(_ panelH: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            /* 顶上这个搜索框就是微信二楼那一条：整宽、圆角、灰底 */
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(C.searchIcon)
-                Text(Tr("搜索"))
-                    .font(pf(14))
-                    .foregroundColor(C.subLabel)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 36)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.searchBg))
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-
+            /* 微信的二楼顶上是一块空白的页（没有搜索框），内容从下面这一行开始 */
             HStack(spacing: 6) {
                 Text(Tr("最近使用的小程序"))
                     .font(pf(14.5, .medium))
@@ -305,7 +293,7 @@ struct ChatsView: View {
                     .foregroundColor(C.arrow)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 28)
+            .padding(.top, 24)
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 4),
                       spacing: 18) {
@@ -507,6 +495,10 @@ struct ChatsView: View {
                             .padding(L.searchPad)
                             /* 和通讯录一样用「页面底色」，两页看着才是同一个色 */
                             .background(C.chatsPageBg)
+                            /* 下拉露二楼的时候这条搜索框要淡出：
+                               微信拉下来是「最上面一块空白页」，搜索框不能跟着二楼一起冒出来 */
+                            .opacity(Double(1 - min(1, floorProgress * 5)))
+                            .allowsHitTesting(floorProgress <= 0.01)
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,
@@ -544,11 +536,9 @@ struct ChatsView: View {
                             .onEnded { _ in
                                 /* 拉过一半就停在二楼（跟微信一样，松手不会自己缩回去）；
                                    只拉一点点就弹回会话列表 */
-                                if max(dragPull, max(0, topOffset)) >= floorOpenAt {
+                                if floorPull >= floorOpenAt {
                                     dragPull = 0
-                                    withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
-                                        floorOpen = true
-                                    }
+                                    withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = true }
                                 } else {
                                     dragPull = 0
                                 }
@@ -564,13 +554,15 @@ struct ChatsView: View {
             .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
             /* 下拉二楼：露出来的时候盖在最上面（上滑/点一下里面的项就回去） */
             .overlay(alignment: .top) {
-                /* 二楼跟着手指走：拉 130pt 就完全露出，拉过一半松手就停在二楼（微信那种手感） */
+                /* 二楼的露出高度 = 手指拉出来的距离（1:1 跟手），拉过一半松手整页翻过去 */
                 GeometryReader { geo in
-                    secondFloorView(geo.size.height)
-                        .offset(y: (floorProgress - 1) * geo.size.height)
-                        .opacity(floorProgress > 0.02 ? 1 : 0)
-                        .allowsHitTesting(floorProgress > 0.5)
-                        .animation(.spring(response: 0.42, dampingFraction: 0.72), value: floorProgress)
+                    let h = geo.size.height
+                    let reveal = floorOpen ? h : min(h, floorPull)
+                    secondFloorView(reveal)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .clipped()
+                        .opacity(reveal > 2 ? 1 : 0)
+                        .allowsHitTesting(floorOpen)
                 }
             }
             .sheet(isPresented: $showSearch) {

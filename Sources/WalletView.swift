@@ -26,6 +26,8 @@ struct WalletView: View {
     /// 钱包页里的「身份信息」「支付设置」
     @State private var showIdentity = false
     @State private var showPaySettings = false
+    /// 钱包页里的「支付分」：进新的支付分页面（微信那套）
+    @State private var showPayScore = false
     /// 「安全分」那一行显示真实分数（wallet.json 里加一项 action=score 就会读出来）
     @State private var creditText = ""
     /// 点开看过的金额（每次进页面都清空 → 默认都是星号）
@@ -87,6 +89,7 @@ struct WalletView: View {
         .sheet(isPresented: $showSupport) { SupportView().environmentObject(app) }
         .sheet(isPresented: $showIdentity) { IdentityView().environmentObject(app) }
         .sheet(isPresented: $showPaySettings) { PaySettingsView().environmentObject(app) }
+        .sheet(isPresented: $showPayScore) { PayScoreView().environmentObject(app) }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
@@ -204,7 +207,7 @@ struct WalletView: View {
         case "biz":
             showBiz = true                // 经营账户
         case "score":
-            showScore = true              // 安全分（微信「支付分」那一页）
+            showPayScore = true           // 支付分（微信那套：分数 + 三维度 + 免押服务）
         case "bills":
             showBills = true            // 进「账单」页（真实转账记录）
         case "card":

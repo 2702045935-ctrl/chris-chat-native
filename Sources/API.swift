@@ -1759,6 +1759,43 @@ final class API {
     func paySettings() async throws -> PaySettings {
         try await get("/api/me/paysettings", as: PaySettings.self)
     }
+
+    /* 支付分（钱包 → 支付分）：分数 + 三个维度 + 免押服务 + 分值变化 */
+    struct PayScoreDim: Decodable, Identifiable {
+        var key: String
+        var name: String
+        var value: Double
+        var desc: String?
+        var tip: String?
+        var id: String { key }
+    }
+    struct PayScoreService: Decodable, Identifiable {
+        var id: String
+        var name: String
+        var desc: String?
+        var need: Double?
+        var ok: Bool?
+        var gap: Double?
+    }
+    struct PayScoreHistory: Decodable, Identifiable {
+        var at: String
+        var text: String
+        var delta: Double
+        var id: String { at + text + String(delta) }
+    }
+    struct PayScore: Decodable {
+        var score: Double
+        var level: String
+        var min: Double
+        var max: Double
+        var dims: [PayScoreDim]?
+        var services: [PayScoreService]?
+        var history: [PayScoreHistory]?
+        var note: String?
+    }
+    func payScore() async throws -> PayScore {
+        try await get("/api/me/payscore", as: PayScore.self)
+    }
     func savePaySettings(noPin: Bool, noPinLimit: Double, payMethod: String) async {
         let _: SimpleOK? = try? await post("/api/me/paysettings",
             ["noPin": noPin, "noPinLimit": noPinLimit, "payMethod": payMethod], as: SimpleOK.self)

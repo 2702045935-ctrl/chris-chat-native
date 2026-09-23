@@ -258,6 +258,10 @@ struct ChatDetailView: View {
     private func startRealCall(video: Bool) {
         guard !isGroup else { app.show(Tr("群聊通话还没做，先在单聊里打")); return }
         guard let peer = peerUserId else { app.show(Tr("找不到对方账号，先刷新一下会话")); return }
+       if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
+        /* 万一状态卡住了（异步回调把「通话中」又设回来过），这里先自愈一次，
+           不然用户会「打不出去」：点拨打只弹一句「正在通话中」。 */
+        CallCenter.shared.resetIfStale()
         if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
         CallCenter.shared.start(peerId: peer, name: chat.name, avatar: chat.avatar ?? "", video: video)
     }

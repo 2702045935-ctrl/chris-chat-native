@@ -157,6 +157,9 @@ final class CallCenter: NSObject, ObservableObject {
 
     /// 打出去（peer 是一对一会话里的对方）
     func start(peerId: String, name: String, avatar: String, video: Bool) {
+        /* 状态要是卡住了（比如上一通结束后有异步回调把「通话中」又设回来），
+           先自愈一次再判断 —— 不然用户点拨打只会看到「正在通话中」，打不出去。 */
+        resetIfStale()
         guard phase == .idle else { errorText = "正在通话中"; return }
         guard !peerId.isEmpty else { errorText = "找不到对方账号"; return }
         dismissDialog()                 // 上一通留下的对话框别压在新通话上面
@@ -596,6 +599,21 @@ final class CallCenter: NSObject, ObservableObject {
         try? s.setActive(true)
     }
 
+    /* ------------------------------------------------------------------
+       通话状态自愈：只要有一个异步回调把 phase 又设回「通话中」，
+       用户就再也拨不出去（点拨打只弹一句「正在通话中」）。
+       这里判断「状态不是 idle，但其实什么都没在跑」→ 直接复位。
+       ------------------------------------------------------------------ */
+    func resetIfStale() {
+        guard phase != .idle else { return }
+        let busy = (pc != nil) || usingTRTC || TRTCBridge.shared.joined
+            || CallAudioPipe.shared.isRunning || !callId.isEmpty
+        if busy { return }
+        phase = .idle
+        tip = ""
+        errorText = nil
+    }
+
     private func stopMedia() {
         capturer?.stopCapture()
         capturer = nil
@@ -632,6 +650,9 @@ final class CallCenter: NSObject, ObservableObject {
         if usingTRTC || TRTCBridge.shared.joined {
             TRTCBridge.shared.stop()
         }
+        /* 把回调也摘掉：通话结束以后 TRTC 还可能补一个回调回来 */
+        TRTCBridge.shared.onJoined = nil
+        TRTCBridge.shared.onPeerChanged = nil
         usingTRTC = false
         trtcJoined = false
         stopMedia()
@@ -829,32 +850,6 @@ extension CallCenter: RTCPeerConnectionDelegate {
             }
         }
     }
-}
-
-/* ---------------------------------------------------------- 小工具 */
-
-enum Permission {
-    /// 申请麦克风 / 摄像头权限
-    static func ask(_ kind: AVMediaType) async -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: kind) {
-        case .authorized: return true
-        case .notDetermined:
-            return await withCheckedContinuation { cont in
-                AVCaptureDevice.requestAccess(for: kind) { ok in cont.resume(returning: ok) }
-            }
-        default: return false
-        }
-    }
-}
-
-enum UINotification {
-    /// 来电震一下（不依赖通知权限）
-    static func buzz() {
-        let gen = UIImpactFeedbackGenerator(style: .heavy)
-        gen.impactOccurred()
-        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-    }
-}
     /* ---------------------------------------------------------- 腾讯云 TRTC
        进房成功**不马上切**：先看对端有没有也进到这个房间。
          · 对端也进来了 → 媒体切给 TRTC（把我们自己那两路停掉，免得叠音）
@@ -867,6 +862,9 @@ enum UINotification {
         bridge.onJoined = { [weak self] ok in
             guard let self = self else { return }
             guard ok else { return }
+            /* 通话已经结束了（TRTC 的回调是异步的，可能迟到）：什么都不做，
+               否则会把 phase 又设回「通话中」，用户就再也拨不出去了。 */
+            guard self.phase != .idle, !self.callId.isEmpty else { return }
             self.trtcJoined = true
             self.note("TRTC 已进房（等对端）")
             /* 对端已经在房里了（比如我先退再进）：直接切 */
@@ -875,6 +873,7 @@ enum UINotification {
         bridge.onPeerChanged = { [weak self] inRoom in
             guard let self = self else { return }
             guard inRoom else { return }
+            guard self.phase != .idle, !self.callId.isEmpty else { return }
             if self.trtcJoined { self.switchMediaToTRTC() }
             if self.phase != .active {
                 Ringtone.shared.stop()
@@ -903,7 +902,7 @@ enum UINotification {
 
     /// 确认对端也在 TRTC 房间里了：把媒体完全交给腾讯云
     private func switchMediaToTRTC() {
-        guard !usingTRTC else { return }
+        guard !usingTRTC, phase != .idle, !callId.isEmpty else { return }
         usingTRTC = true
         note("对端也在腾讯云房间里 → 媒体切到 TRTC ✓")
         /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
@@ -928,3 +927,29 @@ enum UINotification {
             startTimer()
         }
     }
+}
+
+/* ---------------------------------------------------------- 小工具 */
+
+enum Permission {
+    /// 申请麦克风 / 摄像头权限
+    static func ask(_ kind: AVMediaType) async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: kind) {
+        case .authorized: return true
+        case .notDetermined:
+            return await withCheckedContinuation { cont in
+                AVCaptureDevice.requestAccess(for: kind) { ok in cont.resume(returning: ok) }
+            }
+        default: return false
+        }
+    }
+}
+
+enum UINotification {
+    /// 来电震一下（不依赖通知权限）
+    static func buzz() {
+        let gen = UIImpactFeedbackGenerator(style: .heavy)
+        gen.impactOccurred()
+        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+    }
+}

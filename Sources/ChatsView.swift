@@ -556,6 +556,9 @@ struct ChatsView: View {
                        这里把系统的下拉刷新去掉：一来更像微信，二来不会和二楼抢同一个下拉手势。
                        要刷新的地方放两处：二楼里的「刷新会话」、以及实时消息本来就会自动更新。 */
                     .coordinateSpace(name: "chatsScroll")
+                    /* 用 UIKit 实时拿滚动偏移（顶部时 contentOffset.y 是负数），
+                       下拉二楼就靠它判断「已经到最上面了」——比之前的 GeometryReader 稳 */
+                    .background(ScrollOffsetProbe { y in topOffset = y })
                     /* 手指往下拖的时候直接算「拉了多远」：滚到最顶上才生效，松手弹回去 */
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 8)
@@ -582,9 +585,8 @@ struct ChatsView: View {
                                 floorHapticDone = false
                             }
                     )
-                    .onPreferenceChange(ChatsTopKey.self) { y in
-                        topOffset = y
-                    }
+                    /* 偏移统一由上面的 ScrollOffsetProbe 提供；这里不再用 PreferenceKey，
+                       免得两个来源互相覆盖（以前就是这里不稳，导致二楼拉不下来） */
                 }
             }
             /* 第一页面（会话列表）的底色跟通讯录统一：都用后台的「页面底色」pageBg，

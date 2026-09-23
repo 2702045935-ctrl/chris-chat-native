@@ -120,7 +120,11 @@ final class TRTCBridge: NSObject, ObservableObject {
     }
 
     func setSpeaker(_ on: Bool) {
-        cloud?.setAudioRoute(on ? .speakerphone : .earphone)
+        /* 头文件里：TRTCAudioModeSpeakerphone = 0（外放）、TRTCAudioModeEarpiece = 1（听筒）。
+           这里按原始值构造，省得被 Swift 把枚举名改来改去。 */
+        if let route = TRTCAudioRoute(rawValue: on ? 0 : 1) {
+            cloud?.setAudioRoute(route)
+        }
     }
 }
 

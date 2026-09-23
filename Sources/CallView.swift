@@ -17,6 +17,8 @@ import WebRTC
 
 struct CallOverlay: View {
     @ObservedObject private var call = CallCenter.shared
+    /// 腾讯云 TRTC 的画面从它自己的 view 里来
+    @ObservedObject private var trtc = TRTCBridge.shared
 
     var body: some View {
         if call.phase != .idle {
@@ -208,9 +210,15 @@ struct CallView: View {
 
     private var videoLayer: some View {
         ZStack {
-            VideoSurface(track: call.remoteVideo)
-                .ignoresSafeArea()
-            if call.remoteVideo == nil {
+            /* 走了腾讯云就用腾讯云的画面；没走（或还没进房）还是老样子 */
+            if call.usingTRTC {
+                TRTCVideoView(view: trtc.remoteView)
+                    .ignoresSafeArea()
+            } else {
+                VideoSurface(track: call.remoteVideo)
+                    .ignoresSafeArea()
+            }
+            if call.usingTRTC ? (trtc.remoteView == nil) : (call.remoteVideo == nil) {
                 VStack(spacing: 10) {
                     ProgressView().tint(.white)
                     Text(Tr("正在连接画面…"))
@@ -235,7 +243,13 @@ struct CallView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    VideoSurface(track: call.localVideo)
+                    Group {
+                        if call.usingTRTC {
+                            TRTCVideoView(view: trtc.localView)
+                        } else {
+                            VideoSurface(track: call.localVideo)
+                        }
+                    }
                         .frame(width: 104, height: 148)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 10)
@@ -409,8 +423,12 @@ struct CallView: View {
                     Group {
                         if call.isVideo {
                             ZStack {
-                                VideoSurface(track: call.remoteVideo)
-                                if call.remoteVideo == nil {
+                                if call.usingTRTC {
+                                    TRTCVideoView(view: trtc.remoteView)
+                                } else {
+                                    VideoSurface(track: call.remoteVideo)
+                                }
+                                if call.usingTRTC ? (trtc.remoteView == nil) : (call.remoteVideo == nil) {
                                     Avatar(path: call.peerAvatar, size: 44, radius: 8)
                                 }
                             }

@@ -1204,6 +1204,24 @@ final class API {
 
     /* ---------------- 登录滑动验证（拖滑块拼图） ---------------- */
 
+    /* ---------------- 腾讯云 TRTC（音视频通话） ---------------- */
+
+    /// 进房参数：sdkAppId / userId / userSig / roomId（密钥只在服务端）
+    struct TRTCSig: Decodable {
+        var sdkAppId: Int
+        var userId: String
+        var userSig: String
+        var roomId: Int
+        var roomStr: String?
+        var expire: Int?
+    }
+
+    /// 取一张 TRTC 进房票。room 用「这次通话的 callId」，两边算出来的房间号一致。
+    func trtcSig(room: String) async throws -> TRTCSig {
+        try await get("/api/trtc/sig?room=" + (room.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? room),
+                      as: TRTCSig.self)
+    }
+
     /// 服务端出的一道题：缺口在哪、坐标系多大、背景用什么种子画
     struct SliderChallenge: Decodable {
         var id: String

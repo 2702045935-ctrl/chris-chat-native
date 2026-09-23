@@ -36,6 +36,20 @@ jobs:
           ls WebRTCKit/WebRTC.xcframework
           ls WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework
 
+      # 腾讯云 TRTC（音视频通话）：官方 iOS SDK。通话走腾讯云的接入点，
+      # 这样就算自家机房的 TURN 走 UDP 被挡（实测 3478/udp 外资进不来），通话也不受影响。
+      - name: 下载 TRTC 音视频 SDK
+        run: |
+          set -e
+          curl -L --fail -o /tmp/trtc.zip \
+            https://liteav.sdk.qcloud.com/download/latest/TXLiteAVSDK_TRTC_iOS_latest.zip
+          rm -rf /tmp/trtc-x TRTCKit && mkdir -p /tmp/trtc-x TRTCKit
+          unzip -q /tmp/trtc.zip -d /tmp/trtc-x
+          FW="$(find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework' -path '*ios-arm64*' | head -1)"
+          echo "找到 framework: $FW"
+          cp -R "$FW" TRTCKit/
+          ls -la TRTCKit/TXLiteAVSDK_TRTC.framework
+
       # 英文词典里有重复 key 的话，Swift 的字典字面量会在启动时直接崩（以前线上崩过好几次）。
       # 这里打包前先查一遍，有问题就让这次构建失败，别把崩溃版发出去。
       - name: 检查英文词典有没有重复 key
@@ -71,6 +85,16 @@ jobs:
           # 把 WebRTC 打进 App 里（动态库，运行时从 @executable_path/Frameworks 加载）
           mkdir -p "$APP/Frameworks"
           cp -R WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework "$APP/Frameworks/WebRTC.framework"
+          # 腾讯云 TRTC 也是动态库，同样嵌进来（只留 arm64，省 8MB）
+          cp -R TRTCKit/TXLiteAVSDK_TRTC.framework "$APP/Frameworks/TXLiteAVSDK_TRTC.framework"
+          lipo -thin arm64 "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC" \
+            -output "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" || true
+          if [ -f "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" ]; then
+            mv "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" \
+               "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC"
+          fi
+          rm -rf "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/_CodeSignature"
+          ls -lh "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC"
           xcrun --sdk iphoneos swiftc \
             -sdk "$SDK" \
             -target arm64-apple-ios16.0 \
@@ -79,11 +103,18 @@ jobs:
             -O \
             -F "$SDK/System/Library/Frameworks" \
             -F WebRTCKit/WebRTC.xcframework/ios-arm64 \
+            -F TRTCKit \
             -o "$APP/CHRIS" \
             Sources/*.swift \
             -framework SwiftUI -framework UIKit -framework Foundation \
             -framework LocalAuthentication -framework AVFoundation \
             -framework WebRTC \
+            -framework TXLiteAVSDK_TRTC \
+            -framework AudioToolbox -framework CoreTelephony -framework CoreMedia \
+            -framework CoreVideo -framework VideoToolbox -framework MetalKit -framework Metal \
+            -framework Accelerate -framework SystemConfiguration -framework ReplayKit \
+            -framework CoreGraphics -framework QuartzCore -framework OpenGLES \
+            -lz -lsqlite3 -lc++ \
             -Xlinker -rpath -Xlinker @executable_path/Frameworks 2>&1 | tee /tmp/build.log
           if grep -q "error:" /tmp/build.log; then
             grep -E "error:" /tmp/build.log | head -40 > build-error.txt

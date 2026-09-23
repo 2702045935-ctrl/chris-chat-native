@@ -56,6 +56,13 @@ final class CallCenter: NSObject, ObservableObject {
     private var diag: [String] = []
     /// 语音是否正在走「服务器转发」这条路
     private var serverAudioOn = false
+    /// 这通电话是不是已经交给腾讯云 TRTC 了（媒体走腾讯云，不依赖我们自己的 TURN）
+    @Published private(set) var usingTRTC = false
+    /// TRTC 的远端画面 / 本地小窗（界面直接用）
+    var trtcRemoteView: UIView? { TRTCBridge.shared.remoteView }
+    var trtcLocalView: UIView? { TRTCBridge.shared.localView }
+    /// TRTC 进房后对端在不在
+    var trtcPeerInRoom: Bool { TRTCBridge.shared.peerInRoom }
 
     func dismissDialog() {
         dialogTask?.cancel()
@@ -164,6 +171,7 @@ final class CallCenter: NSObject, ObservableObject {
         startRingTimeout()
         Ringtone.shared.startRingback()        // 等对方接的时候放回铃音（嘟——）
         Task { await beginMedia() }
+        Task { await startTRTCIfPossible() }   // 能进腾讯云就交给腾讯云（两边都拨进来以后音视频才真正通）
     }
 
     /// 接听（来电界面点绿键）
@@ -174,6 +182,7 @@ final class CallCenter: NSObject, ObservableObject {
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
+        Task { await startTRTCIfPossible() }
         startConnectWatch()
         startServerAudioIfVoice()            // 语音：立刻开始走服务器转发
     }
@@ -200,18 +209,21 @@ final class CallCenter: NSObject, ObservableObject {
     func toggleMute() {
         muted.toggle()
         audioTrack?.isEnabled = !muted
+        if usingTRTC { TRTCBridge.shared.setMuted(muted) }
     }
 
     func toggleCamera() {
         guard isVideo else { return }
         cameraOff.toggle()
         localVideoTrack?.isEnabled = !cameraOff
+        if usingTRTC { TRTCBridge.shared.setCameraOff(cameraOff) }
     }
 
     /// 扬声器开关：语音通话默认走听筒（关），视频通话默认开
     func toggleSpeaker() {
         speakerOn.toggle()
         applySpeaker()
+        if usingTRTC { TRTCBridge.shared.setSpeaker(speakerOn) }
     }
 
     func minimize() { minimized = true }
@@ -237,6 +249,7 @@ final class CallCenter: NSObject, ObservableObject {
 
     /// 前后摄像头切换（视频通话中）
     func flipCamera() {
+        if usingTRTC { TRTCBridge.shared.flipCamera(); return }
         guard isVideo, let capturer = capturer else { return }
         let front = capturer.captureSession.isRunning
         let devices = RTCCameraVideoCapturer.captureDevices()
@@ -611,6 +624,11 @@ final class CallCenter: NSObject, ObservableObject {
         CallAudioPipe.shared.onFrame = nil
         CallAudioPipe.shared.stop()
         serverAudioOn = false
+        /* 腾讯云那路也退房 */
+        if usingTRTC || TRTCBridge.shared.joined {
+            TRTCBridge.shared.stop()
+        }
+        usingTRTC = false
         stopMedia()
         /* 把这一通的 ICE 过程报给服务器（写进 call-trace.log），
            「一直在连接中」这种问题一看就知道卡在哪一步 */
@@ -653,6 +671,66 @@ final class CallCenter: NSObject, ObservableObject {
     private func note(_ s: String) {
         diag.append(s)
         if diag.count > 20 { diag.removeFirst() }
+    }
+
+    /* ---------------------------------------------------------- 腾讯云 TRTC
+       进房成功 → 媒体交给腾讯云（把我们自己那两路都关掉，免得叠音）；
+       进不去 → 什么也不动，继续走原来的 WebRTC / 服务器转发语音。 */
+
+    private func startTRTCIfPossible() async {
+        guard !usingTRTC, !callId.isEmpty else { return }
+        let bridge = TRTCBridge.shared
+        bridge.onJoined = { [weak self] ok in
+            guard let self = self else { return }
+            if ok { self.trtcTookOver() }
+        }
+        bridge.onPeerChanged = { [weak self] inRoom in
+            guard let self = self else { return }
+            if inRoom, !self.usingTRTC { return }
+            if inRoom, self.phase != .active {
+                Ringtone.shared.stop()
+                self.phase = .active
+                self.tip = "通话中"
+                self.ringTimer?.invalidate()
+                self.ringTimer = nil
+                self.connectTimer?.invalidate()
+                self.connectTimer = nil
+                self.startTimer()
+            }
+        }
+        let ok = await bridge.start(roomSeed: callId, video: isVideo)
+        if !ok {
+            note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
+        } else {
+            note("TRTC 已请求进房（room=" + callId + "）")
+        }
+    }
+
+    /// TRTC 进房成功：把我们的 WebRTC / 服务器转发语音都停掉，媒体全交给腾讯云
+    private func trtcTookOver() {
+        guard !usingTRTC else { return }
+        usingTRTC = true
+        note("媒体已切到腾讯云 TRTC ✓")
+        /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
+        CallAudioPipe.shared.onFrame = nil
+        CallAudioPipe.shared.stop()
+        serverAudioOn = false
+        audioTrack?.isEnabled = false
+        localVideoTrack?.isEnabled = false
+        capturer?.stopCapture()
+        TRTCBridge.shared.setMuted(muted)
+        TRTCBridge.shared.setSpeaker(speakerOn)
+        if phase != .active {
+            Ringtone.shared.stop()
+            phase = .active
+            tip = "通话中"
+            ringTimer?.invalidate()
+            ringTimer = nil
+            connectTimer?.invalidate()
+            connectTimer = nil
+            startTimer()
+        }
+        if !isVideo { TRTCBridge.shared.setSpeaker(speakerOn) }
     }
 
     /// 接通阶段盯 12 秒：还是「正在接通」就把最可能的原因写在屏幕上

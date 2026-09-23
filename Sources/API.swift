@@ -1907,6 +1907,33 @@ final class API {
     func payScore() async throws -> PayScore {
         try await get("/api/me/payscore", as: PayScore.self)
     }
+
+    /* 青少年模式（设置 → 青少年模式）：开关要 4 位密码，开了按勾选限制功能 */
+    struct TeenStatus: Decodable {
+        var enabled: Bool?
+        var hasPin: Bool?
+        var scopes: [String: Int]?
+        var guardianPhone: String?
+        var setAt: String?
+    }
+    private struct TeenPayload: Decodable { var teen: TeenStatus? }
+
+    func teen() async throws -> TeenStatus {
+        let p: TeenPayload = try await get("/api/me/teen", as: TeenPayload.self)
+        return p.teen ?? TeenStatus()
+    }
+    func teenSetup(pin: String) async throws -> TeenStatus {
+        let p: TeenPayload = try await post("/api/me/teen/setup", ["pin": pin], as: TeenPayload.self)
+        return p.teen ?? TeenStatus()
+    }
+    func teenSet(pin: String, enabled: Bool?, scopes: [String: Int]?, guardianPhone: String?) async throws -> TeenStatus {
+        var body: [String: Any] = ["pin": pin]
+        if let e = enabled { body["enabled"] = e }
+        if let s = scopes { body["scopes"] = s }
+        if let g = guardianPhone { body["guardianPhone"] = g }
+        let p: TeenPayload = try await post("/api/me/teen/set", body, as: TeenPayload.self)
+        return p.teen ?? TeenStatus()
+    }
     func savePaySettings(noPin: Bool, noPinLimit: Double, payMethod: String) async {
         let _: SimpleOK? = try? await post("/api/me/paysettings",
             ["noPin": noPin, "noPinLimit": noPinLimit, "payMethod": payMethod], as: SimpleOK.self)

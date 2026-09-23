@@ -317,6 +317,8 @@ struct SettingsView: View {
     /// 有没有设过支付密码（设置页那一行显示「已设置 / 未设置」）
     @State private var hasPay = false
     @State private var showFeedback = false
+    @State private var showTeen = false
+    @State private var showCare = false
     @State private var showAbout = false
     @State private var showLang = false
     @State private var showPairApprove = false
@@ -346,6 +348,10 @@ struct SettingsView: View {
                            账号与安全 → 新消息通知 → 隐私 → 通用 → 帮助与反馈 → 关于 → 切换账号 → 退出登录
                            （个人信息、实名、支付密码、安全锁、安全分、登录设备都归到「账号与安全」里了） */
                         settingLink(Tr("账号与安全"), accountSubtitle, key: "account")
+                        HairLine(inset: 16)
+                        settingRow(Tr("青少年模式"), "") { showTeen = true }
+                        HairLine(inset: 16)
+                        settingRow(Tr("关怀模式"), CareMode.on ? Tr("已开启") : Tr("未开启")) { showCare = true }
                         HairLine(inset: 16)
                         settingRow(Tr("新消息通知"), "") { showNotify = true }
                         HairLine(inset: 16)
@@ -429,6 +435,8 @@ struct SettingsView: View {
             PhotoPicker { image in changeBg(image) }
         }
         .sheet(isPresented: $showFeedback) { FeedbackView() }
+        .sheet(isPresented: $showTeen) { TeenModeView().environmentObject(app) }
+        .sheet(isPresented: $showCare) { CareModeView().environmentObject(app) }
         .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showPairApprove) { PairApproveView() }
         .sheet(isPresented: $showMyQR) { MyQRView() }

@@ -361,7 +361,15 @@ func pfName(_ weight: Font.Weight) -> String? {
 
 /// 带全站缩放的字号（界面文字都用这个）
 func pf(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    pfExact(max(9, (size * fontScale).rounded()), weight)
+    /* 关怀模式：本机开关一开，全站字号整体放大（微信的关怀模式也是这个思路） */
+    pfExact(max(9, (size * fontScale * CareMode.scale).rounded()), weight)
+}
+
+/// 关怀模式（设置 → 关怀模式）：只存在本机，开了全站字号放大
+enum CareMode {
+    static var on: Bool { UserDefaults.standard.bool(forKey: "chris.careMode") }
+    static var scale: CGFloat { on ? 1.18 : 1.0 }
+    static func set(_ v: Bool) { UserDefaults.standard.set(v, forKey: "chris.careMode") }
 }
 
 /// 不给缩放的字号（少数要严格对齐网页版数值的地方）

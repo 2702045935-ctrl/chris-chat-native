@@ -139,7 +139,23 @@ struct BotCardView: View {
         return "有问题随时问我，还能帮你查最新资讯～"
     }
 
+    /// 新版官方号名片（畅聊/HarmonyOS 语言）开关：后台 data/ui.json 里
+    /// agentCardStyle = "new" 才走新版；默认 "old" 就是原来这版。
     var body: some View {
+        if UIConfig.text("agentCardStyle", "old") == "new" {
+            BotCardNew(name: chat.name,
+                       bio: bio,
+                       avatarPath: chat.avatar ?? "",
+                       isEyes: isEyesBot,
+                       onClose: { dismiss() },
+                       onMessage: { dismiss() },
+                       onCall: { calling = true })
+        } else {
+            cardBody
+        }
+    }
+
+    private var cardBody: some View {
         VStack(spacing: 0) {
             NavBar(title: "", back: { dismiss() }) { EmptyView() }
                 .background(sheetBg)

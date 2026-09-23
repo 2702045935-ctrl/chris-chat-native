@@ -23,6 +23,44 @@ enum CrashCatcher {
         for sig in [SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP] {
             signal(sig, chrisSignalHandler)
         }
+        /* 上次崩了但没发出去（崩的瞬间网络不通 / 进程被系统直接杀掉）：
+           这次一进来就补发一遍，这样电脑这边才看得到崩在哪。 */
+        uploadPending()
+    }
+
+    /// 补发上次没送出去的崩溃信息（存成 kind\ntext\n\nstack 这种格式）
+    static func uploadPending() {
+        let raw = UserDefaults.standard.string(forKey: "chris.lastCrash") ?? ""
+        let at = UserDefaults.standard.string(forKey: "chris.lastCrashAt") ?? ""
+        guard !raw.isEmpty, !at.isEmpty else { return }
+        if (UserDefaults.standard.string(forKey: "chris.lastCrashSent") ?? "") == at { return }
+        let parts = raw.components(separatedBy: "\n\n")
+        let head = parts.first ?? raw
+        let stack = parts.count > 1 ? parts[1] : ""
+        let headLines = head.components(separatedBy: "\n")
+        let kind = headLines.first ?? "Crash"
+        let text = headLines.dropFirst().joined(separator: "\n")
+        var payload: [String: Any] = [
+            "kind": "补报/" + kind,
+            "text": String(text.prefix(3000)),
+            "stack": String(stack.prefix(6000)),
+            "app": AppInfo.build.prefix(28).description,
+            "at": at,
+            "late": true
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: payload),
+           let url = URL(string: API.shared.base + "/api/clientlog") {
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 6
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = data
+            URLSession.shared.dataTask(with: req) { _, resp, _ in
+                if let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                    UserDefaults.standard.set(at, forKey: "chris.lastCrashSent")
+                }
+            }.resume()
+        }
     }
 
     /// 主动上报（不一定崩，也可以记异常）

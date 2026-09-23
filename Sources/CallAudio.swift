@@ -159,10 +159,15 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         }
         capture.commitConfiguration()
         var ok = false
-        captureQueue.sync { [capture] in
+        /* 用信号量 + 超时，而不是 captureQueue.sync：万一 startRunning 卡住，
+           也只会让这一轮失败（下一轮重试），不会把线程挂死（挂死会被系统判成闪退）。 */
+        let wait = DispatchSemaphore(value: 0)
+        captureQueue.async { [capture] in
             if !capture.isRunning { capture.startRunning() }
             ok = capture.isRunning
+            wait.signal()
         }
+        _ = wait.wait(timeout: .now() + 4)
         if !ok { lastError = "AVCaptureSession 没能启动" }
         return ok
     }

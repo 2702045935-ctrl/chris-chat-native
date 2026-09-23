@@ -105,9 +105,24 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private func startCapture() {
         capture.beginConfiguration()
         if capture.canSetSessionPreset(.high) { capture.sessionPreset = .high }
-        guard let dev = AVCaptureDevice.default(for: .audio),
-              let input = try? AVCaptureDeviceInput(device: dev),
-              capture.canAddInput(input) else {
+        /* 麦克风有时候会被上一通电话 / 别的引擎（TRTC、铃声、保活）占着，
+           表现为「拿不到麦克风输入」。这里抢不到就先把音频会话放掉再抢一次，
+           最多 3 次 —— 蜂窝网那次失败就是这么救回来的。 */
+        var picked: AVCaptureDeviceInput? = nil
+        for attempt in 0..<3 {
+            if let dev = AVCaptureDevice.default(for: .audio),
+               let input = try? AVCaptureDeviceInput(device: dev),
+               capture.canAddInput(input) {
+                picked = input
+                break
+            }
+            if attempt < 2 {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                Thread.sleep(forTimeInterval: 0.35)
+                try? AVAudioSession.sharedInstance().setActive(true, options: [])
+            }
+        }
+        guard let input = picked else {
             capture.commitConfiguration()
             /* 最常见的原因就是「麦克风权限还没批下来」（第一次通话时权限弹窗刚弹、
                用户还没点「允许」）。这里把权限状态也带上，日志一眼能看出来。 */

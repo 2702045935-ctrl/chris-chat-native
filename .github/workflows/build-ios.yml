@@ -45,10 +45,14 @@ jobs:
             https://liteav.sdk.qcloud.com/download/latest/TXLiteAVSDK_TRTC_iOS_latest.zip
           rm -rf /tmp/trtc-x TRTCKit && mkdir -p /tmp/trtc-x TRTCKit
           unzip -q /tmp/trtc.zip -d /tmp/trtc-x
-          FW="$(find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework' -path '*ios-arm64*' | head -1)"
+          # 注意：必须取「设备」那一片（ios-arm64_armv7）。写成 *ios-arm64* 会先匹配到
+          # ios-arm64_x86_64-simulator（模拟器片），链接时会报 “built for iOS Simulator”。
+          FW="$(find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework' -path '*ios-arm64_armv7*' | head -1)"
+          if [ -z "$FW" ]; then echo "没找到设备片 framework"; find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework'; exit 1; fi
           echo "找到 framework: $FW"
           cp -R "$FW" TRTCKit/
           ls -la TRTCKit/TXLiteAVSDK_TRTC.framework
+          lipo -info TRTCKit/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC || true
 
       # 英文词典里有重复 key 的话，Swift 的字典字面量会在启动时直接崩（以前线上崩过好几次）。
       # 这里打包前先查一遍，有问题就让这次构建失败，别把崩溃版发出去。

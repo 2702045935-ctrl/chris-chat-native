@@ -19,7 +19,9 @@ private let hGreen  = Color(hex: 0x2E7D32)
 struct ContactCardNew: View {
     let name: String
     let idLine: String
-    let initial: String
+    /// 头像（真人用图片，眼睛机器人用会动的眼睛）
+    let avatarPath: String
+    let isEyes: Bool
     let remark: String
     let phone: String
     let momentCount: Int
@@ -100,8 +102,14 @@ struct ContactCardNew: View {
     private var hero: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
-                Circle().fill(Color(hex: 0xE4E6EB)).frame(width: 88, height: 88)
-                    .overlay(Text(initial).font(pf(34, .medium)).foregroundColor(hInk))
+                Group {
+                    if isEyes {
+                        JarvisEyesAvatar(size: 88)
+                    } else {
+                        Avatar(path: avatarPath, size: 88, radius: 44)
+                    }
+                }
+                .frame(width: 88, height: 88)
                 Circle().fill(hGreen).frame(width: 16, height: 16)
                     .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
             }

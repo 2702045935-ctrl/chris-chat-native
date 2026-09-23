@@ -353,7 +353,8 @@ struct ContactCardView: View {
         if UIConfig.text("cardStyle", "old") == "new" {
             ContactCardNew(name: displayName,
                            idLine: "微信号 " + (u.username ?? ""),
-                           initial: String(displayName.prefix(1)),
+                           avatarPath: u.avatarPath,
+                           isEyes: isEyesBot,
                            remark: meta?.remark ?? "",
                            phone: phone,
                            momentCount: thumbs.count,

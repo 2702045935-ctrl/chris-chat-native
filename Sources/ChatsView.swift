@@ -252,8 +252,16 @@ struct ChatsView: View {
     @State private var dragPull: CGFloat = 0
     /// 二楼这整页露出来时，是不是已经把底部标签栏收起来了（收/放要配对）
     @State private var floorHidTab = false
-    /// 拉开多少才算是「要停在二楼」（微信也是拉过一半就翻过去）
-    private let floorOpenAt: CGFloat = 58
+    /// 拉开多少才算是「要停在二楼」：微信拇指轻轻下滑就出来了，门槛放低一点
+    private let floorOpenAt: CGFloat = 40
+    /// 震动过没有（微信二楼拉到底会「嗡」一下，只有一次）
+    @State private var floorHapticDone = false
+    /// 二楼拉到底那一下的震动
+    private func floorHaptic() {
+        guard !floorHapticDone else { return }
+        floorHapticDone = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
 
     /// 手指把二楼拉出来多少（点）—— 二楼是「从屏幕顶上往下让出来」，
     /// 手指拉多少就露多少，松手拉够了才整页翻过去（微信的手感）
@@ -284,6 +292,21 @@ struct ChatsView: View {
     /// 面板高度 = 会话列表这一块的高度（底部 4 个 tab 还在，微信就是这样，不是盖满整屏）
     private func secondFloorView(_ panelH: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            /* 顶上这条「搜索小程序」：微信二楼最上面就是这个搜索框（上面留出导航栏那块位置） */
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(C.searchIcon)
+                Text(Tr("搜索小程序"))
+                    .font(pf(14))
+                    .foregroundColor(C.subLabel)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.searchBg))
+            .padding(.horizontal, 16)
+            .padding(.top, 50)
+
             /* 微信的二楼顶上是一块空白的页（没有搜索框），内容从下面这一行开始 */
             HStack(spacing: 6) {
                 Text(Tr("最近使用的小程序"))
@@ -308,11 +331,10 @@ struct ChatsView: View {
             .padding(.top, 16)
 
             HStack(spacing: 6) {
-                Text(Tr("我的小程序"))
+                Text(Tr("常用的小程序"))
                     .font(pf(14.5, .medium))
                     .foregroundColor(C.label)
                 Spacer(minLength: 4)
-                Text(Tr("更多")).font(pf(13)).foregroundColor(C.subLabel)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(C.arrow)
@@ -331,6 +353,16 @@ struct ChatsView: View {
             .padding(.top, 16)
 
             Spacer(minLength: 0)
+            /* 最下面这一块：微信二楼里是「最近看过的直播、视频、文章」 */
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Tr("最近看过的直播、视频、文章等将出现在这里。"))
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
             HStack(spacing: 6) {
                 Image(systemName: "chevron.up").font(.system(size: 11, weight: .semibold))
                 Text(Tr("上滑回到会话列表")).font(pf(12.5))
@@ -529,8 +561,10 @@ struct ChatsView: View {
                         DragGesture(minimumDistance: 8)
                             .onChanged { v in
                                 guard !floorOpen else { return }
-                                if v.translation.height > 0 && topOffset <= 0.5 {
+                                if v.translation.height > 0 && topOffset <= 1.5 {
                                     dragPull = min(160, v.translation.height)
+                                    /* 拉够门槛那一下就震一下（微信二楼也是这样） */
+                                    if dragPull >= floorOpenAt { floorHaptic() }
                                 } else if v.translation.height < -4 {
                                     dragPull = 0
                                 }
@@ -540,10 +574,12 @@ struct ChatsView: View {
                                    只拉一点点就弹回会话列表 */
                                 if floorPull >= floorOpenAt {
                                     dragPull = 0
+                                    floorHaptic()
                                     withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = true }
                                 } else {
                                     dragPull = 0
                                 }
+                                floorHapticDone = false
                             }
                     )
                     .onPreferenceChange(ChatsTopKey.self) { y in

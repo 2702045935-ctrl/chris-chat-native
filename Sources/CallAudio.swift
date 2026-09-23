@@ -31,6 +31,8 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private var playerReady = false
 
     private var started = false
+    /// 抢麦克风的重试任务（上一通刚结束、TRTC/铃声还占着的时候要靠它抢回来）
+    private var startTask: Task<Void, Never>?
     /// 采集有没有真的跑起来（起不来时页面/日志能看到原因）
     var isRunning: Bool { started && capture.isRunning }
     /// 起不来时的原因（上报日志用）
@@ -49,28 +51,41 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     }
 
     func start() {
-        guard !started else { return }
+        if started { return }
+        startTask?.cancel()
         started = false
         lastError = ""
         pending.removeAll()
 
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playAndRecord, mode: .voiceChat,
-                                    options: [.defaultToSpeaker, .allowBluetooth])
-        } catch {
-            lastError = "setCategory 失败: \(error.localizedDescription)"
+        /* 麦克风经常被「上一通电话 / TRTC 进房 / 铃声引擎」占着，一次抢不到就报错的话，
+           整通电话对面就听不到你说话（假通）。这里改成最多抢 6 次、每次间隔 0.7 秒，
+           中间把音频会话放开再抢。 */
+        startTask = Task.detached { [weak self] in
+            guard let self = self else { return }
+            for attempt in 0..<6 {
+                if Task.isCancelled || self.started { return }
+                self.configureSession()
+                self.startPlayback()
+                if self.startCaptureBlocking() {
+                    self.started = true
+                    self.lastError = ""
+                    DispatchQueue.main.async { self.onStateChange?(true) }
+                    return
+                }
+                /* 没抢到：放开音频会话，等一下再抢 */
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if Task.isCancelled { return }
+            }
+            self.started = false
+            DispatchQueue.main.async { self.onStateChange?(false) }
         }
-        do { try session.setActive(true, options: []) } catch {
-            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "setActive 失败: \(error.localizedDescription)"
-        }
-
-        startPlayback()
-        startCapture()
     }
 
     func stop() {
         started = false
+        startTask?.cancel()
+        startTask = nil
         captureQueue.async { [capture] in if capture.isRunning { capture.stopRunning() } }
         playerNode.stop()
         player.stop()
@@ -102,65 +117,54 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
 
     /* ---------------------------------------------------------- 采集：AVCaptureSession */
 
-    private func startCapture() {
+    /// 配音频会话：每一轮抢麦之前都重新配一遍（上一通电话可能把它改过）
+    private func configureSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.defaultToSpeaker, .allowBluetooth])
+        } catch {
+            lastError = "setCategory 失败: \(error.localizedDescription)"
+        }
+        do { try session.setActive(true, options: []) } catch {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "setActive 失败: \(error.localizedDescription)"
+        }
+    }
+
+    /// 配好采集并启动；这一轮没起来就返回 false（调用方会放开会话、过一会儿重试）
+    private func startCaptureBlocking() -> Bool {
+        if capture.isRunning { return true }
         capture.beginConfiguration()
         if capture.canSetSessionPreset(.high) { capture.sessionPreset = .high }
-        /* 麦克风有时候会被上一通电话 / 别的引擎（TRTC、铃声、保活）占着，
-           表现为「拿不到麦克风输入」。这里抢不到就先把音频会话放掉再抢一次，
-           最多 3 次 —— 蜂窝网那次失败就是这么救回来的。 */
-        var picked: AVCaptureDeviceInput? = nil
-        for attempt in 0..<3 {
-            if let dev = AVCaptureDevice.default(for: .audio),
-               let input = try? AVCaptureDeviceInput(device: dev),
-               capture.canAddInput(input) {
-                picked = input
-                break
+        if capture.inputs.isEmpty {
+            guard let dev = AVCaptureDevice.default(for: .audio) else {
+                capture.commitConfiguration()
+                lastError = "找不到麦克风设备"
+                return false
             }
-            if attempt < 2 {
-                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-                Thread.sleep(forTimeInterval: 0.35)
-                try? AVAudioSession.sharedInstance().setActive(true, options: [])
+            guard let input = try? AVCaptureDeviceInput(device: dev), capture.canAddInput(input) else {
+                capture.commitConfiguration()
+                /* 权限状态写清楚：日志里一眼能看出是「没授权」还是「被别人占着」 */
+                let st = AVCaptureDevice.authorizationStatus(for: .audio)
+                lastError = st == .denied ? "麦克风权限被拒绝（去 设置→本 App→麦克风 打开）"
+                    : (st == .notDetermined ? "麦克风权限还没授予（弹窗还没点）"
+                       : "拿不到麦克风输入（可能被上一通/别的引擎占着）")
+                return false
             }
+            capture.addInput(input)
         }
-        guard let input = picked else {
-            capture.commitConfiguration()
-            /* 最常见的原因就是「麦克风权限还没批下来」（第一次通话时权限弹窗刚弹、
-               用户还没点「允许」）。这里把权限状态也带上，日志一眼能看出来。 */
-            let st = AVCaptureDevice.authorizationStatus(for: .audio)
-            let why = st == .denied ? "麦克风权限被拒绝（去 设置→本 App→麦克风 打开）"
-                : (st == .notDetermined ? "麦克风权限还没授予（弹窗还没点）" : "拿不到麦克风输入")
-            lastError = (lastError.isEmpty ? "" : lastError + " / ") + why
-            DispatchQueue.main.async { self.onStateChange?(false) }
-            return
+        if capture.outputs.isEmpty {
+            if capture.canAddOutput(audioOut) { capture.addOutput(audioOut) }
+            audioOut.setSampleBufferDelegate(self, queue: captureQueue)
         }
-        capture.addInput(input)
-        audioOut.setSampleBufferDelegate(self, queue: captureQueue)
-        if capture.canAddOutput(audioOut) { capture.addOutput(audioOut) }
         capture.commitConfiguration()
-
-        captureQueue.async { [weak self] in
-            guard let self = self else { return }
-            /* 起不来就多重试几次：刚拿到麦克风权限、或者音频会话刚被上一步
-               （铃声 / 上一通电话）占着，第一次 startRunning 常常不成功。 */
-            for attempt in 0..<4 {
-                if self.capture.isRunning { break }
-                self.capture.startRunning()
-                if !self.capture.isRunning {
-                    try? AVAudioSession.sharedInstance().setActive(true, options: [])
-                    Thread.sleep(forTimeInterval: 0.25 + 0.25 * Double(attempt))
-                }
-            }
-            DispatchQueue.main.async {
-                self.started = self.capture.isRunning
-                if !self.started {
-                    self.lastError = (self.lastError.isEmpty ? "" : self.lastError + " / ")
-                        + "AVCaptureSession 没能启动（重试 4 次）"
-                } else {
-                    self.lastError = ""
-                }
-                self.onStateChange?(self.started)
-            }
+        var ok = false
+        captureQueue.sync { [capture] in
+            if !capture.isRunning { capture.startRunning() }
+            ok = capture.isRunning
         }
+        if !ok { lastError = "AVCaptureSession 没能启动" }
+        return ok
     }
 
     /// 采集回调：CMSampleBuffer → 16kHz 单声道 Int16 → 攒够 40ms 发一帧

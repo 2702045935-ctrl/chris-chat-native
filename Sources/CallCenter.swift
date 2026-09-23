@@ -311,8 +311,9 @@ final class CallCenter: NSObject, ObservableObject {
             p.onStateChange = nil
             self.micReported(ok, prefix: prefix)
         }
-        /* 兜底：1.5 秒还没回调（比如通道本来就在跑）就自己看一眼 */
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        /* 兜底：采集最多会抢 6 次（约 4~5 秒），这里等 7 秒再自己看一眼，
+           别在重试还没结束时就报「失败」。 */
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) { [weak self] in
             guard let self = self, p.onStateChange != nil else { return }
             p.onStateChange = nil
             self.micReported(p.isRunning, prefix: prefix)

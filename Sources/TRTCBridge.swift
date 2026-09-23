@@ -106,6 +106,9 @@ final class TRTCBridge: NSObject, ObservableObject {
     /// 等真的切过去时 activate() 会把 TRTC 的采集重新打开。
     func standByForLocalMedia() {
         guard let c = cloud, joined else { return }
+        /* 没开始采集过就别去 stop：TRTC SDK 对「没 start 就 stop」比较敏感，
+           少调一次少一分崩的风险（我们这会儿本来也没在采集）。 */
+        guard active else { return }
         c.stopLocalAudio()
         if isVideo { c.stopLocalPreview() }
         active = false

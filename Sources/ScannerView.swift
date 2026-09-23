@@ -10,12 +10,28 @@ import Vision
    两条都认不到才提示「没找到二维码」——保证每次点相册都有明确结果，不会静默失败。
    ============================================================ */
 enum AlbumScan {
+    /// 相册里的原图可能非常大（48MP），识别前先缩一版
+    static func small(_ image: UIImage, _ maxSide: CGFloat) -> UIImage {
+        let long = max(image.size.width, image.size.height)
+        guard long > maxSide, long > 0 else { return image }
+        let k = maxSide / long
+        let size = CGSize(width: image.size.width * k, height: image.size.height * k)
+        let fmt = UIGraphicsImageRendererFormat.default()
+        fmt.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
     /// 相册里的照片分两种方向：UIImage 记在 imageOrientation 里（相机拍的原图、截图转存的），
     /// cgImage 本身是"躺平"的。以前固定按 .up 去识别，竖着拍的图等于转了 90°，当然认不出来。
     /// 这里：先按图片自己的方向识别，再把 4 个方向都试一遍兜底。
     static func decode(_ image: UIImage) -> String? {
-        guard let cg = image.cgImage else { return nil }
-        let own = cgOrientation(image.imageOrientation)
+        /* 48MP 那种原图直接丢给识别器又慢又吃内存：长边超过 2000 先缩一下
+           （二维码识别看的是黑白格子，缩到 2000 完全够用）。 */
+        let work = small(image, 2000)
+        guard let cg = work.cgImage else { return nil }
+        let own = cgOrientation(work.imageOrientation)
         let orders: [CGImagePropertyOrientation] = [own, .up, .right, .down, .left]
         var tried = Set<String>()
         for o in orders {
@@ -27,7 +43,7 @@ enum AlbumScan {
         /* 老办法兜底：CIImage(image:) 会带上方向信息 */
         let det = CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
                              options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
-        if let ci = CIImage(image: image),
+        if let ci = CIImage(image: work),
            let feats = det?.features(in: ci) as? [CIQRCodeFeature],
            let s = feats.compactMap({ $0.messageString }).first(where: { !$0.isEmpty }) {
             return s

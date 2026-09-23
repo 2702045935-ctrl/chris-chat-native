@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import PhotosUI
+import UniformTypeIdentifiers
 
 /// 系统相册（PHPicker，不给权限也能用，选完直接回调）
 struct PhotoPicker: UIViewControllerRepresentable {
@@ -70,16 +71,28 @@ enum AlbumPicker {
 
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             picker.dismiss(animated: true)
-            guard let provider = results.first?.itemProvider,
-                  provider.canLoadObject(ofClass: UIImage.self) else {
+            guard let provider = results.first?.itemProvider else {
                 AlbumPicker.keep = nil
                 return
             }
-            provider.loadObject(ofClass: UIImage.self) { object, _ in
-                let img = object as? UIImage
+            /* 先按 UIImage 取；取不到（HEIC/RAW/超大图、或者 canLoadObject 返回 false 的那种）
+               再退回「拿原始图片数据自己解一次」，保证相册里任何一张图都能交出来。 */
+            let finish: (UIImage?) -> Void = { img in
                 DispatchQueue.main.async {
                     if let img = img { self.onPick(img) }
                     AlbumPicker.keep = nil
+                }
+            }
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { object, _ in
+                    if let img = object as? UIImage { finish(img); return }
+                    provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                        finish(data.flatMap { UIImage(data: $0) })
+                    }
+                }
+            } else {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                    finish(data.flatMap { UIImage(data: $0) })
                 }
             }
         }

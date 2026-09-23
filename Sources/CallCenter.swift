@@ -304,14 +304,31 @@ final class CallCenter: NSObject, ObservableObject {
     /// 采集起来没有：起来了就一切照旧；没起来就在界面上直说（别再「假通」了）
     private func reportMicState(prefix: String) {
         let p = CallAudioPipe.shared
-        Task { await API.shared.callDiag(prefix + " 采集=" + (p.isRunning ? "ok" : "失败")
-            + (p.isRunning ? "" : " 原因: " + p.lastError)) }
-        if p.isRunning {
+        /* 等采集通道「真正起来/彻底失败」再报（异步回调），别在 start() 刚返回就下结论 ——
+           之前日志里那种「采集=失败 原因:（空）」就是打点太早的误报。 */
+        p.onStateChange = { [weak self] ok in
+            guard let self = self else { return }
+            p.onStateChange = nil
+            self.micReported(ok, prefix: prefix)
+        }
+        /* 兜底：1.5 秒还没回调（比如通道本来就在跑）就自己看一眼 */
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self, p.onStateChange != nil else { return }
+            p.onStateChange = nil
+            self.micReported(p.isRunning, prefix: prefix)
+        }
+    }
+
+    private func micReported(_ ok: Bool, prefix: String) {
+        let reason = CallAudioPipe.shared.lastError
+        Task { await API.shared.callDiag(prefix + " 采集=" + (ok ? "ok" : "失败")
+            + (ok ? "" : " 原因: " + reason)) }
+        if ok {
             note("语音走服务器转发 ✓")
         } else {
             note("麦克风没起来")
-            tip = p.lastError.contains("权限") ? "麦克风权限没开：设置 → 本 App → 麦克风"
-                                              : "麦克风没起来，对方可能听不到你说话"
+            tip = reason.contains("权限") ? "麦克风权限没开：设置 → 本 App → 麦克风"
+                                         : "麦克风没起来，对方可能听不到你说话"
         }
     }
 
@@ -920,6 +937,10 @@ extension CallCenter: RTCPeerConnectionDelegate {
             note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
         } else {
             note("TRTC 已请求进房（room=" + callId + "）")
+            /* 关键：TRTC 进房后会自己抢麦克风，而我们这会儿还在走自己的转发通道
+               （对端没进房）—— 不把它按住，我们自己的采集就会「拿不到麦克风输入」，
+               结果就是「通话中但两边都没声音」。等真切到 TRTC 时它会重新打开。 */
+            TRTCBridge.shared.standByForLocalMedia()
             /* 把 TRTC 那点状态也报上来：排查「到底进没进同一个房间」就看这几行 */
             let b = TRTCBridge.shared
             Task { await API.shared.callDiag("TRTC 进房 room=" + self.callId

@@ -99,6 +99,18 @@ final class TRTCBridge: NSObject, ObservableObject {
         if isVideo { c.startLocalPreview(true, view: localView) }
     }
 
+    /// 进房之后先「让出」麦克风和摄像头：
+    /// TRTC 一进房就会自己开本地音频采集，把我们自己的采集通道挤掉
+    /// （日志里「拿不到麦克风输入」就是这么来的）。
+    /// 这时候媒体还没切给 TRTC（对端没进房），本地采集交给我们自己的通道，
+    /// 等真的切过去时 activate() 会把 TRTC 的采集重新打开。
+    func standByForLocalMedia() {
+        guard let c = cloud, joined else { return }
+        c.stopLocalAudio()
+        if isVideo { c.stopLocalPreview() }
+        active = false
+    }
+
     func stop() {
         cloud?.stopLocalPreview()
         cloud?.stopLocalAudio()

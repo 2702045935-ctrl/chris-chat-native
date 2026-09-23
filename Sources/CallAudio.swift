@@ -39,6 +39,10 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
 
     /// 采到一帧就回调（交给长连接发出去）
     var onFrame: ((Data) -> Void)?
+    /// 采集**真正**起来（或彻底失败）之后回调一次：
+    /// 以前是 start() 一返回就去看 isRunning，那时候异步的 startRunning 还没跑完，
+    /// 日志里就会写「采集=失败 原因:（空）」这种误报。
+    var onStateChange: ((Bool) -> Void)?
 
     private var playFormat: AVAudioFormat? {
         AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: sampleRate, channels: 1, interleaved: true)
@@ -111,6 +115,7 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             let why = st == .denied ? "麦克风权限被拒绝（去 设置→本 App→麦克风 打开）"
                 : (st == .notDetermined ? "麦克风权限还没授予（弹窗还没点）" : "拿不到麦克风输入")
             lastError = (lastError.isEmpty ? "" : lastError + " / ") + why
+            DispatchQueue.main.async { self.onStateChange?(false) }
             return
         }
         capture.addInput(input)
@@ -138,6 +143,7 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
                 } else {
                     self.lastError = ""
                 }
+                self.onStateChange?(self.started)
             }
         }
     }

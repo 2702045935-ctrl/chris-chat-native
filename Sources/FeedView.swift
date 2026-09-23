@@ -52,6 +52,9 @@ struct ChannelsView: View {
     @State private var drag: CGFloat = 0
     @State private var loading = true
     @State private var commentFor: FeedItem?
+    /// 转发面板 / 转发给朋友
+    @State private var shareItem: FeedItem?
+    @State private var forwardItem: FeedItem?
     @State private var commentText = ""
     @State private var comments: [FeedCommentItem] = []      // 评论列表
     @State private var pickOpen = false
@@ -138,6 +141,37 @@ struct ChannelsView: View {
         .swipeBack { dismiss() }
         .sheet(item: $commentFor) { item in
             commentSheet(item)
+        }
+        /* 抖音那种转发面板 */
+        .sheet(item: $shareItem) { item in
+            VideoShareSheet(
+                item: item,
+                onForward: { forwardItem = item },
+                onToMoments: {
+                    UIPasteboard.general.string = item.video ?? ""
+                    app.show(Tr("链接已复制，去「发现 → 朋友圈」粘贴就能发"))
+                },
+                onFavorite: {
+                    Task {
+                        if let r = try? await API.shared.feedFavorite(item.id) {
+                            app.show((r.favorited ? Tr("已收藏") : Tr("已取消收藏")))
+                            await load()
+                        }
+                    }
+                },
+                onSaveLocal: {
+                    UIPasteboard.general.string = item.video ?? ""
+                    app.show(Tr("视频链接已复制；保存到相册会占内存，先在聊天里发给自己也能存"))
+                },
+                onHide: {
+                    app.show(Tr("已经减少这类视频的推荐"))
+                }
+            )
+            .environmentObject(app)
+        }
+        .sheet(item: $forwardItem) { item in
+            VideoForwardPicker(link: item.video ?? "")
+                .environmentObject(app)
         }
         .sheet(item: $episodeFor) { item in
             episodeSheet(item)
@@ -294,9 +328,9 @@ struct ChannelsView: View {
         }
     }
 
+    /* 转发：打开抖音那种转发面板（转发给朋友 / 朋友圈 / 收藏 / 复制链接 / 保存本地 / 举报 / 不感兴趣） */
     private func share(_ item: FeedItem) {
-        UIPasteboard.general.string = (item.video ?? "") 
-        app.show(Tr("链接已复制，可以去聊天里粘贴"))
+        shareItem = item
     }
 
     private func follow(_ item: FeedItem) {

@@ -2531,6 +2531,46 @@ final class API {
         _ = try? await request("POST", "/api/chats/\(chatId)/read", body: [:])
     }
 
+    /* ---------------- 聊天记录导出 / 导入 ---------------- */
+
+    /// 导出结果：文件名 + 格式 + 内容。
+    /// json 是「可以再导入」的备份（payload），txt 是给人看的（text）。
+    struct ChatDump {
+        var fileName = "luchat-chat.json"
+        var format = "json"
+        var total = 0
+        var chats = 0
+        var text = ""
+        /// json 格式时的原始对象，直接拿去导入
+        var payload: Any? = nil
+    }
+
+    /// 导出聊天记录：chatId 传空就是全部
+    func exportChats(chatId: String = "", format: String = "json") async throws -> ChatDump {
+        var path = "/api/chats/export?format=" + format
+        if !chatId.isEmpty { path += "&chatId=" + chatId }
+        let any = try await request("GET", path)
+        guard let dict = any as? [String: Any] else { throw APIError.message("导出失败") }
+        var out = ChatDump()
+        out.fileName = (dict["fileName"] as? String) ?? out.fileName
+        out.format = (dict["format"] as? String) ?? format
+        out.total = (dict["total"] as? Int) ?? 0
+        out.chats = (dict["chats"] as? Int) ?? 0
+        if out.format == "txt" {
+            out.text = (dict["data"] as? String) ?? ""
+        } else {
+            out.payload = dict["data"]
+        }
+        return out
+    }
+
+    /// 把导出的 JSON 合回来（按消息 id 去重）
+    func importChats(payload: Any) async throws -> (imported: Int, skipped: Int, chats: Int) {
+        struct Out: Decodable { var imported: Int?; var skipped: Int?; var chats: Int? }
+        let out: Out = try await post("/api/chats/import", ["payload": payload], as: Out.self)
+        return (out.imported ?? 0, out.skipped ?? 0, out.chats ?? 0)
+    }
+
     func markUnread(chatId: String) async {
         _ = try? await request("POST", "/api/chats/\(chatId)/unread", body: [:])
     }

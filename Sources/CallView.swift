@@ -265,11 +265,47 @@ struct CallView: View {
                                 }
                             }
                         }
+                        /* 微信：点画中画自己那个小窗 = 切前后摄像头 */
+                        .contentShape(Rectangle())
+                        .onTapGesture { call.flipCamera() }
                         .padding(.trailing, 16)
                         .padding(.bottom, 150)
                 }
             }
+
+            /* 微信视频通话右上角那组：两个**竖向小圆角钮**并排（左：翻转，右：摄像头开/关）。
+               位置是照着参考图量的：贴在名字下面一点、靠右，右边距和底部小窗对齐。 */
+            VStack {
+                HStack {
+                    Spacer(minLength: 0)
+                    HStack(spacing: 8) {
+                        topPill(symbol: "arrow.triangle.2.circlepath.camera",
+                                on: false,
+                                hint: "翻转") { call.flipCamera() }
+                        topPill(symbol: call.cameraOff ? "video.slash.fill" : "video.fill",
+                                on: call.cameraOff,
+                                hint: call.cameraOff ? "摄像头已关" : "摄像头已开") { call.toggleCamera() }
+                    }
+                    .padding(.trailing, 14)
+                }
+                .padding(.top, L.navH + 52)
+                Spacer(minLength: 0)
+            }
         }
+    }
+
+    /// 右上角那种竖向小钮：宽 30、高 52、圆角 12，半透明白（开着是白底深图标）
+    private func topPill(symbol: String, on: Bool, hint: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(on ? .black : .white)
+                .frame(width: 30, height: 52)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(on ? Color.white : Color.black.opacity(0.28)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(hint))
     }
 
     /* ---------------------------------------------------------- 文字 */
@@ -300,72 +336,65 @@ struct CallView: View {
     /* ---------------------------------------------------------- 底部三个圆按钮 */
 
     private var bottomBar: some View {
-        VStack(spacing: 24) {
-            /* 视频通话：微信那套主次分层 ——
-               下面是「麦克风 / 挂断 / 扬声器」三个大圆按钮（主轴），
-               上面右对齐并排两个**小圆按钮**：「翻转」「摄像头已开/已关」。 */
-            if call.phase != .incoming && call.isVideo {
-                HStack(spacing: 26) {
-                    Spacer(minLength: 0)
-                    smallKey(label: "翻转",
-                             symbol: "arrow.triangle.2.circlepath.camera",
-                             engaged: false) { call.flipCamera() }
-                    smallKey(label: call.cameraOff ? "摄像头已关" : "摄像头已开",
-                             symbol: call.cameraOff ? "video.slash.fill" : "video.fill",
-                             engaged: call.cameraOff) { call.toggleCamera() }
-                }
-                .padding(.trailing, 30)
-            }
-            HStack(spacing: 51) {
-                if call.phase == .incoming {
-                    // 来电：拒接 + 接听
+        Group {
+            if call.phase == .incoming {
+                HStack(spacing: 51) {
                     roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
                     roundKey(label: "接听", bg: Color(hex: 0x07C160), ink: .white,
                              action: { call.accept() }) {
                         Image(systemName: "phone.fill")
                             .font(.system(size: 27, weight: .medium))
                     }
-                } else {
-                    roundKey(key: call.muted ? "ui.callMicOff" : "ui.callMic",
-                             symbol: call.muted ? "mic.slash.fill" : "mic.fill",
-                             builtin: call.muted ? I.callMicOff : I.callMic,
-                             label: call.muted ? "麦克风已关" : "麦克风已开",
-                             engaged: call.muted) { call.toggleMute() }
-                    roundKey(label: call.phase == .active ? "挂断" : "取消",
-                             bg: Color(hex: 0xFA5151)) { call.hangup() }
-                    roundKey(key: call.speakerOn ? "ui.callSpeaker" : "ui.callSpeakerOff",
-                             symbol: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
-                             builtin: call.speakerOn ? I.callSpeaker : I.callSpeakerOff,
-                             label: call.speakerOn ? "扬声器已开" : "扬声器已关",
-                             engaged: call.speakerOn) { call.toggleSpeaker() }
                 }
+                .padding(.bottom, 54)
+            } else if call.isVideo {
+                /* 微信视频通话是「倒三角」：上面一行左边麦克风、右边扬声器，
+                   挂断单独居中、位置更低（照参考图量的：两颗 y≈717，挂断 y≈830）。 */
+                VStack(spacing: 16) {
+                    HStack(spacing: 0) {
+                        micKey
+                        Spacer(minLength: 0)
+                        speakerKey
+                    }
+                    .padding(.horizontal, 48)
+                    hangupKey
+                }
+                .padding(.bottom, 40)
+            } else {
+                /* 语音通话：微信是一行三颗（麦克风 / 挂断 / 扬声器），挂断居中 */
+                HStack(spacing: 51) {
+                    micKey
+                    hangupKey
+                    speakerKey
+                }
+                .padding(.bottom, 54)
             }
         }
-        .padding(.bottom, 54)
+    }
+
+    private var micKey: some View {
+        roundKey(key: call.muted ? "ui.callMicOff" : "ui.callMic",
+                 symbol: call.muted ? "mic.slash.fill" : "mic.fill",
+                 builtin: call.muted ? I.callMicOff : I.callMic,
+                 label: call.muted ? "麦克风已关" : "麦克风已开",
+                 engaged: call.muted) { call.toggleMute() }
+    }
+
+    private var speakerKey: some View {
+        roundKey(key: call.speakerOn ? "ui.callSpeaker" : "ui.callSpeakerOff",
+                 symbol: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                 builtin: call.speakerOn ? I.callSpeaker : I.callSpeakerOff,
+                 label: call.speakerOn ? "扬声器已开" : "扬声器已关",
+                 engaged: call.speakerOn) { call.toggleSpeaker() }
+    }
+
+    private var hangupKey: some View {
+        roundKey(label: call.phase == .active ? "挂断" : "取消",
+                 bg: Color(hex: 0xFA5151)) { call.hangup() }
     }
 
     /// 左右两颗（麦克风 / 扬声器）：打开时**变白底 + 深色图标**（和微信一样），
     /// 关着的时候是半透明黑底 + 白色图标。图标本身后台「UI 图标」里能换。
-    /// 小圆按钮（视频通话里「翻转 / 摄像头」那两个次要按钮）：
-    /// 直径 46，图标 18，下面 11 号小字标签 —— 微信那套主次分层就是这么分的。
-    private func smallKey(label: String, symbol: String, engaged: Bool,
-                          action: @escaping () -> Void) -> some View {
-        VStack(spacing: 6) {
-            Button(action: action) {
-                Image(systemName: symbol)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(engaged ? .black : .white)
-                    .frame(width: 46, height: 46)
-                    .background(Circle().fill(engaged ? Color.white : Color.white.opacity(0.18)))
-            }
-            .buttonStyle(.plain)
-            Text(label)
-                .font(pfExact(11))
-                .foregroundColor(.white.opacity(0.85))
-                .lineLimit(1)
-        }
-    }
-
     private func roundKey(key: String, symbol: String, builtin: String,
                           label: String, engaged: Bool,
                           action: @escaping () -> Void) -> some View {

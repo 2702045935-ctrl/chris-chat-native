@@ -283,6 +283,11 @@ struct ChatsView: View {
                 floorItem("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)) { app.show(Tr("收付款在「我 → 服务 → 收付款」里")); floorPinned = true }
                 floorItem("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)) { app.show(Tr("去「发现 → 朋友圈」就能发")); floorPinned = true }
                 floorItem("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C)) { app.show(Tr("去「发现 → 视频号」看视频")); floorPinned = true }
+                floorItem("刷新会话", "arrow.clockwise", Color(hex: 0x8A8A8E)) {
+                    Task { await app.loadChats() }
+                    app.show(Tr("会话已刷新"))
+                    floorPinned = true
+                }
             }
             Spacer(minLength: 0)
         }
@@ -411,7 +416,9 @@ struct ChatsView: View {
                        从搜索框底下钻出来以后还能在这里继续跟着手指走。
                        如果这里铺一层实底色，字就会被这块盖住，看起来像「不会跟手」。 */
                     .background(Color.clear)
-                    .refreshable { await app.loadChats() }
+                    /* 微信的会话列表本来就没有「下拉刷新」（下拉是二楼），
+                       这里把系统的下拉刷新去掉：一来更像微信，二来不会和二楼抢同一个下拉手势。
+                       要刷新的地方放两处：二楼里的「刷新会话」、以及实时消息本来就会自动更新。 */
                     .coordinateSpace(name: "chatsScroll")
                     .onPreferenceChange(ChatsTopKey.self) { y in
                         topOffset = y
@@ -430,7 +437,8 @@ struct ChatsView: View {
                     .offset(y: (floorProgress - 1) * 300)
                     .opacity(Double(floorProgress))
                     .allowsHitTesting(floorProgress > 0.55)
-                    .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86), value: floorProgress)
+                    /* 弹簧回弹：阻尼调小一点，松手会轻轻弹一下再停住（微信那种手感） */
+                    .animation(.spring(response: 0.42, dampingFraction: 0.66), value: floorProgress)
             }
             .sheet(isPresented: $showSearch) {
                 SearchPage(onOpenChat: { c in path.append(c) })

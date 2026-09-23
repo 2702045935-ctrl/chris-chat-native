@@ -17,8 +17,6 @@ import WebRTC
 
 struct CallOverlay: View {
     @ObservedObject private var call = CallCenter.shared
-    /// 腾讯云 TRTC 的画面从它自己的 view 里来
-    @ObservedObject private var trtc = TRTCBridge.shared
 
     var body: some View {
         if call.phase != .idle {
@@ -89,6 +87,8 @@ struct CallDialogOverlay: View {
 
 struct CallView: View {
     @ObservedObject private var call = CallCenter.shared
+    /// 腾讯云 TRTC 的画面从它自己的 view 里来
+    @ObservedObject private var trtc = TRTCBridge.shared
     @EnvironmentObject var app: AppState
     @State private var showInvite = false
     /// 最小化小窗的位置（nil = 默认贴右上角；拖过之后记住位置，松手会吸附到左右边）

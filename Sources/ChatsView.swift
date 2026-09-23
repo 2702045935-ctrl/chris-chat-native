@@ -244,17 +244,20 @@ struct ChatsView: View {
     @State private var plusMenu = false
     @State private var showScan = false
     @State private var openRow: String?
-    /// 下拉时露出来的距离（用滚动偏移算，不会抢左右滑的手势）
-    @State private var pullY: CGFloat = 0
     /// 下拉二楼：会话列表滚到最上面之后再往下拉，露出二楼；上滑回去
     @State private var topOffset: CGFloat = 0
-    @State private var secondFloor = false
-    /// 二楼是不是刚被点过（点完先收起来，下次下拉再出来）
-    @State private var floorPinned = false
+    /// 二楼已经「停住」了（手指松开也保持在二楼，微信就是这样）
+    @State private var floorOpen = false
+    /// 手指往下拖的距离（只在自己滚到最顶上时才算数）
+    @State private var dragPull: CGFloat = 0
+    /// 二楼露出来的时候是不是已经把底部标签栏收起来了（收起来/放出来要配对）
+    @State private var floorHidTab = false
+    /// 拉开多少才算是「要停在二楼」（微信也是拉过一半就翻过去）
+    private let floorOpenAt: CGFloat = 58
 
     /// 二楼露出多少：0 = 完全收起，1 = 全部露出。跟着手指走（拉的越多露的越多）
     private var floorProgress: CGFloat {
-        if floorPinned { return 0 }
+        if floorOpen { return 1 }
         /* 两个来源取大的：
            ① 滚动偏移（滚到顶还继续下拉时的橡皮筋）；
            ② 手指拖动量（更稳，不再依赖橡皮筋一定能读到） */
@@ -262,8 +265,11 @@ struct ChatsView: View {
         let byDrag = (topOffset <= 0.5) ? max(0, dragPull) : 0
         return min(1, max(byOffset, byDrag) / 130)
     }
-    /// 手指往下拖的距离（只在自己滚到最顶上时才算数）
-    @State private var dragPull: CGFloat = 0
+    /// 二楼收起（上滑 / 点完里面的项都走这里）
+    private func closeFloor() {
+        dragPull = 0
+        floorOpen = false
+    }
     /// 「搜索」整页
     @State private var showSearch = false
 
@@ -272,54 +278,157 @@ struct ChatsView: View {
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
     }
 
-    /// 二楼：微信那种「小程序/快捷入口」格子（黑底 + 圆角图标）
+    /// 二楼：微信那种整屏面板（搜索框 + 最近使用的小程序 + 我的小程序）
     private var secondFloorView: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.6))
-                Text(Tr("上滑回到会话列表"))
-                    .font(pf(12.5))
-                    .foregroundColor(.white.opacity(0.6))
-            }
-            .padding(.top, 6)
-
-            HStack(alignment: .top, spacing: 0) {
-                floorItem("扫一扫", "qrcode.viewfinder", Color(hex: 0x2AAE67)) { showScan = true; floorPinned = true }
-                floorItem("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)) { app.show(Tr("收付款在「我 → 服务 → 收付款」里")); floorPinned = true }
-                floorItem("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)) { app.show(Tr("去「发现 → 朋友圈」就能发")); floorPinned = true }
-                floorItem("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C)) { app.show(Tr("去「发现 → 视频号」看视频")); floorPinned = true }
-                floorItem("刷新会话", "arrow.clockwise", Color(hex: 0x8A8A8E)) {
-                    Task { await app.loadChats() }
-                    app.show(Tr("会话已刷新"))
-                    floorPinned = true
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                /* 顶上这个搜索框就是微信二楼那一条：整宽、圆角、灰底 */
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(C.searchIcon)
+                    Text(Tr("搜索"))
+                        .font(pf(14))
+                        .foregroundColor(C.subLabel)
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.searchBg))
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+
+                HStack(spacing: 6) {
+                    Text(Tr("最近使用的小程序"))
+                        .font(pf(14.5, .medium))
+                        .foregroundColor(C.label)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(C.arrow)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 28)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 4),
+                          spacing: 18) {
+                    ForEach(floorItems.indices, id: \.self) { i in
+                        let it = floorItems[i]
+                        floorTile(it.0, it.1, it.2) { floorRun(it.0) }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 16)
+
+                HStack(spacing: 6) {
+                    Text(Tr("我的小程序"))
+                        .font(pf(14.5, .medium))
+                        .foregroundColor(C.label)
+                    Spacer(minLength: 4)
+                    Text(Tr("更多")).font(pf(13)).foregroundColor(C.subLabel)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(C.arrow)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 30)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 4),
+                          spacing: 18) {
+                    ForEach(myFloorItems.indices, id: \.self) { i in
+                        let it = myFloorItems[i]
+                        floorTile(it.0, it.1, it.2) { floorRun(it.0) }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 16)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.up").font(.system(size: 11, weight: .semibold))
+                    Text(Tr("上滑回到会话列表")).font(pf(12.5))
+                }
+                .foregroundColor(C.subLabel)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 34)
+                .padding(.bottom, 40)
             }
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 260)
-        .background(
-            LinearGradient(colors: [Color(hex: 0x1F1F22), Color(hex: 0x0E0E10)],
-                           startPoint: .top, endPoint: .bottom)
-            .ignoresSafeArea(edges: .top)
+        .frame(height: floorHeight, alignment: .top)
+        .background(C.pageBg.ignoresSafeArea())
+        .contentShape(Rectangle())
+        /* 在二楼里往上滑 = 收回会话列表（微信就是这么退的） */
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12).onEnded { v in
+                if v.translation.height < -40 { closeFloor() }
+            }
         )
-        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    private func floorItem(_ title: String, _ symbol: String, _ color: Color, _ run: @escaping () -> Void) -> some View {
+    /// 二楼的高度：整屏（微信的二楼就是盖满一屏，不是露一条）
+    private var floorHeight: CGFloat { UIScreen.main.bounds.height }
+
+    /// 二楼第一组（常用入口）
+    private var floorItems: [(String, String, Color)] {
+        [("扫一扫", "qrcode.viewfinder", Color(hex: 0x2AAE67)),
+         ("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)),
+         ("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)),
+         ("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C))]
+    }
+    /// 二楼第二组（我的小程序）
+    private var myFloorItems: [(String, String, Color)] {
+        [("收藏", "star.fill", Color(hex: 0xE2A03C)),
+         ("直播", "video.fill", Color(hex: 0xFA5151)),
+         ("游戏", "gamecontroller.fill", Color(hex: 0x8A6FE8)),
+         ("搜一搜", "magnifyingglass", Color(hex: 0x1180E0)),
+         ("摇一摇", "iphone.radiowaves.left.and.right", Color(hex: 0x2AAE67)),
+         ("附近", "location.fill", Color(hex: 0x10AEFF)),
+         ("刷新会话", "arrow.clockwise", Color(hex: 0x8A8A8E)),
+         ("设置", "gearshape.fill", Color(hex: 0x8A8A8E))]
+    }
+
+    private func floorRun(_ label: String) {
+        switch label {
+        case "扫一扫": showScan = true
+        case "刷新会话":
+            Task { await app.loadChats() }
+            app.show(Tr("会话已刷新"))
+        case "收付款": app.show(Tr("收付款在「我 → 服务 → 收付款」里"))
+        case "朋友圈": app.show(Tr("去「发现 → 朋友圈」就能发"))
+        case "视频号": app.show(Tr("去「发现 → 视频号」看视频"))
+        case "收藏": app.show(Tr("去「我 → 收藏」看收藏的内容"))
+        case "直播": app.show(Tr("去「发现 → 直播」看正在播的"))
+        case "游戏": app.show(Tr("去「发现 → 游戏」"))
+        case "搜一搜": app.show(Tr("点会话页上面的搜索框就能搜"))
+        case "摇一摇": app.show(Tr("去「发现 → 摇一摇」"))
+        case "附近": app.show(Tr("去「发现 → 附近」"))
+        case "设置": app.show(Tr("去「我 → 设置」"))
+        default: break
+        }
+        /* 点完一项就把二楼收回去（微信也是点完就回到会话列表） */
+        closeFloor()
+    }
+
+    /// 一个小程序格子：圆角方块图标 + 名字（微信那种）
+    private func floorTile(_ title: String, _ symbol: String, _ color: Color, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
-            VStack(spacing: 8) {
+            VStack(spacing: 7) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.12))
+                        .fill(LinearGradient(colors: [color.opacity(0.26), color.opacity(0.12)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 54, height: 54)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(color.opacity(0.18), lineWidth: 1)
                         .frame(width: 54, height: 54)
                     Image(systemName: symbol)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 23, weight: .medium))
                         .foregroundColor(color)
                 }
-                Text(Tr(title)).font(pf(12)).foregroundColor(.white.opacity(0.9))
+                Text(Tr(title))
+                    .font(pf(12))
+                    .foregroundColor(C.label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
         }
@@ -431,19 +540,28 @@ struct ChatsView: View {
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 8)
                             .onChanged { v in
-                                guard !floorPinned else { return }
+                                guard !floorOpen else { return }
                                 if v.translation.height > 0 && topOffset <= 0.5 {
                                     dragPull = min(160, v.translation.height)
                                 } else if v.translation.height < -4 {
                                     dragPull = 0
                                 }
                             }
-                            .onEnded { _ in dragPull = 0 }
+                            .onEnded { _ in
+                                /* 拉过一半就停在二楼（跟微信一样，松手不会自己缩回去）；
+                                   只拉一点点就弹回会话列表 */
+                                if max(dragPull, max(0, topOffset)) >= floorOpenAt {
+                                    dragPull = 0
+                                    withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
+                                        floorOpen = true
+                                    }
+                                } else {
+                                    dragPull = 0
+                                }
+                            }
                     )
                     .onPreferenceChange(ChatsTopKey.self) { y in
                         topOffset = y
-                        /* 回到顶上就把「刚点过」的标记清掉，下次下拉还能露二楼 */
-                        if y < 6 && floorPinned { floorPinned = false }
                     }
                 }
             }
@@ -454,9 +572,9 @@ struct ChatsView: View {
             .overlay(alignment: .top) {
                 /* 二楼跟着手指走：拉 130pt 就完全露出，松手自己滑回去（微信那种动态感） */
                 secondFloorView
-                    .offset(y: (floorProgress - 1) * 300)
-                    .opacity(Double(floorProgress))
-                    .allowsHitTesting(floorProgress > 0.55)
+                    .offset(y: (floorProgress - 1) * floorHeight)
+                    .opacity(floorProgress > 0.02 ? 1 : 0)
+                    .allowsHitTesting(floorProgress > 0.5)
                     /* 弹簧回弹：阻尼调小一点，松手会轻轻弹一下再停住（微信那种手感） */
                     .animation(.spring(response: 0.42, dampingFraction: 0.66), value: floorProgress)
             }
@@ -512,6 +630,22 @@ struct ChatsView: View {
                 } else {
                     app.show(Tr("找不到这个会话"))
                 }
+            }
+        }
+        /* 二楼盖满整屏（微信就是把底栏也盖住的），所以露出来的时候把底部 4 个 tab 收起来 */
+        .onChange(of: floorOpen) { v in
+            if v && !floorHidTab {
+                floorHidTab = true
+                app.tabBarDepth += 1
+            } else if !v && floorHidTab {
+                floorHidTab = false
+                app.tabBarDepth = max(0, app.tabBarDepth - 1)
+            }
+        }
+        .onDisappear {
+            if floorHidTab {
+                floorHidTab = false
+                app.tabBarDepth = max(0, app.tabBarDepth - 1)
             }
         }
     }

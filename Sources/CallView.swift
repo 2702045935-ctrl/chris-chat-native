@@ -304,16 +304,20 @@ struct CallView: View {
             /* 视频通话多一行（微信那套）：摄像头遮挡 + 翻转。语音通话不显示这一行。 */
             if call.phase != .incoming && call.isVideo {
                 HStack(spacing: 51) {
-                    roundKey(key: call.cameraOff ? "ui.callCamOff" : "ui.callCam",
-                             symbol: call.cameraOff ? "video.slash.fill" : "video.fill",
-                             builtin: nil,
-                             label: call.cameraOff ? "摄像头已关" : "摄像头已开",
-                             engaged: call.cameraOff) { call.toggleCamera() }
-                    roundKey(key: "ui.callFlip",
-                             symbol: "arrow.triangle.2.circlepath.camera",
-                             builtin: nil,
-                             label: "翻转",
-                             engaged: false) { call.flipCamera() }
+                    roundKey(label: call.cameraOff ? "摄像头已关" : "摄像头已开",
+                             bg: call.cameraOff ? Color.white : Color.white.opacity(0.18),
+                             ink: call.cameraOff ? .black : .white,
+                             action: { call.toggleCamera() }) {
+                        Image(systemName: call.cameraOff ? "video.slash.fill" : "video.fill")
+                            .font(.system(size: 26, weight: .medium))
+                    }
+                    roundKey(label: "翻转",
+                             bg: Color.white.opacity(0.18),
+                             ink: .white,
+                             action: { call.flipCamera() }) {
+                        Image(systemName: "arrow.triangle.2.circlepath.camera")
+                            .font(.system(size: 26, weight: .medium))
+                    }
                 }
             }
             HStack(spacing: 51) {

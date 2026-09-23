@@ -56,8 +56,12 @@ final class CallCenter: NSObject, ObservableObject {
     private var diag: [String] = []
     /// 语音是否正在走「服务器转发」这条路
     private var serverAudioOn = false
-    /// 这通电话是不是已经交给腾讯云 TRTC 了（媒体走腾讯云，不依赖我们自己的 TURN）
+    /// 媒体是不是**已经**交给腾讯云 TRTC 了（界面据此换成 TRTC 画面）。
+    /// 注意：TRTC 自己进房成功还不算，要等「对端也在这个房间里」才切 ——
+    /// 否则对面若是旧版本（没有 TRTC），两边会各自说给不同的通道，结果谁都听不到。
     @Published private(set) var usingTRTC = false
+    /// TRTC 已进房（还没切媒体）
+    private var trtcJoined = false
     /// TRTC 的远端画面 / 本地小窗（界面直接用）
     var trtcRemoteView: UIView? { TRTCBridge.shared.remoteView }
     var trtcLocalView: UIView? { TRTCBridge.shared.localView }
@@ -629,6 +633,7 @@ final class CallCenter: NSObject, ObservableObject {
             TRTCBridge.shared.stop()
         }
         usingTRTC = false
+        trtcJoined = false
         stopMedia()
         /* 把这一通的 ICE 过程报给服务器（写进 call-trace.log），
            「一直在连接中」这种问题一看就知道卡在哪一步 */
@@ -671,66 +676,6 @@ final class CallCenter: NSObject, ObservableObject {
     private func note(_ s: String) {
         diag.append(s)
         if diag.count > 20 { diag.removeFirst() }
-    }
-
-    /* ---------------------------------------------------------- 腾讯云 TRTC
-       进房成功 → 媒体交给腾讯云（把我们自己那两路都关掉，免得叠音）；
-       进不去 → 什么也不动，继续走原来的 WebRTC / 服务器转发语音。 */
-
-    private func startTRTCIfPossible() async {
-        guard !usingTRTC, !callId.isEmpty else { return }
-        let bridge = TRTCBridge.shared
-        bridge.onJoined = { [weak self] ok in
-            guard let self = self else { return }
-            if ok { self.trtcTookOver() }
-        }
-        bridge.onPeerChanged = { [weak self] inRoom in
-            guard let self = self else { return }
-            if inRoom, !self.usingTRTC { return }
-            if inRoom, self.phase != .active {
-                Ringtone.shared.stop()
-                self.phase = .active
-                self.tip = "通话中"
-                self.ringTimer?.invalidate()
-                self.ringTimer = nil
-                self.connectTimer?.invalidate()
-                self.connectTimer = nil
-                self.startTimer()
-            }
-        }
-        let ok = await bridge.start(roomSeed: callId, video: isVideo)
-        if !ok {
-            note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
-        } else {
-            note("TRTC 已请求进房（room=" + callId + "）")
-        }
-    }
-
-    /// TRTC 进房成功：把我们的 WebRTC / 服务器转发语音都停掉，媒体全交给腾讯云
-    private func trtcTookOver() {
-        guard !usingTRTC else { return }
-        usingTRTC = true
-        note("媒体已切到腾讯云 TRTC ✓")
-        /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
-        CallAudioPipe.shared.onFrame = nil
-        CallAudioPipe.shared.stop()
-        serverAudioOn = false
-        audioTrack?.isEnabled = false
-        localVideoTrack?.isEnabled = false
-        capturer?.stopCapture()
-        TRTCBridge.shared.setMuted(muted)
-        TRTCBridge.shared.setSpeaker(speakerOn)
-        if phase != .active {
-            Ringtone.shared.stop()
-            phase = .active
-            tip = "通话中"
-            ringTimer?.invalidate()
-            ringTimer = nil
-            connectTimer?.invalidate()
-            connectTimer = nil
-            startTimer()
-        }
-        if !isVideo { TRTCBridge.shared.setSpeaker(speakerOn) }
     }
 
     /// 接通阶段盯 12 秒：还是「正在接通」就把最可能的原因写在屏幕上
@@ -910,3 +855,76 @@ enum UINotification {
         AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
     }
 }
+    /* ---------------------------------------------------------- 腾讯云 TRTC
+       进房成功**不马上切**：先看对端有没有也进到这个房间。
+         · 对端也进来了 → 媒体切给 TRTC（把我们自己那两路停掉，免得叠音）
+         · 对端没进来（旧版本 / 取不到票 / 网络不通）→ 继续走原来的
+           WebRTC（视频）+ 服务器转发语音，通话照样通，不会变哑巴。 */
+
+    private func startTRTCIfPossible() async {
+        guard !trtcJoined, !usingTRTC, !callId.isEmpty else { return }
+        let bridge = TRTCBridge.shared
+        bridge.onJoined = { [weak self] ok in
+            guard let self = self else { return }
+            guard ok else { return }
+            self.trtcJoined = true
+            self.note("TRTC 已进房（等对端）")
+            /* 对端已经在房里了（比如我先退再进）：直接切 */
+            if TRTCBridge.shared.peerInRoom { self.switchMediaToTRTC() }
+        }
+        bridge.onPeerChanged = { [weak self] inRoom in
+            guard let self = self else { return }
+            guard inRoom else { return }
+            if self.trtcJoined { self.switchMediaToTRTC() }
+            if self.phase != .active {
+                Ringtone.shared.stop()
+                self.phase = .active
+                self.tip = "通话中"
+                self.ringTimer?.invalidate()
+                self.ringTimer = nil
+                self.connectTimer?.invalidate()
+                self.connectTimer = nil
+                self.startTimer()
+            }
+        }
+        let ok = await bridge.start(roomSeed: callId, video: isVideo)
+        if !ok {
+            note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
+        } else {
+            note("TRTC 已请求进房（room=" + callId + "）")
+            /* 8 秒还没等到对端进房，就当对面不是 TRTC 版本，把老路继续用着 */
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard let self = self, !self.usingTRTC, !Task.isCancelled else { return }
+                self.note("对端没进 TRTC 房间（可能是旧版本）→ 继续走服务器转发/WebRTC")
+            }
+        }
+    }
+
+    /// 确认对端也在 TRTC 房间里了：把媒体完全交给腾讯云
+    private func switchMediaToTRTC() {
+        guard !usingTRTC else { return }
+        usingTRTC = true
+        note("对端也在腾讯云房间里 → 媒体切到 TRTC ✓")
+        /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
+        CallAudioPipe.shared.onFrame = nil
+        CallAudioPipe.shared.stop()
+        serverAudioOn = false
+        audioTrack?.isEnabled = false
+        localVideoTrack?.isEnabled = false
+        capturer?.stopCapture()
+        /* 我们自己不采集了，才让 TRTC 开始采集（避免两个引擎抢麦克风/摄像头） */
+        TRTCBridge.shared.activate()
+        TRTCBridge.shared.setMuted(muted)
+        TRTCBridge.shared.setSpeaker(speakerOn)
+        if phase != .active {
+            Ringtone.shared.stop()
+            phase = .active
+            tip = "通话中"
+            ringTimer?.invalidate()
+            ringTimer = nil
+            connectTimer?.invalidate()
+            connectTimer = nil
+            startTimer()
+        }
+    }

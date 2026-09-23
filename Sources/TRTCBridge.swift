@@ -41,6 +41,8 @@ final class TRTCBridge: NSObject, ObservableObject {
     private var busy = false
     /// 房间里那个对端的 userId（退房前要把它的画面停掉）
     private var peerUserId = ""
+    /// 是否已经开始真正采集（麦克风 / 摄像头）
+    private var active = false
 
     private override init() { super.init() }
 
@@ -78,15 +80,20 @@ final class TRTCBridge: NSObject, ObservableObject {
         cloud = c
         remoteView = UIView()
         localView = UIView()
-        /* 视频通话：本地预览 + 远端画面；语音通话：只要音频 */
-        if video {
-            c.startLocalPreview(true, view: localView)
-            c.startLocalAudio(.default)
-        } else {
-            c.startLocalAudio(.default)
-        }
+        /* 先只「进房」，**不采集**麦克风和摄像头 ——
+           不然会和我们自己的 WebRTC / 服务器转发抢麦克风（两个引擎同时开就是沙沙声或没声）。
+           等确认对端也在这个房间里，再调 activate() 真正开始采集。 */
         c.enterRoom(params, appScene: video ? .videoCall : .audioCall)
         return true
+    }
+
+    /// 对端也在房间里了：这时候才真正开始采集（麦克风 + 视频通话的摄像头）
+    func activate() {
+        guard let c = cloud, joined, !active else { return }
+        active = true
+        c.startLocalAudio(.default)
+        c.muteLocalAudio(false)
+        if isVideo { c.startLocalPreview(true, view: localView) }
     }
 
     func stop() {
@@ -100,6 +107,7 @@ final class TRTCBridge: NSObject, ObservableObject {
         joined = false
         peerInRoom = false
         peerUserId = ""
+        active = false
         remoteView = nil
         localView = nil
     }

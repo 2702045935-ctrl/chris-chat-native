@@ -66,7 +66,6 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     }
 
     func stop() {
-        guard started else { return }
         started = false
         captureQueue.async { [capture] in if capture.isRunning { capture.stopRunning() } }
         playerNode.stop()
@@ -106,7 +105,12 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
               let input = try? AVCaptureDeviceInput(device: dev),
               capture.canAddInput(input) else {
             capture.commitConfiguration()
-            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "拿不到麦克风输入"
+            /* 最常见的原因就是「麦克风权限还没批下来」（第一次通话时权限弹窗刚弹、
+               用户还没点「允许」）。这里把权限状态也带上，日志一眼能看出来。 */
+            let st = AVCaptureDevice.authorizationStatus(for: .audio)
+            let why = st == .denied ? "麦克风权限被拒绝（去 设置→本 App→麦克风 打开）"
+                : (st == .notDetermined ? "麦克风权限还没授予（弹窗还没点）" : "拿不到麦克风输入")
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + why
             return
         }
         capture.addInput(input)
@@ -116,11 +120,23 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
 
         captureQueue.async { [weak self] in
             guard let self = self else { return }
-            self.capture.startRunning()
+            /* 起不来就多重试几次：刚拿到麦克风权限、或者音频会话刚被上一步
+               （铃声 / 上一通电话）占着，第一次 startRunning 常常不成功。 */
+            for attempt in 0..<4 {
+                if self.capture.isRunning { break }
+                self.capture.startRunning()
+                if !self.capture.isRunning {
+                    try? AVAudioSession.sharedInstance().setActive(true, options: [])
+                    Thread.sleep(forTimeInterval: 0.25 + 0.25 * Double(attempt))
+                }
+            }
             DispatchQueue.main.async {
                 self.started = self.capture.isRunning
                 if !self.started {
-                    self.lastError = (self.lastError.isEmpty ? "" : self.lastError + " / ") + "AVCaptureSession 没能启动"
+                    self.lastError = (self.lastError.isEmpty ? "" : self.lastError + " / ")
+                        + "AVCaptureSession 没能启动（重试 4 次）"
+                } else {
+                    self.lastError = ""
                 }
             }
         }

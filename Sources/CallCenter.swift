@@ -191,7 +191,11 @@ final class CallCenter: NSObject, ObservableObject {
         Task { await beginMedia() }
         Task { await startTRTCIfPossible() }
         startConnectWatch()
-        startServerAudioIfVoice()            // 语音：立刻开始走服务器转发
+        /* 注意：这里**不能**直接开始采集。
+           麦克风权限是在 beginMedia() 里现申请的（第一次会弹窗），
+           以前这一行紧跟在 Task 后面立刻执行 —— 权限还没到手就开始采集，
+           结果是「拿不到麦克风输入」，整通电话对面一个字都听不到（假通）。
+           现在由 beginMedia() 在拿到权限之后再启动转发通道。 */
     }
 
     /// 拒接
@@ -284,9 +288,6 @@ final class CallCenter: NSObject, ObservableObject {
             self.sendCall(["action": "audio", "data": data.base64EncodedString()])
         }
         CallAudioPipe.shared.start()
-        Task { await API.shared.callDiag("App 语音走服务器转发 采集=" + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
-            + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
-        note("语音走服务器转发 ✓")
         /* 这条路已经开始传声音了：界面直接进入「通话中」并开始计时（不用等 ICE） */
         if phase != .active {
             Ringtone.shared.stop()
@@ -295,6 +296,22 @@ final class CallCenter: NSObject, ObservableObject {
             ringTimer?.invalidate()
             ringTimer = nil
             startTimer()
+        }
+        /* 放在设完 tip 之后：麦克风没起来时要把「通话中」改写成提醒，不能被覆盖掉 */
+        reportMicState(prefix: "App 语音走服务器转发")
+    }
+
+    /// 采集起来没有：起来了就一切照旧；没起来就在界面上直说（别再「假通」了）
+    private func reportMicState(prefix: String) {
+        let p = CallAudioPipe.shared
+        Task { await API.shared.callDiag(prefix + " 采集=" + (p.isRunning ? "ok" : "失败")
+            + (p.isRunning ? "" : " 原因: " + p.lastError)) }
+        if p.isRunning {
+            note("语音走服务器转发 ✓")
+        } else {
+            note("麦克风没起来")
+            tip = p.lastError.contains("权限") ? "麦克风权限没开：设置 → 本 App → 麦克风"
+                                              : "麦克风没起来，对方可能听不到你说话"
         }
     }
 
@@ -343,7 +360,14 @@ final class CallCenter: NSObject, ObservableObject {
             phase = .connecting
             tip = "正在接通…"
             startConnectWatch()
-            startServerAudioIfVoice()      // 语音：立刻开始走服务器转发（不等 WebRTC）
+            /* 主叫这边：拨号时 beginMedia() 已经启动过采集了；万一那次因为
+               权限还没批下来失败过，这里再兜一次（start() 是幂等的）。 */
+            if !isVideo, !serverAudioOn {
+                CallAudioPipe.shared.start()
+                Task { await API.shared.callDiag("主叫 语音 对方已接：重新启动采集 采集="
+                    + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
+                    + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
+            }
 
         case "audio":
             /* 服务器转发过来的语音帧：直接丢给播放器（这条路不依赖 TURN/直连，一定通） */
@@ -462,9 +486,6 @@ final class CallCenter: NSObject, ObservableObject {
                 self.sendCall(["action": "audio", "data": data.base64EncodedString()])
             }
             CallAudioPipe.shared.start()
-            Task { await API.shared.callDiag("App 语音走服务器转发 采集=" + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
-                + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
-            note("语音走服务器转发 ✓")
             if phase != .active {
                 Ringtone.shared.stop()
                 phase = .active
@@ -473,6 +494,7 @@ final class CallCenter: NSObject, ObservableObject {
                 ringTimer = nil
                 startTimer()
             }
+            reportMicState(prefix: "App 语音走服务器转发")
             return
         }
 

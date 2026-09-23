@@ -145,10 +145,11 @@ func handleScanned(_ text: String, app: AppState) {
                 } else {
                     await app.loadChats()
                     app.show(Tr("已加入群聊"))
-                    /* 微信那样：扫完群二维码直接进这个群聊（不只是提示一句） */
-                    if let cid = res.chatId, !cid.isEmpty {
-                        NotificationCenter.default.post(name: .chrisOpenChat, object: nil,
-                                                       userInfo: ["chatId": cid])
+                    /* 微信那样：扫完群二维码直接进这个群聊。
+                       等扫一扫那层收起来再打开（不然整页盖整页会打架）。 */
+                    if let c = res.chat {
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        app.openChat = c
                     }
                 }
             }

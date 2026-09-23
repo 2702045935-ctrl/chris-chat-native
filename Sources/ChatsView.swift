@@ -654,7 +654,10 @@ struct ChatsView: View {
             .navigationDestination(for: String.self) { key in
                 if key == "newGroup" {
                     GroupCreateView { chat in
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { path.append(chat) }
+                        /* 建完群直接进这个群：走最外层整页打开，
+                           不往导航栈里 push（push 在「刚 pop 掉建群页」那一下容易被系统丢掉，
+                           表现就是「建完群没跳进去，要退出来重新点一下」）。 */
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { app.openChat = chat }
                     }
                 } else if key == "addFriend" {
                     AddFriendView()
@@ -689,18 +692,8 @@ struct ChatsView: View {
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
             }
         }
-        /* 点了推送通知 → 直接进那个人的聊天（服务器在通知里带了 chatId） */
-        .onReceive(NotificationCenter.default.publisher(for: .chrisOpenChat)) { note in
-            guard let chatId = note.userInfo?["chatId"] as? String, !chatId.isEmpty else { return }
-            Task {
-                await app.loadChats()
-                if let c = app.chats.first(where: { $0.id == chatId }) {
-                    path.append(c)
-                } else {
-                    app.show(Tr("找不到这个会话"))
-                }
-            }
-        }
+        /* 点推送通知进聊天：统一交给最外层的 MainTab 处理（它永远在线，
+           在别的 tab 上点通知也能进得去；以前挂在会话页，人不在会话页就收不到）。 */
         /* 二楼是单独的一整页 —— 露出来的时候把底部 4 个 tab 收起来（微信就是这样盖满整屏） */
         .onChange(of: floorOpen) { v in
             if v && !floorHidTab {

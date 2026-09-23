@@ -85,6 +85,22 @@ struct MainTabView: View {
             PayConfirmPage(target: info, scanText: app.payScanText)
                 .environmentObject(app)
         }
+        /* 全局打开聊天：扫码进群 / 建完群 / 点推送都走这里（整页打开，不受当前在哪个 tab 影响） */
+        .fullScreenCover(item: $app.openChat) { c in
+            ChatDetailView(chat: c).environmentObject(app)
+        }
+        /* 点推送通知 → 直接进那个会话（服务器在通知里带了 chatId） */
+        .onReceive(NotificationCenter.default.publisher(for: .chrisOpenChat)) { note in
+            guard let chatId = note.userInfo?["chatId"] as? String, !chatId.isEmpty else { return }
+            Task { @MainActor in
+                await app.loadChats()
+                if let c = app.chats.first(where: { $0.id == chatId }) {
+                    app.openChat = c
+                } else {
+                    app.show(Tr("找不到这个会话"))
+                }
+            }
+        }
     }
 }
 

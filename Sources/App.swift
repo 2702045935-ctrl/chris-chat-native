@@ -54,6 +54,10 @@ final class AppState: ObservableObject {
     @Published var payScan: PayScanInfo?
     /// 扫到码的原文（一起交给付款页，金额以服务器解析的为准）
     @Published var payScanText: String = ""
+    /// 全局打开某个聊天：扫码进群、建完群、点推送都用它。
+    /// 走最外层整页打开，不依赖「会话页的导航栈还在不在」——扫一扫从任何页面都能开，
+    /// 以前那种「往会话页栈里 push」的写法，人不在会话页时通知就丢了（所以看着像不跳转）。
+    @Published var openChat: Chat?
     @Published var loadingChats = false
     @Published var loadError: String?
     /// 服务器上的界面配置变了就 +1，整个界面重建一次（不用重装 App）

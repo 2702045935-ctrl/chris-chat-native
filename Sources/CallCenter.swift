@@ -891,6 +891,18 @@ extension CallCenter: RTCPeerConnectionDelegate {
             note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
         } else {
             note("TRTC 已请求进房（room=" + callId + "）")
+            /* 视频通话：视频**没有**「服务器转发」这条退路（只有语音有），
+               而我们这边已经进房了 —— 再给 6 秒等对端进房；等不到就直接切 TRTC，
+               因为对端若是新版本（也进了房）我们只是漏收事件，切过去就通了。 */
+            if isVideo {
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 6_000_000_000)
+                    guard let self = self, self.trtcJoined, !self.usingTRTC,
+                          self.phase != .idle, !self.callId.isEmpty else { return }
+                    self.note("视频：6 秒没等到对端进房，直接切 TRTC")
+                    self.switchMediaToTRTC()
+                }
+            }
             /* 8 秒还没等到对端进房，就当对面不是 TRTC 版本，把老路继续用着 */
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 8_000_000_000)

@@ -187,6 +187,17 @@ extension TRTCBridge: TRTCCloudDelegate {
         }
     }
 
+    /// 远端音频可用也算「对端在房间里」—— 光靠 onRemoteUserEnterRoom 会漏：
+    /// 如果对端比我们先进房，那个「进场」事件我们收不到（TRTC 只推后来的人）。
+    nonisolated func onUserAudioAvailable(_ userId: String, available: Bool) {
+        Task { @MainActor in
+            guard available else { return }
+            self.peerUserId = userId
+            self.peerInRoom = true
+            self.onPeerChanged?(true)
+        }
+    }
+
     nonisolated func onError(_ errCode: Int, errMsg: String?, extInfo: [String: Any]?) {
         Task { @MainActor in
             self.lastError = "TRTC 错误 \(errCode)：" + (errMsg ?? "")

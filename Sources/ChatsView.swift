@@ -255,8 +255,15 @@ struct ChatsView: View {
     /// 二楼露出多少：0 = 完全收起，1 = 全部露出。跟着手指走（拉的越多露的越多）
     private var floorProgress: CGFloat {
         if floorPinned { return 0 }
-        return min(1, max(0, topOffset / 130))
+        /* 两个来源取大的：
+           ① 滚动偏移（滚到顶还继续下拉时的橡皮筋）；
+           ② 手指拖动量（更稳，不再依赖橡皮筋一定能读到） */
+        let byOffset = max(0, topOffset)
+        let byDrag = (topOffset <= 0.5) ? max(0, dragPull) : 0
+        return min(1, max(byOffset, byDrag) / 130)
     }
+    /// 手指往下拖的距离（只在自己滚到最顶上时才算数）
+    @State private var dragPull: CGFloat = 0
     /// 「搜索」整页
     @State private var showSearch = false
 
@@ -420,6 +427,19 @@ struct ChatsView: View {
                        这里把系统的下拉刷新去掉：一来更像微信，二来不会和二楼抢同一个下拉手势。
                        要刷新的地方放两处：二楼里的「刷新会话」、以及实时消息本来就会自动更新。 */
                     .coordinateSpace(name: "chatsScroll")
+                    /* 手指往下拖的时候直接算「拉了多远」：滚到最顶上才生效，松手弹回去 */
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 8)
+                            .onChanged { v in
+                                guard !floorPinned else { return }
+                                if v.translation.height > 0 && topOffset <= 0.5 {
+                                    dragPull = min(160, v.translation.height)
+                                } else if v.translation.height < -4 {
+                                    dragPull = 0
+                                }
+                            }
+                            .onEnded { _ in dragPull = 0 }
+                    )
                     .onPreferenceChange(ChatsTopKey.self) { y in
                         topOffset = y
                         /* 回到顶上就把「刚点过」的标记清掉，下次下拉还能露二楼 */

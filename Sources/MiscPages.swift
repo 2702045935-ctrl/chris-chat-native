@@ -446,6 +446,8 @@ struct StatusView: View {
     @State private var caption = ""
     @State private var saving = false
     @FocusState private var typing: Bool
+    /// 我的状态详情（还剩几小时 + 谁看过）
+    @State private var myStatus: API.MyStatus? = nil
 
     /// 现在有没有状态（有的话底部给「结束状态」）
     private var hasMood: Bool {
@@ -474,6 +476,7 @@ struct StatusView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     composeRow
+                    if hasMood, let ms = myStatus { myStatusCard(ms) }
                     ForEach(cats.indices, id: \.self) { i in
                         section(cats[i])
                     }
@@ -488,10 +491,49 @@ struct StatusView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
-        .task { await load() }
+        .task {
+            await load()
+            myStatus = try? await API.shared.myStatus()
+        }
     }
 
     /* ---------------------------------------------------------- 上面那条输入区 */
+
+    /// 已经设了状态时显示：还剩几小时 + 谁看过我
+    private func myStatusCard(_ ms: API.MyStatus) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(ms.moodIcon ?? "").font(pf(18))
+                Text(ms.moodText ?? "").font(pf(15, .medium)).foregroundColor(C.label)
+                Spacer(minLength: 6)
+                if let h = ms.hoursLeft {
+                    Text(h <= 0 ? Tr("马上过期") : (Tr("还剩 ") + "\(h)" + Tr(" 小时")))
+                        .font(pf(12.5)).foregroundColor(C.subLabel)
+                }
+            }
+            if let views = ms.views, !views.isEmpty {
+                Text(Tr("谁看过我的状态") + "（\(views.count)）")
+                    .font(pf(12.5)).foregroundColor(C.subLabel)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(views) { v in
+                            VStack(spacing: 4) {
+                                Avatar(path: v.avatar ?? "", size: 36, radius: 18)
+                                Text(v.name ?? "").font(pf(11)).foregroundColor(C.subLabel).lineLimit(1)
+                            }
+                            .frame(width: 46)
+                        }
+                    }
+                }
+            } else {
+                Text(Tr("还没有人看过")).font(pf(12.5)).foregroundColor(C.subLabel)
+            }
+        }
+        .padding(14)
+        .background(C.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+    }
 
     private var composeRow: some View {
         HStack(spacing: 10) {

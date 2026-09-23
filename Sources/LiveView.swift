@@ -86,6 +86,17 @@ struct LiveListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
         .swipeBack { dismiss() }
+        /* 抖音那套：双击屏幕点赞（连点就飘心），退出前问一句 */
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                like()
+                popHeart()
+            }
+        )
+        .confirmationDialog(Tr("确定要退出直播吗？"), isPresented: $confirmExit, titleVisibility: .visible) {
+            Button(Tr("退出直播"), role: .destructive) { dismiss() }
+            Button(Tr("继续观看"), role: .cancel) { }
+        }
         .navigationDestination(for: LiveRoom.self) { r in
             LiveRoomView(room: r)
         }
@@ -162,6 +173,8 @@ struct LiveRoomView: View {
     @State private var draft = ""
     @State private var watching = 0
     @State private var likes = 0
+    /// 退出前确认（抖音会问一句）
+    @State private var confirmExit = false
     @State private var hearts: [UUID] = []
 
     @ObservedObject private var realtime = Realtime.shared
@@ -254,7 +267,7 @@ struct LiveRoomView: View {
 
     private var navBar: some View {
         HStack(spacing: 10) {
-            Button { dismiss() } label: {
+            Button { confirmExit = true } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 19, weight: .medium))
                     .foregroundColor(.white)

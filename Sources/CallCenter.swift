@@ -632,6 +632,10 @@ final class CallCenter: NSObject, ObservableObject {
     private func finish(tip: String) {
         let wasIdle = (phase == .idle)
         let secs = seconds
+        /* 通话结束：如果这时候人在后台，就把「保活」接回来（通话期间是关掉的） */
+        if UIApplication.shared.applicationState != .active {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { KeepAlive.shared.start() }
+        }
         failTask?.cancel()
         failTask = nil
         self.tip = tip

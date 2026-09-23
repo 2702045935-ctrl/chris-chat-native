@@ -380,6 +380,7 @@ final class AppState: ObservableObject {
 
     func logout() async {
         /* 退出登录：这台手机不再收这个账号的推送 */
+        KeepAlive.shared.stop()          // 别在后台白占着音频
         await API.shared.unregisterPushToken(PushCenter.shared.token)
         await API.shared.logout()
         Realtime.shared.stop()
@@ -495,6 +496,7 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active && app.me != nil {
+                KeepAlive.shared.stop()          // 回到前台：不用再保活了
                 Task {
                     await app.refreshUI()
                     await app.loadChats()
@@ -502,6 +504,10 @@ struct RootView: View {
                     await app.refreshDotCounts()
                     Realtime.shared.start()
                 }
+            } else if phase == .background {
+                /* 退到后台：放一段静音把进程留住 —— 长连接不断，来消息才能弹通知
+                   （上滑强杀之后谁都叫不醒，那只能靠真 APNs） */
+                KeepAlive.shared.start()
             }
         }
         .onChange(of: realtime.event) { ev in

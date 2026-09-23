@@ -10,10 +10,72 @@ struct FavoritesView: View {
     @State private var loading = true
     @State private var viewerPaths: [String] = []
     @State private var viewerIndex: Int?
+    /* 微信收藏页顶部：搜索框 + 类型筛选 */
+    @State private var q = ""
+    @State private var kindFilter = "all"
+
+    private var shown: [[String: Any]] {
+        let key = q.trimmingCharacters(in: .whitespaces)
+        return items.filter { it in
+            let kind = (it["kind"] as? String) ?? "text"
+            if kindFilter == "image" && kind != "image" { return false }
+            if kindFilter == "text" && kind == "image" { return false }
+            if key.isEmpty { return true }
+            let content = (it["content"] as? String) ?? ""
+            return content.localizedCaseInsensitiveContains(key)
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").font(.system(size: 14, weight: .medium))
+                    .foregroundColor(C.searchIcon)
+                TextField(Tr("搜索收藏"), text: $q)
+                    .font(pf(14.5))
+                if !q.isEmpty {
+                    Button { q = "" } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 15))
+                            .foregroundColor(C.searchIcon)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 36)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(C.searchBg))
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+
+            HStack(spacing: 8) {
+                chip(Tr("全部"), "all")
+                chip(Tr("图片与视频"), "image")
+                chip(Tr("文字"), "text")
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+        }
+        .background(C.pageBg)
+    }
+
+    private func chip(_ title: String, _ key: String) -> some View {
+        let on = (kindFilter == key)
+        return Button { kindFilter = key } label: {
+            Text(title)
+                .font(pf(13.5))
+                .foregroundColor(on ? .white : C.subLabel)
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Capsule().fill(on ? C.green : C.cardBg))
+        }
+        .buttonStyle(.plain)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: Tr("收藏"), back: { dismiss() })
+            header
             List {
                 if loading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 30)
@@ -26,8 +88,8 @@ struct FavoritesView: View {
                         .padding(.vertical, 40)
                         .listRowBackground(C.cardBg)
                 }
-                ForEach(items.indices, id: \.self) { i in
-                    let item = items[i]
+                ForEach(shown.indices, id: \.self) { i in
+                    let item = shown[i]
                     let kind = (item["kind"] as? String) ?? "text"
                     let content = (item["content"] as? String) ?? ""
                     HStack(spacing: 12) {

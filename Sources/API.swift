@@ -1766,6 +1766,26 @@ final class API {
     func cancelAutoDebit(_ id: String) async {
         let _: SimpleOK? = try? await post("/api/me/paysettings", ["cancelAutoDebit": id], as: SimpleOK.self)
     }
+
+    /* 我的收藏（微信「我 → 收藏」那一页） */
+    struct FavoriteItem: Decodable, Identifiable {
+        var id: String
+        var kind: String?
+        var content: String?
+        var createdAt: String?
+        var chatId: String?
+        var fromName: String?
+    }
+    private struct FavoritesPayload: Decodable { var favorites: [FavoriteItem]? }
+
+    func favorites() async -> [FavoriteItem] {
+        let p: FavoritesPayload? = try? await get("/api/favorites", as: FavoritesPayload.self)
+        return p?.favorites ?? []
+    }
+
+    func deleteFavorite(_ id: String) async {
+        _ = try? await request("DELETE", "/api/favorites/" + id)
+    }
     struct BizInvoiceResult: Decodable {
         var invoice: BizInvoiceRaw?
         var invoices: [BizInvoiceRaw]?

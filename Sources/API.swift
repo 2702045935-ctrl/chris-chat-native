@@ -2482,13 +2482,20 @@ final class API {
         return (p.code ?? "", p.url ?? "", p.rows ?? [])
     }
 
-    /// 扫码（打开链接）进群
-    @discardableResult
-    func joinByInvite(code: String) async -> String? {
+    /// 扫码进群：成功返回群 id（调用方拿到就能直接跳进这个群聊），失败返回错误文案
+    func joinByInvite(code: String) async -> (chatId: String?, error: String?) {
+        struct JoinPayload: Decodable {
+            struct C: Decodable { var id: String? }
+            var joined: Bool?
+            var already: Bool?
+            var chat: C?
+        }
         do {
-            _ = try await post("/api/join", ["code": code], as: SendPayload.self)
-            return nil
-        } catch { return (error as? APIError)?.errorDescription ?? "进群失败" }
+            let p: JoinPayload = try await post("/api/join", ["code": code], as: JoinPayload.self)
+            return (p.chat?.id, nil)
+        } catch {
+            return (nil, (error as? APIError)?.errorDescription ?? "进群失败")
+        }
     }
 
     /// 全员禁言（群主）

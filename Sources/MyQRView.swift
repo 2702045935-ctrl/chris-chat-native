@@ -44,15 +44,14 @@ struct MyQRView: View {
                             Text(Tr("二维码生成失败，稍后再试"))
                                 .font(pf(13.5)).foregroundColor(C.subLabel)
                         } else {
-                            /* 二维码 + 中间本人的头像（和微信一样）：
-                               头像只占 19%，在纠错范围内，扫码不受影响 */
-                            ZStack {
-                                QRCanvas(rows: rows).frame(width: 228, height: 228)
-                                Avatar(path: avatar, size: 44, radius: 8)
-                                    .padding(4)
-                                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.white))
-                            }
-                            .frame(width: 228, height: 228)
+                            /* 中间**不能**再盖头像了。
+                               服务器这套二维码编码器是纠错等级 L（只容忍 7% 破损），
+                               原来在正中间盖一个 44pt 的头像（占码宽 23%）＝ 把码毁掉：
+                               实测「不盖头像能扫出来、按原样盖头像完全扫不出来」。
+                               微信敢盖是因为它用纠错 H（30%）。这里改成：二维码保持干净，
+                               头像放到下面那张个人信息卡里（照样一眼认人）。 */
+                            QRCanvas(rows: rows).frame(width: 228, height: 228)
+                                .frame(width: 228, height: 228)
                         }
                     }
                     .frame(width: 256, height: 256)

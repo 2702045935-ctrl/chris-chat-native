@@ -155,7 +155,10 @@ struct QRCanvas: View {
     var body: some View {
         GeometryReader { geo in
             let n = max(1, rows.count)
-            let cell = geo.size.width / CGFloat(n + 4)      // 四周各留 2 格白边
+            /* 四周留 4 格白边：二维码标准（ISO 18004）要求至少 4 个模块的静默区，
+               以前只留 2 格，摄像头稍微偏一点就容易识别失败。 */
+            let pad = 4
+            let cell = geo.size.width / CGFloat(n + pad * 2)
             ZStack(alignment: .topLeading) {
                 Color.white
                 ForEach(0..<n, id: \.self) { y in
@@ -165,7 +168,7 @@ struct QRCanvas: View {
                             Rectangle()
                                 .fill(Color.black)
                                 .frame(width: cell, height: cell)
-                                .offset(x: CGFloat(x + 2) * cell, y: CGFloat(y + 2) * cell)
+                                .offset(x: CGFloat(x + pad) * cell, y: CGFloat(y + pad) * cell)
                         }
                     }
                 }

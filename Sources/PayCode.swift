@@ -217,12 +217,9 @@ struct ReceiveCodePage: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12).fill(Color.white)
                         if let info = info, let rows = info.rows, !rows.isEmpty {
-                            ZStack {
-                                QRCanvas(rows: rows).frame(width: 232, height: 232)
-                                Avatar(path: info.user?.avatar ?? "", size: 46, radius: 8)
-                                    .padding(4)
-                                    .background(RoundedRectangle(cornerRadius: 11).fill(Color.white))
-                            }
+                            /* 中间不盖头像：这套二维码是纠错 L（只能容忍 7% 破损），
+                               盖头像等于让码扫不出来（个人码踩过这个坑）。 */
+                            QRCanvas(rows: rows).frame(width: 232, height: 232)
                         } else {
                             ProgressView()
                         }

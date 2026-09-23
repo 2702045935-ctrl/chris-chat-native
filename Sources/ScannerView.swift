@@ -1,6 +1,62 @@
 import SwiftUI
 import AVFoundation
 import CoreImage
+import Vision
+
+/* ============================================================
+   相册二维码识别（跑在后台线程）
+   ① Vision（VNDetectBarcodesRequest）：新版系统识别率最高，倾斜、有背景的照片也能认；
+   ② 认不到再用老的 CIDetector 兜一次（老系统上它反而稳）。
+   两条都认不到才提示「没找到二维码」——保证每次点相册都有明确结果，不会静默失败。
+   ============================================================ */
+enum AlbumScan {
+    /// 相册里的照片分两种方向：UIImage 记在 imageOrientation 里（相机拍的原图、截图转存的），
+    /// cgImage 本身是"躺平"的。以前固定按 .up 去识别，竖着拍的图等于转了 90°，当然认不出来。
+    /// 这里：先按图片自己的方向识别，再把 4 个方向都试一遍兜底。
+    static func decode(_ image: UIImage) -> String? {
+        guard let cg = image.cgImage else { return nil }
+        let own = cgOrientation(image.imageOrientation)
+        let orders: [CGImagePropertyOrientation] = [own, .up, .right, .down, .left]
+        var tried = Set<String>()
+        for o in orders {
+            let key = "\(o.rawValue)"
+            if tried.contains(key) { continue }
+            tried.insert(key)
+            if let hit = vision(cg, o) { return hit }
+        }
+        /* 老办法兜底：CIImage(image:) 会带上方向信息 */
+        let det = CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
+                             options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
+        if let ci = CIImage(image: image),
+           let feats = det?.features(in: ci) as? [CIQRCodeFeature],
+           let s = feats.compactMap({ $0.messageString }).first(where: { !$0.isEmpty }) {
+            return s
+        }
+        return nil
+    }
+
+    private static func vision(_ cg: CGImage, _ o: CGImagePropertyOrientation) -> String? {
+        let req = VNDetectBarcodesRequest()
+        req.symbologies = [.qr, .code128, .ean13, .ean8]
+        let handler = VNImageRequestHandler(cgImage: cg, orientation: o, options: [:])
+        guard (try? handler.perform([req])) != nil else { return nil }
+        return (req.results ?? []).compactMap({ $0.payloadStringValue }).first(where: { !$0.isEmpty })
+    }
+
+    private static func cgOrientation(_ o: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch o {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
+        }
+    }
+}
 
 /* 扫到的内容统一在这里处理：群二维码 → 进群；6 位数字 → 确认别的设备登录；其它 → 原样提示 */
 @MainActor
@@ -29,6 +85,12 @@ func handleScanned(_ text: String, app: AppState) {
         var code = String(t[r.upperBound...])
         if let amp = code.firstIndex(of: "&") { code = String(code[..<amp]) }
         code = code.trimmingCharacters(in: .whitespaces)
+        /* 扫到自己的码：微信会提示「这是你自己的二维码」（个人码是「用户名.串」这种格式） */
+        let myName = (app.me?.username ?? "").lowercased()
+        if !code.isEmpty, !myName.isEmpty, code.lowercased().hasPrefix(myName + ".") {
+            app.show(Tr("这是你自己的二维码，发给朋友扫才能加你"))
+            return
+        }
         if !code.isEmpty {
             Task {
                 let res = await API.shared.addByCode(code)
@@ -37,6 +99,22 @@ func handleScanned(_ text: String, app: AppState) {
             }
             return
         }
+        app.show(Tr("这个二维码里没有个人信息"))
+        return
+    }
+    /* 有些老版本的二维码里只写了一串个人码（没有链接）：形如 friend001.XyZ123 → 也当加好友 */
+    if !t.contains(" "), t.contains("."), t.count >= 6, t.count <= 40,
+       t.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "." || $0 == "_" || $0 == "-" }) {
+        Task {
+            let res = await API.shared.addByCode(t)
+            if res.user != nil {
+                app.show(res.message + "：" + (res.user?.name ?? ""))
+                if res.message.contains("好友") { await app.loadContacts() }
+            } else {
+                app.show(Tr("扫到：") + t)
+            }
+        }
+        return
     }
     /* 群二维码：链接里带 c=邀请码 */
     if let r = t.range(of: "c=") {
@@ -45,15 +123,23 @@ func handleScanned(_ text: String, app: AppState) {
         code = code.trimmingCharacters(in: .whitespaces)
         if !code.isEmpty {
             Task {
-                if let err = await API.shared.joinByInvite(code: code) {
+                let res = await API.shared.joinByInvite(code: code)
+                if let err = res.error {
                     app.show(err)
                 } else {
                     await app.loadChats()
                     app.show(Tr("已加入群聊"))
+                    /* 微信那样：扫完群二维码直接进这个群聊（不只是提示一句） */
+                    if let cid = res.chatId, !cid.isEmpty {
+                        NotificationCenter.default.post(name: .chrisOpenChat, object: nil,
+                                                       userInfo: ["chatId": cid])
+                    }
                 }
             }
             return
         }
+        app.show(Tr("这个群二维码里没有邀请码"))
+        return
     }
     /* 网页版授权登录出的 6 位数字：扫了就等于确认那台设备登录 */
     if t.count == 6, t.allSatisfy({ $0.isNumber }) {
@@ -195,20 +281,25 @@ struct ScannerView: View {
         .onAppear { askPermission() }
     }
 
-    /// 识别相册里的二维码：用系统 CIDetector，识别不到再提示一句
+    /// 识别相册里的二维码
+    /// 以前的写法有两个毛病：① 直接在主线程跑 CIDetector，一张大图能把界面卡住好几秒（看着像「没反应」）；
+    /// ② CIDetector 对这种照片里的二维码识别率一般，倾斜/反光/带背景就认不出来。
+    /// 现在改成后台线程 + 先用系统的 Vision（识别率高得多），认不到再用 CIDetector 兜一次。
     private func scanAlbum(_ image: UIImage) {
         busy = true
-        guard let cg = image.cgImage else { busy = false; hint = Tr("这张图读不出来，换一张试试"); return }
-        let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
-                                  options: [CIDetectorAccuracy: CIDetectorAccuracyHigh])
-        let found = (detector?.features(in: CIImage(cgImage: cg)) as? [CIQRCodeFeature])?
-            .compactMap { $0.messageString }.first
-        busy = false
-        if let text = found, !text.isEmpty {
-            onFound(text)
-            dismiss()
-        } else {
-            hint = Tr("这张图里没找到二维码，换一张试试")
+        hint = Tr("正在识别…")
+        Task.detached(priority: .userInitiated) {
+            let text = AlbumScan.decode(image)
+            await MainActor.run {
+                busy = false
+                if let t = text, !t.isEmpty {
+                    hint = ""
+                    onFound(t)
+                    dismiss()
+                } else {
+                    hint = Tr("这张图里没找到二维码，换一张清楚点的试试")
+                }
+            }
         }
     }
 

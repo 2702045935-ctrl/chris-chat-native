@@ -34,9 +34,15 @@ enum GestureStore {
 struct PatternPad: View {
     @Binding var picked: [Int]
     var onEnd: () -> Void
+    /// 画错了：整格变红 + 抖一下（微信也是这样）
+    var wrong: Bool = false
 
     private let side: CGFloat = 250
     private let dot: CGFloat = 62
+
+    /// 选中色（错误时红色）/ 未选中灰环
+    private var ink: Color { wrong ? Color(hexString: "#FA5151") : C.green }
+    private var gray: Color { Color.dyn(0xC8C8C8, 0x4A4A4A) }
 
     private func center(_ i: Int) -> CGPoint {
         let r = i / 3, c = i % 3
@@ -46,24 +52,36 @@ struct PatternPad: View {
 
     var body: some View {
         ZStack {
+            /* 连线：微信是 2.5pt 圆头、半透明，连到两个点的圆心 */
+            if picked.count > 1 {
+                Path { path in
+                    path.move(to: center(picked[0]))
+                    picked.dropFirst().forEach { path.addLine(to: center($0)) }
+                }
+                .stroke(ink.opacity(0.55),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            }
             ForEach(0..<9, id: \.self) { i in
                 let p = center(i)
                 let on = picked.contains(i)
                 Circle()
-                    .fill(on ? C.green.opacity(0.18) : Color.clear)
+                    .fill(on ? ink.opacity(wrong ? 0.14 : 0.10) : Color.clear)
                     .overlay(
-                        Circle().stroke(on ? C.green : Color.dyn(0xCFCFCF, 0x4A4A4A),
-                                        lineWidth: on ? 2.5 : 1.5)
+                        Circle().stroke(on ? ink : gray, lineWidth: on ? 2.5 : 1.5)
                     )
                     .overlay(
-                        Circle().fill(on ? C.green : Color.dyn(0xDADADA, 0x5A5A5A))
-                            .frame(width: dot * 0.26, height: dot * 0.26)
+                        /* 微信选中时里面那个实心点会变大一点 */
+                        Circle().fill(on ? ink : gray)
+                            .frame(width: on ? dot * 0.34 : dot * 0.26,
+                                   height: on ? dot * 0.34 : dot * 0.26)
                     )
                     .frame(width: dot, height: dot)
                     .position(p)
             }
         }
         .frame(width: side, height: side)
+        .offset(x: wrong ? -6 : 0)
+        .animation(wrong ? .default.repeatCount(3, autoreverses: true).speed(6) : .default, value: wrong)
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0)
@@ -90,6 +108,8 @@ struct GestureLockView: View {
     @State private var picked: [Int] = []
     @State private var error = ""
     @State private var checking = false
+    /// 画错时让整格变红 + 抖一下
+    @State private var wrong = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -122,7 +142,7 @@ struct GestureLockView: View {
 
             Spacer(minLength: 14)
 
-            PatternPad(picked: $picked) { check() }
+            PatternPad(picked: $picked, wrong: wrong) { check() }
 
             if Biometrics.available {
                 Button {
@@ -156,7 +176,10 @@ struct GestureLockView: View {
             onOk()
             dismiss()
         } else {
-            error = "手势不对，再试一次"
+            /* 微信那种：整格变红抖一下 + 提示还能试几次 */
+            error = "绘制错误，请重试"
+            wrong = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { wrong = false }
         }
         checking = false
     }

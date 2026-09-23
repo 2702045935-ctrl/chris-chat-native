@@ -347,7 +347,25 @@ struct ContactCardView: View {
     private var link: Color { scheme == .dark ? Color(hex: 0x7D90B8) : Color(hex: 0x576B95) }
     private var lineColor: Color { scheme == .dark ? Color(white: 1, opacity: 0.09) : Color(hex: 0xE5E5E5) }
 
+    /// 新版名片页（畅聊/HarmonyOS 语言）的开关：后台 data/ui.json 里
+    /// cardStyle = "new" 才走新版；默认 "old" 就是原来这版，随时能切回来。
     var body: some View {
+        if UIConfig.text("cardStyle", "old") == "new" {
+            ContactCardNew(name: displayName,
+                           idLine: "微信号 " + (u.username ?? ""),
+                           initial: String(displayName.prefix(1)),
+                           remark: meta?.remark ?? "",
+                           phone: phone,
+                           momentCount: thumbs.count,
+                           onClose: { dismiss() },
+                           onMessage: { openChat() },
+                           onMoments: hasMoments ? { onOpenMoments(u.id) } : nil)
+        } else {
+            cardBody
+        }
+    }
+
+    private var cardBody: some View {
         ZStack {
             VStack(spacing: 0) {
                 nav

@@ -775,12 +775,52 @@ struct UnreadBadge: View {
     var body: some View {
         if count > 0 {
             Text(count > 99 ? "99+" : "\(count)")
-                .font(pf(11, .semibold))
+                .font(pf(12, .semibold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 3)
-                .frame(minWidth: 16, minHeight: 16)
+                .padding(.horizontal, count > 9 ? 5 : 0)
+                .frame(minWidth: 18, minHeight: 18)
+                /* 微信那枚徽标：红底白字，外面还有一圈和底色一样的描边，
+                   压在头像右上角上才不会糊成一团 */
                 .background(Capsule().fill(C.red))
+                .overlay(Capsule().stroke(C.cardBg, lineWidth: 1.2))
         }
+    }
+}
+
+/// 免打扰会话的小红点：微信里被「消息免打扰」的会话，
+/// 来新消息只点一个小红点，不给数字（数字留给重要的会话）
+struct UnreadDot: View {
+    var size: CGFloat = 10
+    var body: some View {
+        Circle()
+            .fill(C.red)
+            .frame(width: size, height: size)
+            .overlay(Circle().stroke(C.cardBg, lineWidth: 1.2))
+    }
+}
+
+/// 语音消息「听过没听过」：微信里没听过的语音上有个小红点，点开听过就消失。
+/// 这个状态是「每台设备自己记」的（微信也是本机记），所以存在本地。
+enum VoicePlayed {
+    private static let key = "chris.voice.played"
+    private static let cap = 500
+
+    static func isPlayed(_ id: String) -> Bool {
+        if id.isEmpty { return true }
+        return list().contains(id)
+    }
+
+    static func markPlayed(_ id: String) {
+        guard !id.isEmpty else { return }
+        var arr = list()
+        arr.removeAll { $0 == id }
+        arr.append(id)
+        if arr.count > cap { arr.removeFirst(arr.count - cap) }
+        UserDefaults.standard.set(arr, forKey: key)
+    }
+
+    private static func list() -> [String] {
+        UserDefaults.standard.stringArray(forKey: key) ?? []
     }
 }
 

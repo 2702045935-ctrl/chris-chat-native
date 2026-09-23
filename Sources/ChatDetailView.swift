@@ -683,15 +683,15 @@ struct ChatDetailView: View {
                 scrollTick += 1
             } label: {
                 Text(unreadHere > 99 ? "99+" : "\(unreadHere)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .frame(minWidth: 22, minHeight: 20)
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 20, minHeight: 18)
                     /* 数字外面那个「药丸框」：里面填色，外面再描一圈白边 */
                     .background(
                         Capsule()
                             .fill(C.red)
-                            .overlay(Capsule().stroke(Color.white.opacity(0.9), lineWidth: 1))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.9), lineWidth: 1.2))
                     )
             }
             .buttonStyle(.plain)
@@ -1221,6 +1221,8 @@ struct MessageRow: View {
     @EnvironmentObject var app: AppState
     /// 语音消息播放状态（哪条在播）
     @ObservedObject private var voicePlayer = VoicePlayer.shared
+    /// 这次进聊天页里已经听过哪些语音（配合本机记录，用来点掉那个小红点）
+    @State private var playedVoice: Set<String> = []
 
     private var avatarPath: String {
         if let p = message.senderAvatar, !p.isEmpty { return p }
@@ -1522,8 +1524,19 @@ struct MessageRow: View {
         .padding(.horizontal, 12)
         .frame(width: width, height: 40, alignment: mine ? .trailing : .leading)
         .background(BubbleShape(mine: mine, tail: showTail).fill(bubbleFill))
+        /* 没听过的语音：气泡右上角一个小红点（微信），听过就没了；
+           自己发的语音不点这个点 */
+        .overlay(alignment: .topTrailing) {
+            if !mine, !playedVoice.contains(message.id), !VoicePlayed.isPlayed(message.id) {
+                Circle().fill(C.red)
+                    .frame(width: 8, height: 8)
+                    .offset(x: -5, y: 5)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
+            playedVoice.insert(message.id)
+            VoicePlayed.markPlayed(message.id)
             guard let url = API.shared.assetURL(path) else {
                 app.show(Tr("这条语音找不到了"))
                 return

@@ -43,8 +43,15 @@ struct ChatRow: View {
     private var avatar: some View {
         Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 6)
             .overlay(alignment: .topTrailing) {
-                UnreadBadge(count: chat.unreadCount)
-                    .offset(x: 12, y: -8)
+                /* 免打扰的会话只点一个小红点（微信就是这样），其它会话给数字 */
+                if chat.muted == true {
+                    if chat.unreadCount > 0 {
+                        UnreadDot().offset(x: 8, y: -6)
+                    }
+                } else {
+                    UnreadBadge(count: chat.unreadCount)
+                        .offset(x: 11, y: -6)
+                }
             }
             /* 好友设了状态：头像右下角挂一个小 emoji（微信就是这样） */
             .overlay(alignment: .bottomTrailing) {

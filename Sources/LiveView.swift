@@ -164,17 +164,60 @@ struct LiveRoomView: View {
     @State private var likes = 0
     /// 退出前确认（抖音会问一句）
     @State private var confirmExit = false
-    /// 右侧竖排的礼物面板
-    @State private var showGifts = false
-    @State private var liveGifts: [Gift] = []
     @State private var hearts: [UUID] = []
 
     @ObservedObject private var realtime = Realtime.shared
 
     var body: some View {
-        /* 整块舞台用 AnyView 包一层：让编译器别再对这几层做深度类型推断
-           （之前一直报 "unable to type-check this expression in reasonable time"） */
-        AnyView(stage)
+        ZStack {
+            /* 背景：拿主播头像糊一层（和通话页一个做法），没有就用深色渐变 */
+            ZStack {
+                LinearGradient(colors: [Color(hex: 0x1B2233), Color(hex: 0x0C0C0E)],
+                               startPoint: .top, endPoint: .bottom)
+                if !room.hostAvatar.isEmpty {
+                    RemoteImage(path: room.hostAvatar).blur(radius: 55).scaleEffect(1.4).opacity(0.6)
+                }
+            }
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                navBar
+                Spacer(minLength: 0)
+                danmakuList
+                bottomBar
+            }
+
+            /* 真视频层：观众看到主播画面；主播看到自己的预览（右下小窗） */
+            if live.watching, live.remoteVideo != nil {
+                VideoSurface(track: live.remoteVideo)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            } else if live.publishing, live.localVideo != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        VideoSurface(track: live.localVideo)
+                            .frame(width: 104, height: 148)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .padding(.trailing, 14)
+                            .padding(.bottom, 120)
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+            if live.watching, live.remoteVideo == nil {
+                VStack(spacing: 8) {
+                    ProgressView().tint(.white)
+                    Text(Tr("正在连主播的画面…")).font(pf(14)).foregroundColor(.white.opacity(0.8))
+                }
+            }
+
+            /* 点赞飘心 */
+            ForEach(hearts, id: \.self) { id in
+                FloatingHeart(id: id)
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
         .swipeBack { dismiss() }
@@ -186,38 +229,6 @@ struct LiveRoomView: View {
         .confirmationDialog(Tr("确定要退出直播吗？"), isPresented: $confirmExit, titleVisibility: .visible) {
             Button(Tr("退出直播"), role: .destructive) { dismiss() }
             Button(Tr("继续观看"), role: .cancel) { }
-        }
-        /* 礼物面板：从服务器拉礼物列表，点一个就在直播间里发一条「送出了 X」 */
-        .sheet(isPresented: $showGifts) {
-            VStack(spacing: 0) {
-                NavBar(title: Tr("送礼物"), back: { showGifts = false })
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 12) {
-                        ForEach(liveGifts) { g in
-                            Button {
-                                showGifts = false
-                                Task {
-                                    try? await API.shared.liveDanmaku(room.id, text: "送出了 " + g.name + " " + g.icon)
-                                }
-                            } label: {
-                                VStack(spacing: 6) {
-                                    Text(g.icon).font(.system(size: 30))
-                                    Text(g.name).font(pf(12.5)).foregroundColor(C.label)
-                                    Text("¥\(Int(g.price))").font(pf(11.5)).foregroundColor(C.subLabel)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.cardBg))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(12)
-                }
-                .background(C.pageBg)
-            }
-            .presentationDetents([.height(420)])
-            .task { liveGifts = (try? await API.shared.gifts()) ?? [] }
         }
         .onChange(of: realtime.event) { ev in
             guard ev.type == "live", ev.roomId == room.id else { return }
@@ -336,118 +347,19 @@ struct LiveRoomView: View {
                     .background(Circle().fill(C.green))
             }
             .buttonStyle(.plain)
+            Button { like() } label: {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 17))
+                    .foregroundColor(Color(hex: 0xFF5A7A))
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(Color(white: 1, opacity: 0.14)))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.top, 10)
         .padding(.bottom, max(10, L.safeBottom))
         .background(Color.black.opacity(0.35))
-    }
-
-    /// 右侧竖排那一层（单独拎出来，免得整段 body 的类型推断超时）
-    /// 直播间的舞台层（背景 + 控制层 + 右侧竖排 + 视频层 + 飘心）
-    private var stage: some View {
-        ZStack {
-            ZStack {
-                LinearGradient(colors: [Color(hex: 0x1B2233), Color(hex: 0x0C0C0E)],
-                               startPoint: .top, endPoint: .bottom)
-                if !room.hostAvatar.isEmpty {
-                    RemoteImage(path: room.hostAvatar).blur(radius: 55).scaleEffect(1.4).opacity(0.6)
-                }
-            }
-            .ignoresSafeArea()
-            controlsLayer
-            rightOverlay
-            videoLayer
-            ForEach(hearts, id: \.self) { id in
-                FloatingHeart(id: id)
-            }
-        }
-    }
-
-    private var controlsLayer: some View {
-        VStack(spacing: 0) {
-            navBar
-            Spacer(minLength: 0)
-            danmakuList
-            bottomBar
-        }
-    }
-
-    /// 视频层（观众看主播 / 主播看自己的小窗 / 还没连上时的提示）
-    @ViewBuilder
-    private var videoLayer: some View {
-        if live.watching, live.remoteVideo != nil {
-            VideoSurface(track: live.remoteVideo)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-        } else if live.publishing, live.localVideo != nil {
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    VideoSurface(track: live.localVideo)
-                        .frame(width: 104, height: 148)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .padding(.trailing, 14)
-                        .padding(.bottom, 120)
-                }
-            }
-            .allowsHitTesting(false)
-        }
-        if live.watching, live.remoteVideo == nil {
-            VStack(spacing: 8) {
-                ProgressView().tint(.white)
-                Text(Tr("正在连主播的画面…")).font(pf(14)).foregroundColor(.white.opacity(0.8))
-            }
-        }
-    }
-
-    private var rightOverlay: some View {
-        VStack {
-            Spacer(minLength: 0)
-            HStack {
-                Spacer(minLength: 0)
-                rightColumn
-            }
-            .padding(.bottom, 76)
-        }
-    }
-
-    /* 抖音那种右侧竖排：点赞（带数字）/ 礼物 / 分享 / 更多 */
-    private var rightColumn: some View {
-        VStack(spacing: 16) {
-            Button { like() } label: {
-                vstackIcon("heart.fill", "\(likes)", color: Color(hex: 0xFF5A7A))
-            }
-            .buttonStyle(.plain)
-
-            Button { showGifts = true } label: {
-                vstackIcon("gift.fill", Tr("礼物"), color: Color(hex: 0xFFC740))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                UIPasteboard.general.string = "https://aa.x8iu.com/m.html"
-                app.show(Tr("直播链接已复制，去聊天里粘贴分享"))
-            } label: {
-                vstackIcon("arrowshape.turn.up.right.fill", Tr("分享"), color: .white)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.trailing, 12)
-        .padding(.bottom, 8)
-    }
-
-    private func vstackIcon(_ symbol: String, _ label: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle().fill(Color.black.opacity(0.28)).frame(width: 44, height: 44)
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(color)
-            }
-            Text(label).font(pf(11)).foregroundColor(.white.opacity(0.92))
-        }
     }
 
     private func send() {

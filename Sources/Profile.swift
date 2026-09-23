@@ -1157,6 +1157,9 @@ struct ServiceView: View {
     /// 样式（绿卡背景 / 图标大小 / 字体）：后台「服务页 → 样式」里配，取不到就用参考图那套默认值
     private var st: ServiceStyle { cfg?.style ?? ServiceStyle() }
 
+    /// 底部账单卡 + 右上角「⋯」菜单的文案：后台「服务页 → 底部」里配（留空 = 下面这些默认值）
+    private var bt: ServiceBottom { cfg?.bottom ?? ServiceBottom() }
+
     /// 分类：后台配的优先，没有就用内置那套（内容和参考图一致）
     private var groups: [Group] {
         if let list = cfg?.groups, !list.isEmpty {
@@ -1216,9 +1219,9 @@ struct ServiceView: View {
         .sheet(isPresented: $showServiceSupport) { SupportView().environmentObject(app) }
         .navigationDestination(isPresented: $showBillsPage) { BillsView() }
         .confirmationDialog(Tr("服务"), isPresented: $showMore, titleVisibility: .hidden) {
-            Button(Tr("刷新账单")) { Task { await loadBills() } }
-            Button(Tr("充值")) { rechargeAmount = ""; showRecharge = true }
-            Button(Tr("取消"), role: .cancel) { }
+            Button(Tr(bt.moreRefresh ?? "刷新账单")) { Task { await loadBills() } }
+            Button(Tr(bt.moreRecharge ?? "充值")) { rechargeAmount = ""; showRecharge = true }
+            Button(Tr(bt.moreCancel ?? "取消"), role: .cancel) { }
         }
         .sheet(isPresented: Binding(
             get: { detailInfo != nil },
@@ -1353,7 +1356,7 @@ struct ServiceView: View {
     private var billsCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                Text(Tr("账单"))
+                Text(Tr(bt.billTitle ?? "账单"))
                     .font(pf(14))
                     .foregroundColor(Color.dyn(0x7A7A7A, 0x8A8A8A))
                 Spacer(minLength: 0)
@@ -1363,7 +1366,7 @@ struct ServiceView: View {
                 Button {
                     showBillsPage = true
                 } label: {
-                    Text(Tr("全部账单"))
+                    Text(Tr(bt.billAll ?? "全部账单"))
                         .font(pf(13))
                         .foregroundColor(C.green)
                         .padding(.leading, 14)
@@ -1373,7 +1376,7 @@ struct ServiceView: View {
                     rechargeAmount = ""
                     showRecharge = true
                 } label: {
-                    Text(Tr("充值"))
+                    Text(Tr(bt.billRecharge ?? "充值"))
                         .font(pf(13))
                         .foregroundColor(C.green)
                         .padding(.leading, 14)
@@ -1386,7 +1389,7 @@ struct ServiceView: View {
             if loading {
                 ProgressView().padding(.vertical, 26)
             } else if bills.isEmpty {
-                Text(Tr("还没有账单项"))
+                Text(Tr(bt.billEmpty ?? "还没有账单项"))
                     .font(pf(14))
                     .foregroundColor(C.subLabel)
                     .padding(.vertical, 26)
@@ -1435,13 +1438,18 @@ struct ServiceView: View {
         case "wallet":
             showWallet = true          // 进「钱包」页（照参考图做的那一页）
         case "pay":
-            app.show(Tr("收付款：还没接后端，先把页面做出来"))
+            app.show(soonTip(label))
         default:
             /* 名字兜底：这几页都做好了，后台动作写成 soon 也能点进去 */
             if label.contains("客服") { showServiceSupport = true }
             else if label.contains("经营") { showWallet = true }
-            else { app.show("「\(label)」还没接后端，先把页面做出来") }
+            else { app.show(soonTip(label)) }
         }
+    }
+
+    /// 「XX 还没接后端」这句提示：后台「服务页 → 底部 → 未接提示」能改，{label} 换成格子的名字
+    private func soonTip(_ label: String) -> String {
+        Tr((bt.soonTip ?? "「{label}」还没接后端，先把页面做出来").replacingOccurrences(of: "{label}", with: label))
     }
 
     private func loadConfig() async {

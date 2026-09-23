@@ -29,7 +29,7 @@ private var funcs: [(String, String, Color, String)] {
         (Tr("仅聊天的朋友"), I.chatOnly, Color(hex: 0x8E8E99), "chatOnly"),
         (Tr("标签"), I.tag, Color(hex: 0x4C93DD), "tags"),
         (Tr("服务号"), I.service, Color(hex: 0x4C93DD), "service"),
-        (Tr("企业微信联系人"), I.workMate, Color(hex: 0x35A87E), "work"),
+        (Tr("企业联系人"), I.workMate, Color(hex: 0x35A87E), "work"),
         (Tr("我的企业"), I.myWork, Color(hex: 0x35A87E), "myWork")
     ]
 }
@@ -219,7 +219,7 @@ private var funcs: [(String, String, Color, String)] {
             case "chatOnly": app.show(Tr("仅聊天的朋友：只有聊天记录、没加好友的人会出现在这里"))
             case "tags": app.show(Tr("标签：还没建过标签"))
             case "service": app.show(Tr("服务号：暂时没有关注的服务号"))
-            case "work": app.show(Tr("企业微信联系人：还没绑定微信企业"))
+            case "work": app.show(Tr("企业联系人：还没绑定企业"))
             default: app.show(Tr("我的企业：还没创建企业"))
             }
         } label: {

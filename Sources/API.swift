@@ -655,9 +655,24 @@ struct ServiceStyle: Decodable, Hashable {
 }
 
 /// 整页服务页的配置
+/// 服务页底部那块（账单卡 + 右上角「⋯」菜单）的文案：后台「服务页 → 底部」里配，
+/// 留空就用 App 里的默认值（以前这些字全都是写死在 App 里的）
+struct ServiceBottom: Decodable, Hashable {
+    var billTitle: String? = nil
+    var billAll: String? = nil
+    var billRecharge: String? = nil
+    var billEmpty: String? = nil
+    var moreRefresh: String? = nil
+    var moreRecharge: String? = nil
+    var moreCancel: String? = nil
+    /// 「XX 还没接后端」这句提示，{label} 会替换成格子的名字
+    var soonTip: String? = nil
+}
+
 struct ServiceConfig: Decodable, Hashable {
     var title: String?
     var card: ServiceCard?
+    var bottom: ServiceBottom?
     var style: ServiceStyle?
     var groups: [ServiceGroup]?
 }

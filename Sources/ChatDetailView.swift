@@ -1187,15 +1187,23 @@ struct SystemLine: View {
                 CallIcon(key: message.isVideoCall ? "ui.callRecordVideo" : "ui.callRecord",
                          symbol: message.isVideoCall ? "video.fill" : "phone.fill",
                          builtin: message.isVideoCall ? I.callRecordVideo : I.callRecord,
-                         size: 13, color: C.msgTime)
+                         size: 13, color: ink)
             }
             Text(message.body)
                 .font(pf(12.5))
-                .foregroundColor(C.msgTime)
+                .foregroundColor(ink)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 40)
+    }
+
+    /// 没接通的通话记录用红色（微信里「未接听 / 已拒绝 / 已取消 / 对方无应答」都是红的）
+    private var ink: Color {
+        guard message.isCallRecord else { return C.msgTime }
+        let t = message.body
+        let bad = ["未接听", "已拒绝", "已取消", "无应答", "不在线", "忙线", "未接通", "无人接听"]
+        return bad.contains(where: { t.contains($0) }) ? Color(hex: 0xFA5151) : C.msgTime
     }
 }
 

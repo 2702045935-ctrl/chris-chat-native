@@ -167,9 +167,6 @@ struct LiveRoomView: View {
     @State private var hearts: [UUID] = []
 
     @ObservedObject private var realtime = Realtime.shared
-    /// 抖音那套右侧竖排要用到的：礼物面板
-    @State private var showGifts = false
-    @State private var liveGifts: [Gift] = []
 
     var body: some View {
         ZStack {
@@ -188,10 +185,6 @@ struct LiveRoomView: View {
                 Spacer(minLength: 0)
                 danmakuList
                 bottomBar
-            }
-            /* 抖音那种：右侧竖排（点赞 / 礼物 / 分享）—— 挂在控制层右边，改这里不动原来的结构 */
-            .overlay(alignment: .trailing) {
-                rightColumn.padding(.bottom, 78)
             }
 
             /* 真视频层：观众看到主播画面；主播看到自己的预览（右下小窗） */
@@ -237,36 +230,6 @@ struct LiveRoomView: View {
             Button(Tr("退出直播"), role: .destructive) { dismiss() }
             Button(Tr("继续观看"), role: .cancel) { }
         }
-        /* 礼物面板：从服务器拉礼物列表，点一个就在直播间发一条「送出了 X」 */
-        .sheet(isPresented: $showGifts) {
-            VStack(spacing: 0) {
-                NavBar(title: Tr("送礼物"), back: { showGifts = false })
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 12) {
-                        ForEach(liveGifts) { g in
-                            Button {
-                                showGifts = false
-                                Task { try? await API.shared.liveDanmaku(room.id, text: "送出了 " + g.name + " " + g.icon) }
-                            } label: {
-                                VStack(spacing: 6) {
-                                    Text(g.icon).font(.system(size: 28))
-                                    Text(g.name).font(pf(12.5)).foregroundColor(C.label)
-                                    Text("¥\(Int(g.price))").font(pf(11.5)).foregroundColor(C.subLabel)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(C.cardBg))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(12)
-                }
-                .background(C.pageBg)
-            }
-            .presentationDetents([.height(420)])
-            .task { liveGifts = (try? await API.shared.gifts()) ?? [] }
-        }
         .onChange(of: realtime.event) { ev in
             guard ev.type == "live", ev.roomId == room.id else { return }
             switch ev.liveAction {
@@ -297,40 +260,6 @@ struct LiveRoomView: View {
         .onDisappear {
             live.stopWatch()
             Task { await API.shared.liveLeave(room.id) }
-        }
-    }
-
-    /* 抖音那种右侧竖排：点赞（带数字）/ 礼物 / 分享 */
-    private var rightColumn: some View {
-        VStack(spacing: 16) {
-            Button { like() } label: {
-                vstackIcon("heart.fill", "\(likes)", color: Color(hex: 0xFF5A7A))
-            }
-            .buttonStyle(.plain)
-            Button { showGifts = true } label: {
-                vstackIcon("gift.fill", Tr("礼物"), color: Color(hex: 0xFFC740))
-            }
-            .buttonStyle(.plain)
-            Button {
-                UIPasteboard.general.string = "https://aa.x8iu.com/m.html"
-                app.show(Tr("直播链接已复制，去聊天里分享"))
-            } label: {
-                vstackIcon("arrowshape.turn.up.right.fill", Tr("分享"), color: .white)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.trailing, 12)
-    }
-
-    private func vstackIcon(_ symbol: String, _ label: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            ZStack {
-                Circle().fill(Color.black.opacity(0.28)).frame(width: 44, height: 44)
-                Image(systemName: symbol)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(color)
-            }
-            Text(label).font(pf(11)).foregroundColor(.white.opacity(0.92))
         }
     }
 

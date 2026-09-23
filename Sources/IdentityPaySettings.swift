@@ -34,8 +34,7 @@ struct IdentityView: View {
                         if let n = info?.realName, !n.isEmpty {
                             Text(n).font(pf(13)).foregroundColor(Color.white.opacity(0.9))
                         }
-                        Text((info?.levelName ?? "") + ((info?.bankCount ?? 0) > 0
-                             ? (Tr(" · 已绑 ") + "\(info?.bankCount ?? 0) " + Tr("张卡")) : ""))
+                        Text(subtitleLine)
                             .font(pf(12)).foregroundColor(Color.white.opacity(0.85))
                     }
                     .frame(maxWidth: .infinity)
@@ -112,6 +111,14 @@ struct IdentityView: View {
         .sheet(isPresented: $showUpgrade) {
             WalletUpgradeView().environmentObject(app)
         }
+    }
+
+    /// 头部那行小字（拆出来，免得编译器算不明白那一串拼接）
+    private var subtitleLine: String {
+        let lv = info?.levelName ?? ""
+        let n = info?.bankCount ?? 0
+        if n > 0 { return lv + " · 已绑 " + String(n) + " 张卡" }
+        return lv
     }
 
     private func row(_ t: String, _ v: String) -> some View {

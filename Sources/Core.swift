@@ -133,16 +133,23 @@ enum L {
     static var menuLineInset: CGFloat { o("menuLineInset", 56) }
 
     // 聊天页
-    static var msgPad: CGFloat { v(10, 2.8, 12) }
-    static var chatAvatar: CGFloat { v(38, 9.8, 42) }
-    static var bubblePadH: CGFloat { v(11, 3, 12.6) }
-    static var bubblePadV: CGFloat { v(9, 2.3, 9.8) }
+    /* 以下尺寸照 iPhone 上的微信量：头像 40、头像与气泡间距 10、气泡内边距 12/10、
+       正文 17、时间 12.5、气泡最宽约占屏幕 66% */
+    static var msgPad: CGFloat { v(12, 3.1, 14) }
+    static var chatAvatar: CGFloat { v(40, 10.3, 44) }
+    /// 头像和气泡之间那条缝
+    static var chatGap: CGFloat { o("chatGap", 10) }
+    static var bubblePadH: CGFloat { v(12, 3.1, 13.6) }
+    static var bubblePadV: CGFloat { v(10, 2.6, 11) }
+    /// 气泡最大宽度（微信里长消息也占不到满屏）。
+    /// 下限 240 是为了让转账 / 文件那种固定宽度的卡片在小屏上也放得下。
+    static var bubbleMaxW: CGFloat { min(300, max(240, width * 0.66)) }
     static var composerH: CGFloat { o("composerH", 56) }
     static var composerIconBox: CGFloat { o("composerIconBox", 33) }
     static var composerIcon: CGFloat { o("composerIcon", 28) }
     static var inputH: CGFloat { o("inputH", 39) }
     static var chatFontSize: CGFloat { o("chatFontSize", 17) }
-    static var msgTimeSize: CGFloat { o("msgTimeSize", 14) }
+    static var msgTimeSize: CGFloat { o("msgTimeSize", 12.5) }
 
     // 朋友圈
     static var coverH: CGFloat { o("coverH", 380) }
@@ -479,6 +486,8 @@ struct RemoteImage: View {
     /// 解码上限（默认 1600，防大图解压把内存打爆）。
     /// 封面这种大图单独放宽（见 coverView 传 2560），不然会被压到 1600 看着糊。
     var maxSide: CGFloat = 1600
+    /// 图加载出来以后回一下（聊天页的图片气泡按原比例算缩略图尺寸要用）
+    var onLoaded: ((UIImage) -> Void)? = nil
 
     @State private var image: UIImage?
     @State private var started = false
@@ -514,7 +523,7 @@ struct RemoteImage: View {
 
     private func load() async {
         if path.isEmpty { return }
-        if let hit = ImageStore.shared.get(path) { image = hit; return }
+        if let hit = ImageStore.shared.get(path) { image = hit; onLoaded?(hit); return }
         if path.hasPrefix("data:") {
             if let comma = path.firstIndex(of: ",") {
                 let b64 = String(path[path.index(after: comma)...])
@@ -522,6 +531,7 @@ struct RemoteImage: View {
                    let img = RemoteImage.downsampled(data, maxSide: maxSide) {
                     ImageStore.shared.put(path, img)
                     image = img
+                    onLoaded?(img)
                 }
             }
             return
@@ -536,6 +546,7 @@ struct RemoteImage: View {
             if let img = RemoteImage.downsampled(data, maxSide: maxSide) {
                 ImageStore.shared.put(path, img)
                 image = img
+                onLoaded?(img)
             }
         } catch { }
     }

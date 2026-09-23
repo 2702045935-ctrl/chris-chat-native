@@ -524,61 +524,8 @@ struct ChatDetailView: View {
                         .onTapGesture { Task { await loadOlder() } }
                     }
                     ForEach(messages) { message in
-                        VStack(spacing: 0) {
-                            if showTime(for: message) {
-                                Text(TimeFmt.bubble(message.createdAt))
-                                    .font(pf(L.msgTimeSize))
-                                    .foregroundColor(C.chatTimeInk)
-                                    /* 时间加一个明显的圆角小框（和微信一样；颜色/圆角后台能调，只作用于聊天页） */
-                                    .padding(.horizontal, L.o("chatTimePadX", 8))
-                                    .padding(.vertical, L.o("chatTimePadY", 3))
-                                    .background(RoundedRectangle(cornerRadius: L.o("chatTimeRadius", 4), style: .continuous)
-                                        .fill(C.chatTimeBg))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, 12)
-                                    .padding(.bottom, 16)
-                            }
-                            /* 系统消息（通话记录、撤回提示这种）：微信是居中一行灰字，没有头像和气泡 */
-                            if message.kindName == "system" {
-                                SystemLine(message: message)
-                                    .padding(.bottom, 15)
-                            } else {
-                            MessageRow(message: message,
-                                       mine: message.senderId == myId,
-                                       myId: myId,
-                                       senderName: (!isGroup || message.senderId == myId)
-                                           ? "" : displayName(message),
-                                       onTapTransfer: { info in billInfo = info },
-                                       onOpenImage: { path in openImage(path) },
-                                       onOpenAvatar: { id in openAvatar(id) },
-                                       onOpenWeb: { url in web = WebURL(url: url) },
-                                       onTapRedPacket: { info in tapRedPacket(info) })
-                                .padding(.bottom, 15)
-                                /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
-                                .onLongPressGesture { openActions(message) }
-                                .overlay(alignment: .leading) {
-                                    if selectMode {
-                                        Image(systemName: selected.contains(message.id)
-                                              ? "checkmark.circle.fill" : "circle")
-                                            .font(.system(size: 21))
-                                            .foregroundColor(selected.contains(message.id) ? C.green : C.subLabel)
-                                            .padding(.leading, 10)
-                                    }
-                                }
-                                .overlay {
-                                    if selectMode {
-                                        Color.clear
-                                            .contentShape(Rectangle())
-                                            .onTapGesture { toggleSelect(message) }
-                                    }
-                                }
-                                .background(GeometryReader { g in
-                                    Color.clear.preference(key: MsgFrameKey.self,
-                                                           value: [message.id: g.frame(in: .global)])
-                                })
-                            }
-                        }
-                        .id(message.id)
+                        messageBlock(message)
+                            .id(message.id)
                     }
                     if loading && messages.isEmpty {
                         ProgressView().padding(.top, 40)
@@ -600,6 +547,129 @@ struct ChatDetailView: View {
         } else {
             proxy.scrollTo(last.id, anchor: .bottom)
         }
+    }
+
+    /* ----------------------------------------------------------
+       一条消息 = 时间线 + 内容 + 底部间距（微信的排版逻辑）：
+         · 同一个人连着发：中间只留 4（看起来是一组）
+         · 换个人发：留 15（明显断开）
+         · 出现时间线：让时间线自己带上下 12，消息这边就不留了
+         · 系统消息（通话记录 / 撤回提示）居中一行灰字，上下各 12
+       还有两条跟着分组走：群里昵称只挂在连发的第一条上、气泡的小尖角也只画在第一条上。
+       ---------------------------------------------------------- */
+
+    @ViewBuilder
+    private func messageBlock(_ message: Message) -> some View {
+        VStack(spacing: 0) {
+            if showTime(for: message) { timeLine(message) }
+            if message.kindName == "system" {
+                SystemLine(message: message)
+                    .padding(.bottom, gapAfter(message))
+            } else if message.isRecalled {
+                recallLine(message)
+                    .padding(.bottom, gapAfter(message))
+            } else {
+                messageRow(message)
+            }
+        }
+    }
+
+    private func timeLine(_ message: Message) -> some View {
+        Text(TimeFmt.bubble(message.createdAt))
+            .font(pf(L.msgTimeSize))
+            .foregroundColor(C.chatTimeInk)
+            /* 时间加一个明显的圆角小框（和微信一样；颜色/圆角后台能调，只作用于聊天页） */
+            .padding(.horizontal, L.o("chatTimePadX", 8))
+            .padding(.vertical, L.o("chatTimePadY", 3))
+            .background(RoundedRectangle(cornerRadius: L.o("chatTimeRadius", 4), style: .continuous)
+                .fill(C.chatTimeBg))
+            .frame(maxWidth: .infinity)
+            .padding(.top, L.o("chatTimeGapTop", 12))
+            .padding(.bottom, L.o("chatTimeGapBottom", 12))
+    }
+
+    /// 撤回的提示：微信里不是气泡，是居中一行灰字
+    private func recallLine(_ message: Message) -> some View {
+        Text(recallText(message))
+            .font(pf(12.5))
+            .foregroundColor(C.msgTime)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 40)
+    }
+
+    private func recallText(_ message: Message) -> String {
+        if message.senderId == myId { return Tr("你撤回了一条消息") }
+        if isGroup { return displayName(message) + " " + Tr("撤回了一条消息") }
+        return Tr("对方撤回了一条消息")
+    }
+
+    @ViewBuilder
+    private func messageRow(_ message: Message) -> some View {
+        MessageRow(message: message,
+                   mine: message.senderId == myId,
+                   myId: myId,
+                   senderName: senderNameFor(message),
+                   showTail: isRunStart(message),
+                   onTapTransfer: { info in billInfo = info },
+                   onOpenImage: { path in openImage(path) },
+                   onOpenAvatar: { id in openAvatar(id) },
+                   onOpenWeb: { url in web = WebURL(url: url) },
+                   onTapRedPacket: { info in tapRedPacket(info) })
+            .padding(.bottom, gapAfter(message))
+            /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
+            .onLongPressGesture { openActions(message) }
+            .overlay(alignment: .leading) {
+                if selectMode {
+                    Image(systemName: selected.contains(message.id)
+                          ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 21))
+                        .foregroundColor(selected.contains(message.id) ? C.green : C.subLabel)
+                        .padding(.leading, 10)
+                }
+            }
+            .overlay {
+                if selectMode {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { toggleSelect(message) }
+                }
+            }
+            .background(GeometryReader { g in
+                Color.clear.preference(key: MsgFrameKey.self,
+                                       value: [message.id: g.frame(in: .global)])
+            })
+    }
+
+    private func indexOf(_ message: Message) -> Int? {
+        messages.firstIndex(where: { $0.id == message.id })
+    }
+
+    /// 是不是「同一个人连发」里的第一条（昵称和气泡尖角都挂这一条）
+    private func isRunStart(_ message: Message) -> Bool {
+        guard let i = indexOf(message), i > 0 else { return true }
+        let prev = messages[i - 1]
+        if prev.kindName == "system" || prev.isRecalled { return true }
+        if (prev.senderId ?? "") != (message.senderId ?? "") { return true }
+        return TimeFmt.minutesBetween(prev.createdAt, message.createdAt) >= 5
+    }
+
+    /// 群里才写昵称，而且只写在连发的第一条上（微信就是这样）
+    private func senderNameFor(_ message: Message) -> String {
+        guard isGroup, message.senderId != myId else { return "" }
+        return isRunStart(message) ? displayName(message) : ""
+    }
+
+    /// 这一条下面留多少空隙
+    private func gapAfter(_ message: Message) -> CGFloat {
+        guard let i = indexOf(message) else { return 15 }
+        guard i + 1 < messages.count else { return 4 }
+        let next = messages[i + 1]
+        if showTime(for: next) { return 0 }        // 时间线自己带上下间距
+        if next.kindName == "system" || next.isRecalled { return 12 }
+        if message.kindName == "system" || message.isRecalled { return 12 }
+        let same = (next.senderId ?? "") == (message.senderId ?? "")
+        return same ? 4 : 15
     }
 
     /* 左上角「返回箭头」旁边那个未读数字：和微信一样的位置。
@@ -1135,6 +1205,8 @@ struct MessageRow: View {
     /// 我自己的 id：红包卡片要判断「我抢过没有」
     var myId: String = ""
     var senderName: String = ""
+    /// 气泡那个小尖角只画在「连发的第一条」上（微信就是这样，后面的气泡是普通圆角）
+    var showTail: Bool = true
     /// 点转账卡片 → 打开账单详情
     var onTapTransfer: ((TransferInfo) -> Void)? = nil
     /// 点图片 → 打开大图
@@ -1157,34 +1229,43 @@ struct MessageRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            if mine { Spacer(minLength: 60) }
+            if mine { Spacer(minLength: 0) }
 
             if !mine {
-                Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
-                Spacer().frame(width: 9)
-                VStack(alignment: .leading, spacing: 4) {
-                    if !senderName.isEmpty {
-                        Text(senderName)
-                            .font(pf(12))
-                            .foregroundColor(C.subLabel)
-                    }
-                    content
-                }
-            } else {
-                content
+                avatarView
+                Spacer().frame(width: L.chatGap)
             }
 
-            if !mine { Spacer(minLength: 60) }
+            bubbleColumn
 
             if mine {
-                Spacer().frame(width: 9)
-                Avatar(path: avatarPath, size: L.chatAvatar, radius: 6)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
+                Spacer().frame(width: L.chatGap)
+                avatarView
             }
+
+            if !mine { Spacer(minLength: 0) }
         }
+    }
+
+    /// 头像（点一下看名片）：微信是 40、圆角 4
+    private var avatarView: some View {
+        Avatar(path: avatarPath, size: L.chatAvatar, radius: 4)
+            .contentShape(Rectangle())
+            .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
+    }
+
+    /// 昵称（群里才有）+ 气泡，整列最宽按微信的 66% 卡住
+    private var bubbleColumn: some View {
+        VStack(alignment: mine ? .trailing : .leading, spacing: 3) {
+            if !senderName.isEmpty {
+                Text(senderName)
+                    .font(pf(12))
+                    .foregroundColor(C.subLabel)
+                    .lineLimit(1)
+            }
+            content
+        }
+        .frame(maxWidth: L.bubbleMaxW, alignment: mine ? .trailing : .leading)
     }
 
     @ViewBuilder
@@ -1201,15 +1282,15 @@ struct MessageRow: View {
         }
     }
 
+    /// 气泡底色（自己的绿、对方的白/深灰）
+    private var bubbleFill: Color { mine ? C.bubbleMine : C.bubbleOther }
+
     @ViewBuilder
     private var bubble: some View {
         switch message.kindName {
         case "image":
-            RemoteImage(path: message.body, icon: "photo")
-                .frame(width: 140, height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .contentShape(Rectangle())
-                .onTapGesture { onOpenImage?(message.body) }
+            /* 微信里的图片：按原比例出缩略图（最长边 200），不是硬裁成正方形 */
+            ImageBubble(path: message.body) { onOpenImage?(message.body) }
 
         case "location":
             locationBubble
@@ -1240,7 +1321,7 @@ struct MessageRow: View {
                     .foregroundColor(C.bubbleText)
                     .padding(.horizontal, L.bubblePadH)
                     .padding(.vertical, L.bubblePadV)
-                    .background(BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther))
+                    .background(BubbleShape(mine: mine, tail: showTail).fill(bubbleFill))
             }
 
         case "file":
@@ -1260,11 +1341,13 @@ struct MessageRow: View {
             }
                 .font(pf(L.chatFontSize))
                 .foregroundColor(C.bubbleText)
+                .lineSpacing(4)                        // 微信正文的行距
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, L.bubblePadH)
                 .padding(.vertical, L.bubblePadV)
                 .background(
-                    BubbleShape(mine: mine)
-                        .fill(mine ? C.bubbleMine : C.bubbleOther)
+                    BubbleShape(mine: mine, tail: showTail)
+                        .fill(bubbleFill)
                 )
         }
     }
@@ -1320,8 +1403,10 @@ struct MessageRow: View {
             .padding(.vertical, 9)
         }
         .frame(width: 216)
-        .background(C.bubbleOther)
+        /* 微信的位置气泡是白卡 + 小尖角（自己的也是白的）。
+           先把内容裁成圆角，再把带尖角的形状铺在底下，尖角才不会被裁掉。 */
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(BubbleShape(mine: mine, tail: showTail).fill(C.bubbleOther))
     }
 
     private var transferBubble: some View {
@@ -1418,17 +1503,25 @@ struct MessageRow: View {
         let secs = max(1, (o["seconds"] as? Int) ?? 1)
         let playing = voicePlayer.playingID == message.id
         let width = min(210, 74 + CGFloat(secs) * 3.2)
+        /* 微信里喇叭永远贴着「靠头像那一边」：对方发的在左、自己发的在右 */
         return HStack(spacing: 8) {
-            SVGIcon(markup: I.speaker, size: 20,
-                    color: playing ? C.green : C.bubbleText)
-            Text("\(secs)″")
-                .font(pfMoney(12.5))
-                .foregroundColor(C.subLabel)
-            Spacer(minLength: 0)
+            if mine { Spacer(minLength: 0) }
+            if mine {
+                Text("\(secs)″")
+                    .font(pfMoney(12.5))
+                    .foregroundColor(C.subLabel)
+                speakerIcon(playing: playing)
+            } else {
+                speakerIcon(playing: playing)
+                Text("\(secs)″")
+                    .font(pfMoney(12.5))
+                    .foregroundColor(C.subLabel)
+            }
+            if !mine { Spacer(minLength: 0) }
         }
         .padding(.horizontal, 12)
         .frame(width: width, height: 40, alignment: mine ? .trailing : .leading)
-        .background(BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther))
+        .background(BubbleShape(mine: mine, tail: showTail).fill(bubbleFill))
         .contentShape(Rectangle())
         .onTapGesture {
             guard let url = API.shared.assetURL(path) else {
@@ -1437,6 +1530,12 @@ struct MessageRow: View {
             }
             voicePlayer.toggle(id: message.id, url: url)
         }
+    }
+
+    /// 语音那个小喇叭（播放中变绿）
+    private func speakerIcon(playing: Bool) -> some View {
+        SVGIcon(markup: I.speaker, size: 20,
+                color: playing ? C.green : C.bubbleText)
     }
 
     private var giftBubble: some View {
@@ -1454,7 +1553,7 @@ struct MessageRow: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(
-            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
+            BubbleShape(mine: mine, tail: showTail).fill(bubbleFill)
         )
     }
 
@@ -1473,7 +1572,7 @@ struct MessageRow: View {
         .padding(.vertical, 11)
         .frame(width: 216, alignment: .leading)
         .background(
-            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
+            BubbleShape(mine: mine, tail: showTail).fill(bubbleFill)
         )
     }
 
@@ -1496,12 +1595,50 @@ struct MessageRow: View {
         .padding(.horizontal, L.bubblePadH)
         .padding(.vertical, L.bubblePadV)
         .background(
-            BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther)
+            BubbleShape(mine: mine, tail: showTail).fill(bubbleFill)
         )
     }
 }
 
 /* ============================================================ 地图小图 */
+
+/* ============================================================
+   图片气泡（照微信）：保持原比例，最长边不超过 200；图还没加载出来时
+   先按 150 的方块占位，加载完自动变成真实比例。点一下看大图。
+   ============================================================ */
+
+struct ImageBubble: View {
+    let path: String
+    let onTap: () -> Void
+
+    @State private var box: CGSize? = nil
+
+    var body: some View {
+        let size = box ?? CGSize(width: 150, height: 150)
+        RemoteImage(path: path, icon: "photo", onLoaded: { img in
+            if box == nil { box = ImageBubble.thumb(img.size) }
+        })
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+    }
+
+    /// 微信的缩略图尺寸：按比例缩到最长边 200；太小的图给到 60 以上好点
+    static func thumb(_ size: CGSize) -> CGSize {
+        let w = max(1, size.width)
+        let h = max(1, size.height)
+        let scale = min(1, 200 / max(w, h))
+        var tw = (w * scale).rounded()
+        var th = (h * scale).rounded()
+        if max(tw, th) < 60 {
+            let k = 60 / max(tw, th)
+            tw = (tw * k).rounded()
+            th = (th * k).rounded()
+        }
+        return CGSize(width: min(200, tw), height: min(200, th))
+    }
+}
 
 enum Tiles {
     static func url(lat: Double, lng: Double, z: Int = 15) -> String {

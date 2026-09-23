@@ -20,6 +20,8 @@ struct SupportView: View {
     @State private var openCat: API.SupportCategory?
     @State private var showTicket = false
     @State private var busyHuman = false
+    /// 「联系客服」直接开独立客服页（不再跳普通聊天）
+    @State private var showKefu = false
 
     private var cats: [API.SupportCategory] { cfg?.categories ?? [] }
     private var tickets: [API.SupportTicket] { cfg?.tickets ?? [] }
@@ -95,6 +97,10 @@ struct SupportView: View {
                 }
             }
             .environmentObject(app)
+        }
+        /* 「联系客服」：开独立的在线客服页面 */
+        .sheet(isPresented: $showKefu) {
+            KefuPage().environmentObject(app)
         }
     }
 
@@ -399,22 +405,9 @@ struct SupportView: View {
 
     /// 转人工：开一个和「在线客服」的会话，直接进聊天页
     private func openHuman() {
+        /* 直接开「在线客服」独立页面（页面里自己会建会话、拉消息），不再跳普通聊天 */
         if busyHuman { return }
-        busyHuman = true
-        Task {
-            /* 服务器那边已经把这个会话建好了（没建也会自动建 + 补好友关系），
-               这里用「打开和在线客服的单聊」把它拿到手，然后直接进聊天页 */
-            if let r = try? await API.shared.supportHuman() {
-                if let chat = try? await API.shared.openDirect(userId: r.agent?.id ?? "") {
-                    nextChat = chat
-                } else {
-                    app.show(Tr("打不开客服会话，稍后再试"))
-                }
-            } else {
-                app.show(Tr("在线客服暂时接不上，先看看常见问题"))
-            }
-            busyHuman = false
-        }
+        showKefu = true
     }
 
     private func catSymbol(_ title: String) -> String {

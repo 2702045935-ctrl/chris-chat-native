@@ -23,6 +23,7 @@ struct KefuPage: View {
     @State private var agentAvatar = ""
     @State private var showFAQ = false
     @State private var humanAsked = false
+    @State private var connectTip = ""
 
     private var myId: String { app.me?.id ?? "" }
 
@@ -45,6 +46,25 @@ struct KefuPage: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         header
+                        if !connectTip.isEmpty {
+                            VStack(spacing: 10) {
+                                Text(connectTip).font(pf(13.5)).foregroundColor(C.subLabel)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 30)
+                                Button { 
+                                    connectTip = ""
+                                    Task { await start() }
+                                } label: {
+                                    Text(Tr("重试"))
+                                        .font(pf(15, .medium)).foregroundColor(.white)
+                                        .padding(.horizontal, 24).frame(height: 40)
+                                        .background(Capsule().fill(C.green))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 30)
+                        }
                         ForEach(messages) { m in
                             kefuBubble(m)
                         }
@@ -181,6 +201,7 @@ struct KefuPage: View {
 
     /* ---------------------------------------------------------- 逻辑 */
     private func start() async {
+        /* 先拿客服配置（头像/名字/值班时间/快捷问题），拿不到也不影响后面开会话 */
         if let cfg = try? await API.shared.support() {
             greet = cfg.greet ?? ""
             workTime = cfg.workTime ?? ""
@@ -195,6 +216,8 @@ struct KefuPage: View {
             chatId = r.chatId
         }
         await loadMessages()
+        /* 万一服务器没建出会话（网络问题），给个能重试的提示，别只留一个空页面 */
+        if chatId.isEmpty { connectTip = "客服暂时接不上，点下面重试一次" }
         loading = false
     }
 

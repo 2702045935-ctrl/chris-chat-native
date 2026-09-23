@@ -447,7 +447,7 @@ struct StatusView: View {
     @State private var saving = false
     @FocusState private var typing: Bool
     /// 我的状态详情（还剩几小时 + 谁看过）
-    @State private var myStatus: API.MyStatus? = nil
+    @State private var myStatus: MyStatus? = nil
 
     /// 现在有没有状态（有的话底部给「结束状态」）
     private var hasMood: Bool {
@@ -500,7 +500,7 @@ struct StatusView: View {
     /* ---------------------------------------------------------- 上面那条输入区 */
 
     /// 已经设了状态时显示：还剩几小时 + 谁看过我
-    private func myStatusCard(_ ms: API.MyStatus) -> some View {
+    private func myStatusCard(_ ms: MyStatus) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(ms.moodIcon ?? "").font(pf(18))
@@ -516,7 +516,7 @@ struct StatusView: View {
                     .font(pf(12.5)).foregroundColor(C.subLabel)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(views) { v in
+                        ForEach(views, id: \.self) { v in
                             VStack(spacing: 4) {
                                 Avatar(path: v.avatar ?? "", size: 36, radius: 18)
                                 Text(v.name ?? "").font(pf(11)).foregroundColor(C.subLabel).lineLimit(1)

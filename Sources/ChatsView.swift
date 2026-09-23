@@ -249,6 +249,14 @@ struct ChatsView: View {
     /// 下拉二楼：会话列表滚到最上面之后再往下拉，露出二楼；上滑回去
     @State private var topOffset: CGFloat = 0
     @State private var secondFloor = false
+    /// 二楼是不是刚被点过（点完先收起来，下次下拉再出来）
+    @State private var floorPinned = false
+
+    /// 二楼露出多少：0 = 完全收起，1 = 全部露出。跟着手指走（拉的越多露的越多）
+    private var floorProgress: CGFloat {
+        if floorPinned { return 0 }
+        return min(1, max(0, topOffset / 130))
+    }
     /// 「搜索」整页
     @State private var showSearch = false
 
@@ -271,10 +279,10 @@ struct ChatsView: View {
             .padding(.top, 6)
 
             HStack(alignment: .top, spacing: 0) {
-                floorItem("扫一扫", "qrcode.viewfinder", Color(hex: 0x2AAE67)) { showScan = true; secondFloor = false }
-                floorItem("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)) { app.show(Tr("收付款在「我 → 服务 → 收付款」里")); secondFloor = false }
-                floorItem("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)) { app.show(Tr("去「发现 → 朋友圈」就能发")); secondFloor = false }
-                floorItem("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C)) { app.show(Tr("去「发现 → 视频号」看视频")); secondFloor = false }
+                floorItem("扫一扫", "qrcode.viewfinder", Color(hex: 0x2AAE67)) { showScan = true; floorPinned = true }
+                floorItem("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)) { app.show(Tr("收付款在「我 → 服务 → 收付款」里")); floorPinned = true }
+                floorItem("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)) { app.show(Tr("去「发现 → 朋友圈」就能发")); floorPinned = true }
+                floorItem("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C)) { app.show(Tr("去「发现 → 视频号」看视频")); floorPinned = true }
             }
             Spacer(minLength: 0)
         }
@@ -407,11 +415,8 @@ struct ChatsView: View {
                     .coordinateSpace(name: "chatsScroll")
                     .onPreferenceChange(ChatsTopKey.self) { y in
                         topOffset = y
-                        /* 往下拉超过 46pt 就露二楼（比刷新的阈值小，二楼先出来） */
-                        let open = y > 46
-                        if open != secondFloor {
-                            withAnimation(.easeOut(duration: 0.18)) { secondFloor = open }
-                        }
+                        /* 回到顶上就把「刚点过」的标记清掉，下次下拉还能露二楼 */
+                        if y < 6 && floorPinned { floorPinned = false }
                     }
                 }
             }
@@ -420,10 +425,12 @@ struct ChatsView: View {
             .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
             /* 下拉二楼：露出来的时候盖在最上面（上滑/点一下里面的项就回去） */
             .overlay(alignment: .top) {
-                if secondFloor {
-                    secondFloorView
-                        .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { secondFloor = false } }
-                }
+                /* 二楼跟着手指走：拉 130pt 就完全露出，松手自己滑回去（微信那种动态感） */
+                secondFloorView
+                    .offset(y: (floorProgress - 1) * 300)
+                    .opacity(Double(floorProgress))
+                    .allowsHitTesting(floorProgress > 0.55)
+                    .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86), value: floorProgress)
             }
             .sheet(isPresented: $showSearch) {
                 SearchPage(onOpenChat: { c in path.append(c) })

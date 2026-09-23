@@ -246,6 +246,65 @@ struct ChatsView: View {
     @State private var openRow: String?
     /// 下拉时露出来的距离（用滚动偏移算，不会抢左右滑的手势）
     @State private var pullY: CGFloat = 0
+    /// 下拉二楼：会话列表滚到最上面之后再往下拉，露出二楼；上滑回去
+    @State private var topOffset: CGFloat = 0
+    @State private var secondFloor = false
+    /// 「搜索」整页
+    @State private var showSearch = false
+
+    private struct ChatsTopKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    }
+
+    /// 二楼：微信那种「小程序/快捷入口」格子（黑底 + 圆角图标）
+    private var secondFloorView: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.6))
+                Text(Tr("上滑回到会话列表"))
+                    .font(pf(12.5))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(.top, 6)
+
+            HStack(alignment: .top, spacing: 0) {
+                floorItem("扫一扫", "qrcode.viewfinder", Color(hex: 0x2AAE67)) { showScan = true; secondFloor = false }
+                floorItem("收付款", "yensign.circle.fill", Color(hex: 0xFA9D3C)) { app.show(Tr("收付款在「我 → 服务 → 收付款」里")); secondFloor = false }
+                floorItem("朋友圈", "photo.on.rectangle.angled", Color(hex: 0x1180E0)) { app.show(Tr("去「发现 → 朋友圈」就能发")); secondFloor = false }
+                floorItem("视频号", "play.rectangle.fill", Color(hex: 0xE2A03C)) { app.show(Tr("去「发现 → 视频号」看视频")); secondFloor = false }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 260)
+        .background(
+            LinearGradient(colors: [Color(hex: 0x1F1F22), Color(hex: 0x0E0E10)],
+                           startPoint: .top, endPoint: .bottom)
+            .ignoresSafeArea(edges: .top)
+        )
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    private func floorItem(_ title: String, _ symbol: String, _ color: Color, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.12))
+                        .frame(width: 54, height: 54)
+                    Image(systemName: symbol)
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundColor(color)
+                }
+                Text(Tr(title)).font(pf(12)).foregroundColor(.white.opacity(0.9))
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
     /// 点会话列表里机器人那几行的头像 → 弹它的名片
     @State private var botCardChat: Chat?
 
@@ -308,10 +367,23 @@ struct ChatsView: View {
                         LazyVStack(spacing: 0) {
                             /* 搜索框放进滚动区里：上滑会跟着列表一起滚走，
                                下拉会跟着列表一起下来 —— 微信就是这样（参考图里第二张搜索框已经滚没了）。 */
-                            SearchBoxCenter(text: $keyword)
-                                .padding(L.searchPad)
-                                /* 和通讯录一样用「页面底色」，两页看着才是同一个色 */
-                                .background(C.chatsPageBg)
+                            /* 用来读滚动偏移：滚到顶之后再往下拉就露二楼 */
+                            GeometryReader { geo in
+                                Color.clear.preference(key: ChatsTopKey.self,
+                                                       value: geo.frame(in: .named("chatsScroll")).minY)
+                            }
+                            .frame(height: 0)
+                            /* 微信那样：这个框不是就地过滤，点一下进「搜索」整页
+                               （上面一排「搜索指定内容」+ 最近搜索） */
+                            Button {
+                                showSearch = true
+                            } label: {
+                                SearchBoxCenter(text: .constant(""))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(L.searchPad)
+                            /* 和通讯录一样用「页面底色」，两页看着才是同一个色 */
+                            .background(C.chatsPageBg)
                             ForEach(list) { chat in
                                 SwipeChatRow(
                                     chat: chat,
@@ -333,11 +405,30 @@ struct ChatsView: View {
                     .background(Color.clear)
                     .refreshable { await app.loadChats() }
                     .coordinateSpace(name: "chatsScroll")
+                    .onPreferenceChange(ChatsTopKey.self) { y in
+                        topOffset = y
+                        /* 往下拉超过 46pt 就露二楼（比刷新的阈值小，二楼先出来） */
+                        let open = y > 46
+                        if open != secondFloor {
+                            withAnimation(.easeOut(duration: 0.18)) { secondFloor = open }
+                        }
+                    }
                 }
             }
             /* 第一页面（会话列表）的底色跟通讯录统一：都用后台的「页面底色」pageBg，
                以前这里用的是 navBg，深色下比通讯录浅一档（#18181A vs #0B0B0D）。 */
             .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
+            /* 下拉二楼：露出来的时候盖在最上面（上滑/点一下里面的项就回去） */
+            .overlay(alignment: .top) {
+                if secondFloor {
+                    secondFloorView
+                        .onTapGesture { withAnimation(.easeOut(duration: 0.18)) { secondFloor = false } }
+                }
+            }
+            .sheet(isPresented: $showSearch) {
+                SearchPage(onOpenChat: { c in path.append(c) })
+                    .environmentObject(app)
+            }
             .background(C.chatsPageBg.ignoresSafeArea(edges: .top))
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Chat.self) { chat in

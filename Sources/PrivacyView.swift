@@ -218,6 +218,7 @@ struct GeneralView: View {
     @State private var showBg = false
     @State private var showBgPick = false
     @State private var showStorage = false
+    @State private var showHistory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -236,6 +237,8 @@ struct GeneralView: View {
                         HairLine(inset: 16)
                         /* 微信「通用 → 存储空间」：看占用 + 清缓存 + 清某个会话的记录 */
                         row(Tr("存储空间"), "") { showStorage = true }
+                        HairLine(inset: 16)
+                        row(Tr("聊天记录管理"), "") { showHistory = true }
                     }
                     .padding(.top, 8)
                     Spacer().frame(height: 30)
@@ -274,6 +277,9 @@ struct GeneralView: View {
         }
         .sheet(isPresented: $showStorage) {
             StorageView().environmentObject(app)
+        }
+        .sheet(isPresented: $showHistory) {
+            ChatHistoryView().environmentObject(app)
         }
     }
 

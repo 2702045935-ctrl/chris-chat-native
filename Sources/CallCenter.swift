@@ -374,16 +374,24 @@ final class CallCenter: NSObject, ObservableObject {
         case "accepted":
             guard ev.callId == callId else { return }
             Ringtone.shared.stop()
-            phase = .connecting
-            tip = "正在接通…"
             startConnectWatch()
-            /* 主叫这边：拨号时 beginMedia() 已经启动过采集了；万一那次因为
-               权限还没批下来失败过，这里再兜一次（start() 是幂等的）。 */
-            if !isVideo, !serverAudioOn {
-                CallAudioPipe.shared.start()
-                Task { await API.shared.callDiag("主叫 语音 对方已接：重新启动采集 采集="
-                    + (CallAudioPipe.shared.isRunning ? "ok" : "失败")
-                    + (CallAudioPipe.shared.isRunning ? "" : " 原因: " + CallAudioPipe.shared.lastError)) }
+            if isVideo {
+                phase = .connecting
+                tip = "正在接通…"
+            } else {
+                /* 语音：对方接了 —— 通道已经起来就直接进「通话中」开计时；
+                   万一拨号那次因权限没批起来失败过，这里再兜一次（start() 幂等）。 */
+                if !serverAudioOn { CallAudioPipe.shared.start(); serverAudioOn = true }
+                if phase != .active {
+                    phase = .active
+                    tip = "通话中"
+                    ringTimer?.invalidate()
+                    ringTimer = nil
+                    connectTimer?.invalidate()
+                    connectTimer = nil
+                    startTimer()
+                }
+                reportMicState(prefix: "App 语音走服务器转发（对方已接）")
             }
 
         case "audio":
@@ -503,12 +511,22 @@ final class CallCenter: NSObject, ObservableObject {
                 self.sendCall(["action": "audio", "data": data.base64EncodedString()])
             }
             CallAudioPipe.shared.start()
-            if phase != .active {
+            if iAmCaller {
+                /* ⚠ 关键：语音这条必须自己把「邀请」发出去。
+                   以前这一支 return 得太早，发 invite 的代码在下面视频分支里 ——
+                   结果是：主叫这边自己起了通道、界面显示「通话中」，对面手机**根本不响**
+                   （看着就是「假通 / 打不出去」）。视频分支一直在发 invite，所以视频能响。 */
+                sendCall(["action": "invite", "toUserId": peerId, "media": "audio"])
+                tip = "正在呼叫…"
+            } else {
+                /* 被叫点了接听：直接进「通话中」并开始计时（语音这条路不依赖 ICE） */
                 Ringtone.shared.stop()
                 phase = .active
                 tip = "通话中"
                 ringTimer?.invalidate()
                 ringTimer = nil
+                connectTimer?.invalidate()
+                connectTimer = nil
                 startTimer()
             }
             reportMicState(prefix: "App 语音走服务器转发")

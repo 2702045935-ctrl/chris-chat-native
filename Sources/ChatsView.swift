@@ -272,26 +272,6 @@ struct ChatsView: View {
         dragPull = 0
         withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = false }
     }
-    /// 二楼这一页「长出来」的程度：0 = 还没出现（只有下拉的小球），1 = 整页铺满（微信那个过程）
-    private var floorAppear: CGFloat {
-        let p = floorProgress
-        return max(0, min(1, (p - 0.22) / 0.60))
-    }
-    /// 下拉时顶上先冒出来的小灰球（一个变三个），页面完全长出来之前它负责「跟手」
-    private var floorDots: some View {
-        let p = floorProgress
-        let grow = min(1, p / 0.08)
-        let split = max(0, min(1, (p - 0.08) / 0.08))
-        let fade = max(0, min(1, 1 - max(0, p - 0.20) / 0.05))
-        return HStack(spacing: 6) {
-            Circle().fill(C.searchIcon).frame(width: 7, height: 7).opacity(Double(split))
-            Circle().fill(C.searchIcon).frame(width: 7, height: 7).scaleEffect(grow)
-            Circle().fill(C.searchIcon).frame(width: 7, height: 7).opacity(Double(split))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 16)
-        .opacity(Double(min(1, p / 0.03) * fade))
-    }
     /// 「搜索」整页
     @State private var showSearch = false
 
@@ -576,26 +556,16 @@ struct ChatsView: View {
             .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
             /* 下拉二楼：露出来的时候盖在最上面（上滑/点一下里面的项就回去） */
             .overlay(alignment: .top) {
-                /* 微信的过程：先冒小灰球 → 页面缩小着长出来（上面压一层页底色）→ 蒙层淡掉、页面铺满一屏。
-                   松手拉够了就停在这一页；在这一页上往上滑超过一定距离才回会话列表。 */
-                ZStack(alignment: .top) {
-                    floorDots
-                    GeometryReader { geo in
-                        /* 拉的过程中页面先只铺会话列表这一块（底栏还在下面）；
-                           真正翻过去以后才是「单独的一整页」，连底栏那一块一起盖住 */
-                        let h = floorOpen ? max(geo.size.height, UIScreen.main.bounds.height)
-                                          : geo.size.height
-                        let appear = floorAppear
-                        secondFloorView(h)
-                            .frame(maxWidth: .infinity, alignment: .top)
-                            /* 缩小着从上面下来，上面压一层页底色（跟微信那层蒙层一样），
-                               越拉蒙层越淡、页面越大，最后铺满一屏 */
-                            .overlay(C.pageBg.opacity(Double(1 - appear)))
-                            .scaleEffect(0.88 + 0.12 * appear, anchor: .top)
-                            .offset(y: (1 - appear) * -40)
-                            .opacity(Double(min(1, appear * 1.6)))
-                            .allowsHitTesting(floorOpen)
-                    }
+                /* 手指拉多少，这一整页就跟着下来多少（不缩放、不淡入）：
+                   拉过一半松手就整页停住；在这一页上往上滑才回会话列表。 */
+                GeometryReader { geo in
+                    let full = max(geo.size.height, UIScreen.main.bounds.height)
+                    let reveal = floorOpen ? full : min(full, floorPull)
+                    secondFloorView(reveal)
+                        .frame(maxWidth: .infinity, alignment: .top)
+                        .clipped()
+                        .opacity(reveal > 1 ? 1 : 0)
+                        .allowsHitTesting(floorOpen)
                 }
             }
             .sheet(isPresented: $showSearch) {

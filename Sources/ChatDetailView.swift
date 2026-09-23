@@ -1342,31 +1342,56 @@ struct MessageRow: View {
         } else {
             card = Color(hex: 0xFA9D3C)
         }
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "yensign.circle.fill")
-                    .font(pf(26))
-                    .foregroundColor(Color(hex: 0xFFFFFF))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("¥\(String(format: "%.2f", amount))")
-                        .font(pfMoney(19))
+        /* 排版照微信：左边一个白色圆底图标，右边金额（大字）+"转账"/说明，
+           最下面一条细线隔开的底栏：左边「转账」，右边状态（待对方确认收款 / 已收款 / 已退回） */
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 10) {
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.22)).frame(width: 38, height: 38)
+                    Image(systemName: "yensign")
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.white)
-                    Text(note.isEmpty ? (mine ? "你发起了一笔转账" : "转账给你") : note)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("¥\(String(format: "%.2f", amount))")
+                        .font(pfMoney(21, .medium))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(note.isEmpty ? Tr("转账") : note)
                         .font(pf(12))
-                        .foregroundColor(Color.white.opacity(0.88))
+                        .foregroundColor(Color.white.opacity(0.85))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
-            Text(state)
-                .font(pf(11))
-                .foregroundColor(Color.white.opacity(0.8))
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 11)
+
+            Rectangle()
+                .fill(Color.white.opacity(0.22))
+                .frame(height: 0.5)
+
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(Color.white.opacity(0.85))
+                Text(Tr("转账"))
+                    .font(pf(11.5))
+                    .foregroundColor(Color.white.opacity(0.85))
+                Spacer(minLength: 4)
+                Text(state)
+                    .font(pf(12))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 30)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .frame(width: 216, alignment: .leading)
+        .frame(width: 240, alignment: .leading)
         .background(card)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     /// 红包气泡：橙色卡片（领过 / 领完 / 过期都变淡）

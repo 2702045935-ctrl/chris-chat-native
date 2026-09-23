@@ -47,12 +47,15 @@ jobs:
           unzip -q /tmp/trtc.zip -d /tmp/trtc-x
           # 注意：必须取「设备」那一片（ios-arm64_armv7）。写成 *ios-arm64* 会先匹配到
           # ios-arm64_x86_64-simulator（模拟器片），链接时会报 “built for iOS Simulator”。
-          FW="$(find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework' -path '*ios-arm64_armv7*' | head -1)"
-          if [ -z "$FW" ]; then echo "没找到设备片 framework"; find /tmp/trtc-x -type d -name 'TXLiteAVSDK_TRTC.framework'; exit 1; fi
-          echo "找到 framework: $FW"
-          cp -R "$FW" TRTCKit/
-          ls -la TRTCKit/TXLiteAVSDK_TRTC.framework
-          lipo -info TRTCKit/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC || true
+          # TRTC 主库自己还依赖两个动态库（TXFFmpeg / TXSoundTouch），
+          # 三个都必须嵌进 App —— 少一个就是「一启动就闪退」（dyld: Library not loaded）。
+          for NAME in TXLiteAVSDK_TRTC TXFFmpeg TXSoundTouch; do
+            FW="$(find /tmp/trtc-x -type d -name "$NAME.framework" -path '*ios-arm64_armv7*' | head -1)"
+            if [ -z "$FW" ]; then echo "没找到 $NAME 的设备片"; exit 1; fi
+            cp -R "$FW" TRTCKit/
+            lipo -info "TRTCKit/$NAME.framework/$NAME" || true
+          done
+          ls -la TRTCKit
 
       # 英文词典里有重复 key 的话，Swift 的字典字面量会在启动时直接崩（以前线上崩过好几次）。
       # 这里打包前先查一遍，有问题就让这次构建失败，别把崩溃版发出去。
@@ -89,16 +92,17 @@ jobs:
           # 把 WebRTC 打进 App 里（动态库，运行时从 @executable_path/Frameworks 加载）
           mkdir -p "$APP/Frameworks"
           cp -R WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework "$APP/Frameworks/WebRTC.framework"
-          # 腾讯云 TRTC 也是动态库，同样嵌进来（只留 arm64，省 8MB）
-          cp -R TRTCKit/TXLiteAVSDK_TRTC.framework "$APP/Frameworks/TXLiteAVSDK_TRTC.framework"
-          lipo -thin arm64 "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC" \
-            -output "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" || true
-          if [ -f "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" ]; then
-            mv "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC.arm64" \
-               "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC"
-          fi
-          rm -rf "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/_CodeSignature"
-          ls -lh "$APP/Frameworks/TXLiteAVSDK_TRTC.framework/TXLiteAVSDK_TRTC"
+          # 腾讯云 TRTC 的三个动态库全嵌进来（各只留 arm64，省体积）
+          for NAME in TXLiteAVSDK_TRTC TXFFmpeg TXSoundTouch; do
+            cp -R "TRTCKit/$NAME.framework" "$APP/Frameworks/$NAME.framework"
+            lipo -thin arm64 "$APP/Frameworks/$NAME.framework/$NAME" \
+              -output "$APP/Frameworks/$NAME.framework/$NAME.arm64" || true
+            if [ -f "$APP/Frameworks/$NAME.framework/$NAME.arm64" ]; then
+              mv "$APP/Frameworks/$NAME.framework/$NAME.arm64" "$APP/Frameworks/$NAME.framework/$NAME"
+            fi
+            rm -rf "$APP/Frameworks/$NAME.framework/_CodeSignature"
+            ls -lh "$APP/Frameworks/$NAME.framework/$NAME"
+          done
           xcrun --sdk iphoneos swiftc \
             -sdk "$SDK" \
             -target arm64-apple-ios16.0 \
@@ -130,6 +134,22 @@ jobs:
           ls -lh "$APP/CHRIS"
           echo "依赖了哪些动态库："
           otool -L "$APP/CHRIS" | head -12
+          # 自检：App 和它嵌进去的每个动态库，引用的 @rpath 库必须在包里找得到，
+          # 否则装到手机上就是「一启动就闪退」（dyld: Library not loaded）。
+          echo "=== 动态库自检 ==="
+          MISSING=0
+          for BIN in "$APP/CHRIS" "$APP"/Frameworks/*.framework/*; do
+            [ -f "$BIN" ] || continue
+            otool -L "$BIN" | tail -n +2 | awk '{print $1}' | grep '^@rpath/' | while read -r DEP; do
+              NAME="$(basename "$DEP")"
+              if ! ls "$APP"/Frameworks/*/"$NAME" >/dev/null 2>&1; then
+                echo "缺少动态库: $DEP（被 $(basename "$BIN") 依赖）"
+                exit 1
+              fi
+            done || MISSING=1
+          done
+          if [ "$MISSING" != "0" ]; then echo "自检没通过：包里的动态库不全"; exit 1; fi
+          echo "自检通过：包里所有 @rpath 依赖都在"
           zip -qry CHRISChat-unsigned.ipa Payload
           ls -lh CHRISChat-unsigned.ipa
           # 安装包加密：仓库是私有的，产物再加一层 AES-256，光有链接也装不了

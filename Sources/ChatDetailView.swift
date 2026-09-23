@@ -82,6 +82,8 @@ struct ChatDetailView: View {
     @State private var viewer: PhotoPager.Item?
     /// 点头像 → 名片（自己的头像是自己的名片）
     @State private var cardUser: User?
+    /// 点位置气泡打开的大地图页
+    @State private var openLocation: LocationPoint?
     /// 点机器人（AI 助手 / 腾讯新闻）的头像 → 弹它的名片
     @State private var botCard = false
 
@@ -494,6 +496,10 @@ struct ChatDetailView: View {
             BotCardView(chat: chat).environmentObject(app)
         }
         .sheet(item: $web) { SafariSheet(url: $0.url) }
+        /* 点位置气泡 → 整页大地图（微信那样） */
+        .sheet(item: $openLocation) { p in
+            LocationDetailView(point: p).environmentObject(app)
+        }
         .onChange(of: messages.count) { _ in autoOpenShopCard() }
         .sheet(isPresented: $showGroupInfo) { GroupInfoView(chat: chat) }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
@@ -1403,7 +1409,11 @@ struct MessageRow: View {
             ImageBubble(path: message.body) { onOpenImage?(message.body) }
 
         case "location":
+            /* 点一下就进「位置详情」大地图页（微信就是这么点的） */
             locationBubble
+                .onTapGesture {
+                    if let p = LocationPoint.parse(message.body) { openLocation = p }
+                }
 
         case "transfer":
             transferBubble
@@ -1500,9 +1510,11 @@ struct MessageRow: View {
         let lng = (o["lng"] as? Double) ?? 0
         let name = (o["name"] as? String) ?? "位置"
         let addr = (o["addr"] as? String) ?? ""
+        let pt = LocationPoint(lat: lat, lng: lng, name: name, addr: addr)
         return VStack(spacing: 0) {
-            RemoteImage(path: Tiles.url(lat: lat, lng: lng), icon: "map")
-                .frame(width: 216, height: 136)
+            /* 小地图改成**本机用苹果地图渲染的快照**：
+               以前用的是 tile.openstreetmap.org 的瓦片，国内网络经常拉不到 → 气泡一片空白。 */
+            MapSnapshotView(point: pt, width: 216, height: 136)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).font(pf(15)).foregroundColor(C.bubbleText).lineLimit(1)
                 Text(addr.isEmpty ? "点击查看地图" : addr)

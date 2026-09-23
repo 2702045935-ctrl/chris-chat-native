@@ -46,6 +46,17 @@ struct ChatRow: View {
                 UnreadBadge(count: chat.unreadCount)
                     .offset(x: 12, y: -8)
             }
+            /* 好友设了状态：头像右下角挂一个小 emoji（微信就是这样） */
+            .overlay(alignment: .bottomTrailing) {
+                if let icon = chat.moodIcon, !icon.isEmpty {
+                    Text(icon)
+                        .font(.system(size: 9))
+                        .frame(width: 17, height: 17)
+                        .background(Circle().fill(C.cardBg))
+                        .overlay(Circle().stroke(C.hairline, lineWidth: 0.5))
+                        .offset(x: 5, y: 5)
+                }
+            }
     }
 }
 

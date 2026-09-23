@@ -428,87 +428,59 @@ struct StickerView: View {
     }
 }
 
-/* ============================================================ 状态（我 → ＋状态） */
+/* ============================================================
+   状态（我 → ＋状态）——照微信那套：
+     · 上面一条输入区：左边是挑中的状态图标，右边「说点什么」写一句（最多 30 字）
+     · 下面按后台配的分类，一组一张卡，一格一个状态
+     · 右上角「就这样」保存；已经设了状态的，底部可以「结束状态」
+   状态 24 小时后自己消失（服务端算的），点自己那一条能看到「谁看过我」。
+   ============================================================ */
 
 struct StatusView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
 
     @State private var cats: [StatusCategory] = []
-    @State private var cat = 0
+    @State private var picked: StatusItem? = nil
+    @State private var pickedColor = ""
+    @State private var caption = ""
+    @State private var saving = false
+    @FocusState private var typing: Bool
 
-    private var items: [StatusItem] {
-        guard cat < cats.count else { return [] }
-        return cats[cat].items ?? []
+    /// 现在有没有状态（有的话底部给「结束状态」）
+    private var hasMood: Bool {
+        !((app.me?.moodText ?? "").isEmpty && (app.me?.moodIcon ?? "").isEmpty)
     }
+
+    private let cols = [GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
         VStack(spacing: 0) {
-            NavBar(title: Tr("状态"), back: { dismiss() })
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(cats.indices, id: \.self) { i in
-                        Button {
-                            cat = i
-                        } label: {
-                            Text(cats[i].name ?? "分类")
-                                .font(pf(13.5))
-                                .foregroundColor(cat == i ? .white : C.label)
-                                .padding(.horizontal, 12)
-                                .frame(height: 30)
-                                .background(RoundedRectangle(cornerRadius: 15)
-                                    .fill(cat == i ? C.green : C.cardBg))
-                        }
-                        .buttonStyle(.plain)
-                    }
+            NavBar(title: Tr("状态"), back: { dismiss() }) {
+                Button { save() } label: {
+                    Text(Tr("就这样"))
+                        .font(pf(15, .medium))
+                        .foregroundColor(picked == nil ? C.subLabel : C.green)
+                        .padding(.horizontal, 16)
+                        .frame(height: L.navH)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .buttonStyle(.plain)
+                .disabled(picked == nil || saving)
             }
 
             ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                    ForEach(items.indices, id: \.self) { i in
-                        let it = items[i]
-                        Button {
-                            pick(it)
-                        } label: {
-                            VStack(spacing: 6) {
-                                Text(it.icon ?? "🙂").font(pf(30))
-            Text(Tr(it.label ?? "状态"))
-                                    .font(pf(13))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 96)
-                            .background(
-                                LinearGradient(colors: [Color(hexString: it.color ?? "#6F8A38"),
-                                                        Color(hexString: it.color2 ?? it.color ?? "#6F8A38")],
-                                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
+                VStack(spacing: 10) {
+                    composeRow
+                    ForEach(cats.indices, id: \.self) { i in
+                        section(cats[i])
                     }
+                    if hasMood { endRow }
+                    Spacer().frame(height: 30)
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 12)
-
-                Button {
-                    clear()
-                } label: {
-                    Text(Tr("取消当前状态"))
-                        .font(pf(15))
-                        .foregroundColor(C.red)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(C.cardBg)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 30)
+                .padding(.top, 10)
             }
             .background(C.pageBg)
         }
@@ -516,27 +488,389 @@ struct StatusView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { dismiss() }
         .hidesTabBar()
-        .task {
-            cats = (try? await API.shared.statusCategories()) ?? []
+        .task { await load() }
+    }
+
+    /* ---------------------------------------------------------- 上面那条输入区 */
+
+    private var composeRow: some View {
+        HStack(spacing: 10) {
+            moodBox
+            TextField("", text: $caption, prompt: Text(Tr("说点什么…")).foregroundColor(C.subLabel))
+                .font(pf(14.5))
+                .foregroundColor(C.label)
+                .focused($typing)
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .background(Capsule().fill(C.cardBg))
+                .onChange(of: caption) { v in
+                    if v.count > 30 { caption = String(v.prefix(30)) }
+                }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var moodBox: some View {
+        let icon = picked?.icon ?? ""
+        let on = picked != nil
+        return ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(on ? AnyShapeStyle(tileGradient(picked?.color ?? pickedColor))
+                         : AnyShapeStyle(C.cardBg))
+                .frame(width: 44, height: 44)
+            if on {
+                Text(icon.isEmpty ? "🙂" : icon).font(pf(22))
+            } else {
+                Text("＋").font(pf(20)).foregroundColor(C.subLabel)
+            }
         }
     }
 
-    private func pick(_ item: StatusItem) {
+    /* ---------------------------------------------------------- 一组状态 */
+
+    private func section(_ c: StatusCategory) -> some View {
+        let title = c.name ?? ""
+        let items = c.items ?? []
+        let catColor = MoodColor.clean(c.color)
+        return VStack(alignment: .leading, spacing: 9) {
+            Text(Tr(title))
+                .font(pf(13))
+                .foregroundColor(C.subLabel)
+                .padding(.leading, 15)
+            LazyVGrid(columns: cols, spacing: 8) {
+                ForEach(items, id: \.self) { it in
+                    tile(it, fallback: catColor)
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .padding(.vertical, 12)
+        .background(C.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+    }
+
+    private func tile(_ it: StatusItem, fallback: String) -> some View {
+        let own = MoodColor.clean(it.color)
+        let base = own.isEmpty ? (fallback.isEmpty ? "#6F8A38" : fallback) : own
+        let on = (picked?.id ?? "-") == (it.id ?? "?")
+        return Button { pick(it, base: base) } label: {
+            VStack(spacing: 4) {
+                Text(it.icon ?? "🙂").font(pf(24))
+                Text(Tr(it.label ?? "状态"))
+                    .font(pf(12))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 68)
+            .background(tileGradient(base))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white, lineWidth: on ? 2 : 0))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// 格子的底色：主色 + 自动调亮的第二个色做渐变
+    private func tileGradient(_ raw: String) -> LinearGradient {
+        let c1 = MoodColor.clean(raw)
+        let base = c1.isEmpty ? "#6F8A38" : c1
+        let c2 = MoodColor.shift(base, to: true)
+        return LinearGradient(colors: [Color(hexString: base),
+                                       Color(hexString: c2.isEmpty ? base : c2)],
+                              startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    private var endRow: some View {
+        Button { endMood() } label: {
+            Text(Tr("结束状态"))
+                .font(pf(15.5))
+                .foregroundColor(C.red)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(C.cardBg)
+        }
+        .buttonStyle(.plain)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+    }
+
+    /* ---------------------------------------------------------- 动作 */
+
+    private func load() async {
+        cats = (try? await API.shared.statusCategories()) ?? []
+        if hasMood {
+            pickedColor = MoodColor.clean(app.me?.moodColor)
+            caption = app.me?.moodCaption ?? ""
+        }
+    }
+
+    /// 挑一个：微信挑完就把光标放到「说点什么」，不想写就直接点「就这样」
+    private func pick(_ it: StatusItem, base: String) {
+        picked = it
+        pickedColor = base
+        typing = true
+    }
+
+    private func save() {
+        guard let it = picked, !saving else { return }
+        saving = true
         Task {
-            await API.shared.setMood(item)
+            await API.shared.setMood(it, caption: caption, fallbackColor: pickedColor)
             app.me = try? await API.shared.me()
             app.show(Tr("状态更新了"))
+            saving = false
             dismiss()
         }
     }
 
-    private func clear() {
+    private func endMood() {
         Task {
             await API.shared.setMood(nil)
             app.me = try? await API.shared.me()
             app.show(Tr("状态已取消"))
             dismiss()
         }
+    }
+}
+
+/* ============================================================
+   我的状态详情（微信里点自己那条状态进来的）
+   大卡片（图标 + 状态名 + 说点什么 + 还剩 X 小时）+「谁看过我」+ 结束状态
+   ============================================================ */
+
+struct StatusDetailView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var info: MyStatus? = nil
+    @State private var editing = false
+
+    private var icon: String { info?.moodIcon ?? app.me?.moodIcon ?? "" }
+    private var label: String { info?.moodLabel ?? app.me?.moodLabel ?? app.me?.moodText ?? "" }
+    private var note: String { info?.moodCaption ?? app.me?.moodCaption ?? "" }
+    private var c1: String {
+        let mine = MoodColor.clean(info?.moodColor)
+        return mine.isEmpty ? MoodColor.clean(app.me?.moodColor) : mine
+    }
+    private var c2: String {
+        let mine = MoodColor.clean(info?.moodColor2)
+        return mine.isEmpty ? MoodColor.clean(app.me?.moodColor2) : mine
+    }
+    private var viewers: [StatusViewer] { info?.views ?? [] }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("我的状态"), back: { dismiss() }) {
+                Button { editing = true } label: {
+                    Text(Tr("更改状态"))
+                        .font(pf(15))
+                        .foregroundColor(C.green)
+                        .padding(.horizontal, 16)
+                        .frame(height: L.navH)
+                }
+                .buttonStyle(.plain)
+            }
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    bigCard
+                    viewersCard
+                    Spacer().frame(height: 20)
+                }
+                .padding(.top, 12)
+            }
+            .background(C.pageBg)
+
+            endButton
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+        .sheet(isPresented: $editing) { StatusView() }
+        .task { await reload() }
+        .onChange(of: editing) { on in
+            if !on { Task { await reload() } }
+        }
+    }
+
+    private var bigCard: some View {
+        let base = c1.isEmpty ? "#5B7F42" : c1
+        let second = c2.isEmpty ? MoodColor.shift(base, to: true) : c2
+        return VStack(spacing: 10) {
+            Text(icon.isEmpty ? "🙂" : icon).font(pf(44))
+            if !label.isEmpty {
+                Text(Tr(label)).font(pf(17, .medium)).foregroundColor(.white).lineLimit(1)
+            }
+            if !note.isEmpty {
+                Text(note).font(pf(13.5)).foregroundColor(.white.opacity(0.92))
+                    .multilineTextAlignment(.center).lineLimit(3)
+            }
+            Text(leftText).font(pf(11.5)).foregroundColor(.white.opacity(0.82))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 26)
+        .padding(.horizontal, 18)
+        .background(LinearGradient(colors: [Color(hexString: base),
+                                            Color(hexString: second.isEmpty ? base : second)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 12)
+    }
+
+    private var leftText: String {
+        let h = info?.hoursLeft ?? 0
+        if h <= 0 { return Tr("24 小时后自动结束（不到 1 小时）") }
+        return "24 小时后自动结束 · 还剩 \(h) 小时"
+    }
+
+    private var viewersCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text(Tr("谁看过我"))
+                    .font(pf(14, .medium))
+                    .foregroundColor(C.label)
+                Spacer(minLength: 0)
+                Text("\(info?.viewerCount ?? viewers.count) 人")
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+            }
+            .padding(.horizontal, 15)
+            .frame(height: 46)
+            HairLine(inset: 15)
+            if viewers.isEmpty {
+                Text(Tr("还没有人看过你的状态"))
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+                    .padding(.horizontal, 15)
+                    .padding(.vertical, 18)
+            } else {
+                ForEach(viewers, id: \.self) { v in
+                    viewerRow(v)
+                }
+            }
+        }
+        .background(C.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+    }
+
+    private func viewerRow(_ v: StatusViewer) -> some View {
+        HStack(spacing: 10) {
+            Avatar(path: v.avatar ?? "", size: 34, radius: 17, circle: true)
+            Text(v.name ?? "好友")
+                .font(pf(15))
+                .foregroundColor(C.label)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Text(TimeFmt.list(v.at))
+                .font(pf(12))
+                .foregroundColor(C.subLabel)
+                .fixedSize()
+        }
+        .padding(.horizontal, 15)
+        .frame(height: 54)
+    }
+
+    private var endButton: some View {
+        Button { endIt() } label: {
+            Text(Tr("结束状态"))
+                .font(pf(15.5))
+                .foregroundColor(C.red)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(C.cardBg)
+        }
+        .buttonStyle(.plain)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, max(10, L.safeBottom))
+    }
+
+    private func reload() async {
+        info = try? await API.shared.myStatus()
+        app.me = try? await API.shared.me()
+    }
+
+    private func endIt() {
+        Task {
+            await API.shared.endMyStatus()
+            app.me = try? await API.shared.me()
+            app.show(Tr("状态已取消"))
+            dismiss()
+        }
+    }
+}
+
+/* ============================================================
+   好友的状态（名片页 / 聊天气泡那一条点进来的）
+   好友那边只看得到「图标 + 状态名 + 说点什么 + 还剩几个小时」
+   ============================================================ */
+
+struct FriendStatusView: View {
+    @Environment(\.dismiss) private var dismiss
+    let user: User
+
+    private var base: String {
+        let c = MoodColor.clean(user.moodColor)
+        return c.isEmpty ? "#5B7F42" : c
+    }
+    private var second: String {
+        let c = MoodColor.clean(user.moodColor2)
+        return c.isEmpty ? MoodColor.shift(base, to: true) : c
+    }
+    private var label: String {
+        let l = (user.moodLabel ?? "").trimmingCharacters(in: .whitespaces)
+        return l.isEmpty ? (user.moodText ?? "") : l
+    }
+    private var note: String { user.moodCaption ?? "" }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("状态"), back: { dismiss() })
+            ScrollView {
+                VStack(spacing: 14) {
+                    VStack(spacing: 10) {
+                        Text(user.moodIcon ?? "🙂").font(pf(46))
+                        if !label.isEmpty {
+                            Text(Tr(label)).font(pf(17, .medium)).foregroundColor(.white)
+                        }
+                        if !note.isEmpty {
+                            Text(note).font(pf(13.5)).foregroundColor(.white.opacity(0.92))
+                                .multilineTextAlignment(.center)
+                        }
+                        Text(leftText).font(pf(11.5)).foregroundColor(.white.opacity(0.82))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+                    .padding(.horizontal, 18)
+                    .background(LinearGradient(colors: [Color(hexString: base),
+                                                        Color(hexString: second.isEmpty ? base : second)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 12)
+                    Spacer().frame(height: 20)
+                }
+                .padding(.top, 12)
+            }
+            .background(C.pageBg)
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .top))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+        .hidesTabBar()
+    }
+
+    private var leftText: String {
+        let exp = Double(user.moodExpiresAt ?? 0)
+        guard exp > 0 else { return Tr("24 小时内有效") }
+        let left = (exp - Date().timeIntervalSince1970 * 1000) / 3600000
+        if left <= 0 { return Tr("已经结束了") }
+        if left < 1 { return Tr("24 小时内有效（不到 1 小时）") }
+        return "24 小时内有效 · 还剩 \(Int(left.rounded())) 小时"
     }
 }
 

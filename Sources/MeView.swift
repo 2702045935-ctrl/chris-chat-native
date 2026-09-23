@@ -64,7 +64,12 @@ struct MeView: View {
                 } else if key == "works" {
                     WorksView()
                 } else if key == "status" {
-                    StatusView()
+                    /* 微信：还没有状态 → 进选择页；已经有状态 → 先进「我的状态」（看谁看过、还剩多久） */
+                    if (app.me?.moodIcon ?? "").isEmpty && (app.me?.moodText ?? "").isEmpty {
+                        StatusView()
+                    } else {
+                        StatusDetailView()
+                    }
                 } else if key == "paypwd" {
                     PayPasswordView()
                 } else if key == "gesture" {

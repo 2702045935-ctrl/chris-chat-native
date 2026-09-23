@@ -12,6 +12,11 @@ struct User: Codable, Identifiable, Hashable {
     var moodIcon: String?
     var moodColor: String?
     var moodColor2: String?
+    /// 状态名（后台配的「摸鱼」这种）和「说点什么」那句自定义文案，是分开的两层
+    var moodLabel: String?
+    var moodCaption: String?
+    /// 状态什么时候过期（毫秒时间戳，0 = 没有状态）
+    var moodExpiresAt: Double?
     var username: String?
     var nickname: String?
     var avatar: String?
@@ -72,6 +77,9 @@ struct Chat: Decodable, Identifiable, Hashable {
     var type: String?
     var title: String?
     var avatar: String?
+    /// 好友的「状态」（微信那种：会话列表头像右下角挂一个 emoji）
+    var moodIcon: String?
+    var moodText: String?
     var unread: Int?
     var pinned: Bool?
     var botRank: Int?
@@ -447,7 +455,72 @@ struct StatusItem: Decodable, Hashable {
 struct StatusCategory: Decodable, Hashable {
     var id: String?
     var name: String?
+    /// 分类自己的底色（后台「状态」页配的），格子没单独配色就用它
+    var color: String?
+    var enabled: Bool?
     var items: [StatusItem]?
+}
+
+/* ---------------- 我的状态（微信那套：24 小时过期 / 谁看过 / 结束状态） ---------------- */
+
+/// 看过我状态的人
+struct StatusViewer: Decodable, Hashable {
+    var userId: String?
+    var name: String?
+    var avatar: String?
+    var at: String?
+}
+
+/// 我的状态详情：还在不在、是什么、还剩几个小时、谁看过
+struct MyStatus: Decodable {
+    var alive: Bool?
+    var moodText: String?
+    var moodIcon: String?
+    var moodColor: String?
+    var moodColor2: String?
+    var moodLabel: String?
+    var moodCaption: String?
+    var hoursLeft: Int?
+    var createdAt: String?
+    var viewerCount: Int?
+    var views: [StatusViewer]?
+
+    var isAlive: Bool { alive ?? false }
+    /// 大卡片上那一行：优先显示「说点什么」，没有就显示状态名
+    var shownText: String {
+        let cap = (moodCaption ?? "").trimmingCharacters(in: .whitespaces)
+        if !cap.isEmpty { return cap }
+        return (moodLabel ?? moodText ?? "")
+    }
+}
+
+/// 状态配色：后台配了就用，没配就用分类色，第二个色自动调亮一点做渐变
+enum MoodColor {
+    /// "#6f8a38" / "6f8a38" → "#6F8A38"；拿不准就给空串
+    static func clean(_ raw: String?) -> String {
+        var s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s = String(s.dropFirst()) }
+        guard s.count == 6, UInt32(s, radix: 16) != nil else { return "" }
+        return "#" + s.uppercased()
+    }
+
+    /// 同色系调亮 / 调暗一点（给渐变的第二格用）
+    static func shift(_ hex: String, to light: Bool) -> String {
+        let c = clean(hex)
+        guard !c.isEmpty, let v = UInt32(c.dropFirst(), radix: 16) else { return "" }
+        var r = Double((v >> 16) & 0xFF)
+        var g = Double((v >> 8) & 0xFF)
+        var b = Double(v & 0xFF)
+        let k = light ? 0.28 : -0.18
+        let mix = light ? 255.0 : 0.0
+        r += (mix - r) * k
+        g += (mix - g) * k
+        b += (mix - b) * k
+        let out = (UInt32(max(0, min(255, r))) << 16)
+            | (UInt32(max(0, min(255, g))) << 8)
+            | UInt32(max(0, min(255, b)))
+        return String(format: "#%06X", out)
+    }
 }
 
 /// 发现页的一行（后台可以自由增删改）
@@ -2595,17 +2668,38 @@ final class API {
     }
 
     /// 设置/清除「状态」（对应后台配的那些状态）
-    func setMood(_ item: StatusItem?) async {
+    /// 「说点什么」那句可选文案（≤30 字）一起带上，和微信一样分两层存
+    func setMood(_ item: StatusItem?, caption: String = "", fallbackColor: String = "") async {
         if let item = item {
+            let label = (item.label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let note = String(caption.trimmingCharacters(in: .whitespacesAndNewlines).prefix(30))
+            let own = MoodColor.clean(item.color)
+            var c1 = own
+            if c1.isEmpty { c1 = MoodColor.clean(fallbackColor) }
+            var c2 = MoodColor.clean(item.color2)
+            if c2.isEmpty { c2 = MoodColor.shift(c1, to: true) }
             await updateMe([
-                "moodText": item.label ?? "",
+                "moodLabel": label,
+                "moodCaption": note,
+                "moodText": note.isEmpty ? label : note,
                 "moodIcon": item.icon ?? "",
-                "moodColor": item.color ?? "",
-                "moodColor2": item.color2 ?? ""
+                "moodColor": c1,
+                "moodColor2": c2
             ])
         } else {
-            await updateMe(["moodText": "", "moodIcon": "", "moodColor": "", "moodColor2": ""])
+            await updateMe(["moodText": "", "moodLabel": "", "moodCaption": "",
+                            "moodIcon": "", "moodColor": "", "moodColor2": ""])
         }
+    }
+
+    /// 我的状态详情：还剩几个小时、谁看过（微信里点自己的状态看到的就是这些）
+    func myStatus() async throws -> MyStatus {
+        try await get("/api/me/status", as: MyStatus.self)
+    }
+
+    /// 结束（清除）我的状态
+    func endMyStatus() async {
+        _ = try? await request("POST", "/api/me/status", body: ["ended": true])
     }
 
     /// 图片压完再传：返回服务器上的 /uploads/xxx.jpg

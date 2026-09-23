@@ -315,10 +315,16 @@ struct ContactCardView: View {
     @State private var showRemark = false
     @State private var showPerm = false
     @State private var confirmDelete = false
+    /// 好友的「状态」（名片上那一小条，点开看大图）
+    @State private var showStatus = false
     /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
     @State private var aiCall: Chat?
 
     private var u: User { full ?? user }
+    /// 好友有状态才显示那一小条
+    private var statusAlive: Bool {
+        !((u.moodIcon ?? "").isEmpty && (u.moodText ?? "").isEmpty)
+    }
     /// 名片上显示的名字：有备注用备注，没有用昵称
     private var displayName: String {
         if let r = meta?.remark, !r.trimmingCharacters(in: .whitespaces).isEmpty { return r }
@@ -391,6 +397,11 @@ struct ContactCardView: View {
         }
         .sheet(isPresented: $showPerm) {
             FriendPermSheet(user: u, meta: meta) { await load() }
+                .environmentObject(app)
+        }
+        /* 好友的「状态」：点名片上那一小条，看大的（微信也是这个动作） */
+        .sheet(isPresented: $showStatus) {
+            FriendStatusView(user: u)
                 .environmentObject(app)
         }
         .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
@@ -467,6 +478,9 @@ struct ContactCardView: View {
                 }
                 .frame(height: L.cdNameRowH)
 
+                /* 好友设了状态：名字下面挂一小条（图标 + 状态名），点开能看大的 */
+                if statusAlive { statusChip.padding(.top, 3) }
+
                 cardLine(isBot ? ("账号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
                                : ("昵称：" + ((u.realNickname?.isEmpty == false) ? u.realNickname! : u.name)))
                     .padding(.top, L.cdLineGap)
@@ -495,6 +509,26 @@ struct ContactCardView: View {
             .foregroundColor(gray)
             .lineLimit(1)
             .frame(height: L.cdLineH, alignment: .leading)
+    }
+
+    /// 好友状态那一小条：图标 + 状态名（点开是大的状态卡）
+    private var statusChip: some View {
+        let c = MoodColor.clean(u.moodColor)
+        let cap = (u.moodCaption ?? "").trimmingCharacters(in: .whitespaces)
+        let lab = (u.moodLabel ?? "").trimmingCharacters(in: .whitespaces)
+        let text = cap.isEmpty ? (lab.isEmpty ? (u.moodText ?? "") : lab) : cap
+        return Button { showStatus = true } label: {
+            HStack(spacing: 4) {
+                Text(u.moodIcon ?? "🙂")
+                Text(text).lineLimit(1)
+            }
+            .font(pf(12))
+            .foregroundColor(c.isEmpty ? gray : .white)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(c.isEmpty ? lineColor : Color(hexString: c)))
+        }
+        .buttonStyle(.plain)
     }
 
     /* ---------------------------------------------------------- 朋友资料 / 电话 */

@@ -6,33 +6,16 @@ struct ChatRow: View {
     var onTapAvatar: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .top, spacing: L.rowGap) {
-            /* 机器人那几行：点头像弹名片。普通会话：头像跟整行一样，点了进聊天 */
-            if let tap = onTapAvatar {
-                avatar.contentShape(Rectangle()).onTapGesture { tap() }
-            } else {
-                avatar
-            }
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text(chat.name)
-                    .font(pf(L.rowNameSize))
-                    .foregroundColor(C.name)
-                    .lineLimit(1)
-                Text(chat.lastMessage?.preview ?? "")
-                    .font(pf(L.rowPreviewSize))
-                    .foregroundColor(C.preview)
-                    .lineLimit(1)
-                    .padding(.top, 3)
-            }
-
+        /* 微信的位置是固定的：头像在行高里居中，文字块和右边那列都从离顶 13 的地方开始 */
+        HStack(alignment: .top, spacing: 0) {
+            avatarBlock
+                .padding(.top, avatarTop)
+            Spacer().frame(width: L.rowGap)
+            textColumn
+                .padding(.top, L.rowPadTop)
             Spacer(minLength: 6)
-
-            Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
-                .font(pf(L.rowTimeSize))
-                .foregroundColor(C.time)
-                .padding(.top, 2)
-                .fixedSize()
+            rightColumn
+                .padding(.top, L.rowPadTop)
         }
         .padding(.leading, L.rowPadL)
         .padding(.trailing, L.rowPadR)
@@ -40,19 +23,59 @@ struct ChatRow: View {
         .contentShape(Rectangle())
     }
 
-    private var avatar: some View {
-        Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 6)
-            .overlay(alignment: .topTrailing) {
-                /* 免打扰的会话只点一个小红点（微信就是这样），其它会话给数字 */
-                if chat.muted == true {
-                    if chat.unreadCount > 0 {
-                        UnreadDot().offset(x: 8, y: -6)
-                    }
-                } else {
-                    UnreadBadge(count: chat.unreadCount)
-                        .offset(x: 11, y: -6)
-                }
+    /// 头像在行高里居中（微信 76 的行、48 的头像 → 上下各 14）
+    private var avatarTop: CGFloat { max(0, (L.rowH - L.avatar) / 2) }
+
+    /// 头像：机器人那几行点它能弹名片，普通会话点了进聊天
+    private var avatarBlock: some View {
+        Group {
+            if let tap = onTapAvatar {
+                avatar.contentShape(Rectangle()).onTapGesture { tap() }
+            } else {
+                avatar
             }
+        }
+    }
+
+    /// 名字在上、预览在下
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: L.rowTextGap) {
+            Text(chat.name)
+                .font(pf(L.rowNameSize))
+                .foregroundColor(C.name)
+                .lineLimit(1)
+            Text(chat.lastMessage?.preview ?? "")
+                .font(pf(L.rowPreviewSize))
+                .foregroundColor(C.preview)
+                .lineLimit(1)
+        }
+    }
+
+    /// 右边一列：时间在上，未读徽标在下（微信就是这样，徽标不在头像上）
+    private var rightColumn: some View {
+        VStack(alignment: .trailing, spacing: 5) {
+            Text(TimeFmt.list(chat.lastMessage?.createdAt ?? chat.updatedAt))
+                .font(pf(L.rowTimeSize))
+                .foregroundColor(C.time)
+                .fixedSize()
+            unreadMark
+        }
+    }
+
+    /// 未读标记：普通会话给数字徽标；免打扰会话只给一个小红点（微信的规则）
+    @ViewBuilder
+    private var unreadMark: some View {
+        if chat.unreadCount > 0 {
+            if chat.muted == true {
+                UnreadDot()
+            } else {
+                UnreadBadge(count: chat.unreadCount)
+            }
+        }
+    }
+
+    private var avatar: some View {
+        Avatar(path: chat.avatar ?? "", size: L.avatar, radius: 4)
             /* 好友设了状态：头像右下角挂一个小 emoji（微信就是这样） */
             .overlay(alignment: .bottomTrailing) {
                 if let icon = chat.moodIcon, !icon.isEmpty {

@@ -136,21 +136,11 @@ struct BillDetailView: View {
                         .padding(.top, 16)
 
                     /* 提示 + 操作链接：参考图 15pt，灰字 + 链接蓝 */
-                    HStack(spacing: 2) {
-                        Text(hintText)
-                            .font(pfExact(14.5))
-                            .foregroundColor(faint)
-                        if t.status == "pending" {
-                            Button {
-                                billAction()
-                            } label: {
-                                Text(mine ? "提醒对方收款" : "立即收款")
-                                    .font(pfExact(14.5))
-                                    .foregroundColor(C.link)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    /* 状态下面这行只放提示语（微信也是灰字一行），
+                       操作按钮放到明细下面做整颗大按钮，不挤在这一行里 */
+                    Text(hintText)
+                        .font(pfExact(14.5))
+                        .foregroundColor(faint)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
                     .padding(.top, 21)
@@ -168,6 +158,24 @@ struct BillDetailView: View {
                     detailRow("转账单号", t.billNo)
                     if t.status == "received" { detailRow("收款时间", TimeFmt.bill(t.receivedAt)) }
                     if t.status == "refunded" { detailRow("退回时间", TimeFmt.bill(t.refundedAt)) }
+
+                    /* 微信那种整颗大按钮：发钱方「提醒对方收款」是橙色，收钱方「确认收款」是绿色 */
+                    if t.status == "pending" {
+                        Button {
+                            billAction()
+                        } label: {
+                            Text(mine ? Tr("提醒对方收款") : Tr("确认收款"))
+                                .font(pf(16.5, .medium))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 46)
+                                .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(mine ? Color(hex: 0xFA9D3C) : C.green))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 32)
+                        .padding(.top, 26)
+                    }
 
                     Spacer(minLength: 40)
                 }

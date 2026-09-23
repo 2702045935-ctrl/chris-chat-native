@@ -30,6 +30,8 @@ final class TRTCBridge: NSObject, ObservableObject {
     @Published private(set) var peerInRoom = false
     /// 最近一次错误（给通话页显示）
     @Published private(set) var lastError = ""
+    /// 我方在 TRTC 里的 userId（就是我们的用户 id，排查用）
+    @Published private(set) var userId = ""
 
     /// 进房 / 退房回调（CallCenter 用它切状态）
     var onJoined: ((Bool) -> Void)?
@@ -71,6 +73,7 @@ final class TRTCBridge: NSObject, ObservableObject {
         let params = TRTCParams()
         params.sdkAppId = UInt32(cfg.sdkAppId)
         params.userId = cfg.userId
+        userId = cfg.userId
         params.userSig = cfg.userSig
         params.roomId = UInt32(cfg.roomId)
         params.role = .anchor

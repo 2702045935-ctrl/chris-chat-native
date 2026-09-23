@@ -301,24 +301,20 @@ struct CallView: View {
 
     private var bottomBar: some View {
         VStack(spacing: 24) {
-            /* 视频通话多一行（微信那套）：摄像头遮挡 + 翻转。语音通话不显示这一行。 */
+            /* 视频通话：微信那套主次分层 ——
+               下面是「麦克风 / 挂断 / 扬声器」三个大圆按钮（主轴），
+               上面右对齐并排两个**小圆按钮**：「翻转」「摄像头已开/已关」。 */
             if call.phase != .incoming && call.isVideo {
-                HStack(spacing: 51) {
-                    roundKey(label: call.cameraOff ? "摄像头已关" : "摄像头已开",
-                             bg: call.cameraOff ? Color.white : Color.white.opacity(0.18),
-                             ink: call.cameraOff ? .black : .white,
-                             action: { call.toggleCamera() }) {
-                        Image(systemName: call.cameraOff ? "video.slash.fill" : "video.fill")
-                            .font(.system(size: 26, weight: .medium))
-                    }
-                    roundKey(label: "翻转",
-                             bg: Color.white.opacity(0.18),
-                             ink: .white,
-                             action: { call.flipCamera() }) {
-                        Image(systemName: "arrow.triangle.2.circlepath.camera")
-                            .font(.system(size: 26, weight: .medium))
-                    }
+                HStack(spacing: 26) {
+                    Spacer(minLength: 0)
+                    smallKey(label: "翻转",
+                             symbol: "arrow.triangle.2.circlepath.camera",
+                             engaged: false) { call.flipCamera() }
+                    smallKey(label: call.cameraOff ? "摄像头已关" : "摄像头已开",
+                             symbol: call.cameraOff ? "video.slash.fill" : "video.fill",
+                             engaged: call.cameraOff) { call.toggleCamera() }
                 }
+                .padding(.trailing, 30)
             }
             HStack(spacing: 51) {
                 if call.phase == .incoming {
@@ -350,6 +346,26 @@ struct CallView: View {
 
     /// 左右两颗（麦克风 / 扬声器）：打开时**变白底 + 深色图标**（和微信一样），
     /// 关着的时候是半透明黑底 + 白色图标。图标本身后台「UI 图标」里能换。
+    /// 小圆按钮（视频通话里「翻转 / 摄像头」那两个次要按钮）：
+    /// 直径 46，图标 18，下面 11 号小字标签 —— 微信那套主次分层就是这么分的。
+    private func smallKey(label: String, symbol: String, engaged: Bool,
+                          action: @escaping () -> Void) -> some View {
+        VStack(spacing: 6) {
+            Button(action: action) {
+                Image(systemName: symbol)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(engaged ? .black : .white)
+                    .frame(width: 46, height: 46)
+                    .background(Circle().fill(engaged ? Color.white : Color.white.opacity(0.18)))
+            }
+            .buttonStyle(.plain)
+            Text(label)
+                .font(pfExact(11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+    }
+
     private func roundKey(key: String, symbol: String, builtin: String,
                           label: String, engaged: Bool,
                           action: @escaping () -> Void) -> some View {

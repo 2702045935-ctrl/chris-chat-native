@@ -1080,6 +1080,9 @@ final class API {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.timeoutInterval = 12
+        /* 报一下自己是哪一版（"B456 · 09-23 21:08" 这种）——
+           排查「两台手机版本不一样」时，服务器日志里一眼就能看出来 */
+        req.setValue(AppInfo.build, forHTTPHeaderField: "X-App-Build")
         if !token.isEmpty {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

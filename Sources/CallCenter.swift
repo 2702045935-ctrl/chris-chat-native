@@ -891,6 +891,12 @@ extension CallCenter: RTCPeerConnectionDelegate {
             note("TRTC 用不了：" + bridge.lastError + "（继续走老路）")
         } else {
             note("TRTC 已请求进房（room=" + callId + "）")
+            /* 把 TRTC 那点状态也报上来：排查「到底进没进同一个房间」就看这几行 */
+            let b = TRTCBridge.shared
+            Task { await API.shared.callDiag("TRTC 进房 room=" + self.callId
+                + " 我方ID=" + b.userId
+                + " 对端在房里=" + (b.peerInRoom ? "是" : "否")
+                + (b.lastError.isEmpty ? "" : " 错误=" + b.lastError)) }
             /* 视频通话：视频**没有**「服务器转发」这条退路（只有语音有），
                而我们这边已经进房了 —— 再给 6 秒等对端进房；等不到就直接切 TRTC，
                因为对端若是新版本（也进了房）我们只是漏收事件，切过去就通了。 */
@@ -899,7 +905,7 @@ extension CallCenter: RTCPeerConnectionDelegate {
                     try? await Task.sleep(nanoseconds: 6_000_000_000)
                     guard let self = self, self.trtcJoined, !self.usingTRTC,
                           self.phase != .idle, !self.callId.isEmpty else { return }
-                    self.note("视频：6 秒没等到对端进房，直接切 TRTC")
+                    self.note("6 秒没等到对端进房，直接切 TRTC（对端可能是旧版本）")
                     self.switchMediaToTRTC()
                 }
             }

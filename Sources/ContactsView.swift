@@ -319,6 +319,10 @@ struct ContactCardView: View {
     @State private var showStatus = false
     /// 机器人（AI 助手 / 腾讯新闻）：点「语音通话」走 AI 通话，不是真人 WebRTC
     @State private var aiCall: Chat?
+    /// 点名片上的头像 → 放大看（微信那样）
+    @State private var showBigAvatar = false
+
+    private var avatarPath: String { u.avatarPath }
 
     private var u: User { full ?? user }
     /// 好友有状态才显示那一小条
@@ -441,6 +445,10 @@ struct ContactCardView: View {
             FriendStatusView(user: u)
                 .environmentObject(app)
         }
+        /* 点名片上的头像 → 整页放大（微信那样，可缩放/长按保存） */
+        .fullScreenCover(isPresented: $showBigAvatar) {
+            PhotoPager(paths: [avatarPath], startIndex: 0) { showBigAvatar = false }
+        }
         .confirmationDialog("", isPresented: $showInfo, titleVisibility: .hidden) {
             if isBot {
                 Button("昵称：\(u.name)") { }
@@ -500,7 +508,10 @@ struct ContactCardView: View {
                     .overlay(RoundedRectangle(cornerRadius: L.cdAvatarRadius, style: .continuous)
                         .stroke(lineColor, lineWidth: 0.6))
             } else {
+                /* 微信：名片页点一下头像 = 放大看这张头像（可以保存/转发那种大图） */
                 Avatar(path: u.avatarPath, size: L.cdAvatar, radius: L.cdAvatarRadius)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if !avatarPath.isEmpty { showBigAvatar = true } }
             }
 
             VStack(alignment: .leading, spacing: 0) {

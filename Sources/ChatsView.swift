@@ -581,8 +581,10 @@ struct ChatsView: View {
                 ZStack(alignment: .top) {
                     floorDots
                     GeometryReader { geo in
-                        /* 「单独的一整页」：高度按整屏算，连底栏那一块也盖住 */
-                        let h = max(geo.size.height, UIScreen.main.bounds.height)
+                        /* 拉的过程中页面先只铺会话列表这一块（底栏还在下面）；
+                           真正翻过去以后才是「单独的一整页」，连底栏那一块一起盖住 */
+                        let h = floorOpen ? max(geo.size.height, UIScreen.main.bounds.height)
+                                          : geo.size.height
                         let appear = floorAppear
                         secondFloorView(h)
                             .frame(maxWidth: .infinity, alignment: .top)

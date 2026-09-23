@@ -28,6 +28,24 @@ struct MainTabView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            /* 登录后同步最近聊天记录：顶上挂一条小小的进度提示（同步是后台做的，不拦着用） */
+            .overlay(alignment: .top) {
+                if app.syncing || !app.syncText.isEmpty {
+                    HStack(spacing: 8) {
+                        if app.syncing { ProgressView().scaleEffect(0.7) }
+                        Text(app.syncText.isEmpty ? "正在同步最近的聊天记录…" : app.syncText)
+                            .font(pf(13))
+                            .foregroundColor(C.label)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 36)
+                    .background(Capsule().fill(C.cardBg))
+                    .overlay(Capsule().stroke(C.hairline, lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                    .padding(.top, L.safeTop + 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
 
             if !app.tabBarHidden {
                 TabBar(selection: $tab,

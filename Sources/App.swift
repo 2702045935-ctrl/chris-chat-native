@@ -215,6 +215,8 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+        /* 登录后同步最近的聊天记录（微信那句文案对应的动作） */
+        Task { await syncRecentMessages() }
     }
 
     /// 注册成功后直接用返回的用户进去（注册接口已经把登录态发下来了，不用再走一次登录）
@@ -223,6 +225,7 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+        Task { await syncRecentMessages() }
     }
 
     func login(phone: String, code: String) async throws {
@@ -230,6 +233,7 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+        Task { await syncRecentMessages() }
     }
 
     /// 身份证自助解封成功后走这里：等同于登录成功（解封接口会把登录态一起发下来）
@@ -238,6 +242,7 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+        Task { await syncRecentMessages() }
     }
 
     /* ---------------- 红点兜底 ----------------
@@ -295,6 +300,41 @@ final class AppState: ObservableObject {
         await loadChats()
         await loadContacts()
         await loadMoments()
+    }
+
+    /* ----------------------------------------------------------
+       登录后同步最近的聊天记录（微信那句「登录后同步最近的聊天记录」）
+       一次把最近 10 个会话、每个最近 30 条消息拉下来：
+         · 会话列表立刻就有
+         · 每个会话的最近消息先存在 prefetched 里，进会话时直接铺出来，不用等网络
+       同步是后台做的，界面顶部显示一条进度提示，失败也不拦着用。
+       ---------------------------------------------------------- */
+    @Published var syncing = false
+    @Published var syncText = ""
+    /// 预取的最近消息：chatId -> 最近 N 条
+    var prefetched: [String: [Message]] = [:]
+
+    func syncRecentMessages(chats: Int = 10, limit: Int = 30) async {
+        syncing = true
+        syncText = "正在同步最近的聊天记录…"
+        defer { syncing = false }
+        do {
+            let r = try await API.shared.chatsWithRecentMessages(chats: chats, limit: limit)
+            chats = r.chats
+            var total = 0
+            for c in r.synced {
+                if let msgs = c.messages, !msgs.isEmpty {
+                    prefetched[c.id] = msgs
+                    total += msgs.count
+                }
+            }
+            syncText = "已同步 " + String(r.synced.count) + " 个会话 / " + String(total) + " 条消息"
+            /* 提示留一会儿再消失，别一闪而过 */
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            syncText = ""
+        } catch {
+            syncText = ""
+        }
     }
 
     func loadChats() async {
@@ -362,6 +402,7 @@ final class AppState: ObservableObject {
         rememberLastUser()
         await refreshAll()
         Realtime.shared.start()
+        Task { await syncRecentMessages() }      // 进来后顺手同步最近的聊天记录（不拦着用）
         return true
     }
 

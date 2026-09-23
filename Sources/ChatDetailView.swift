@@ -1176,6 +1176,12 @@ struct ChatDetailView: View {
     /* ---------------------------------------------------------- 数据 */
 
     private func load(initial: Bool) async {
+        /* 登录后同步下来的最近记录：先铺在界面上（微信也是先出内容再刷），
+           然后再向服务器要最新的 —— 这样点开会话是"立刻有内容"，不是白屏等网络。 */
+        if initial, messages.isEmpty, let cached = app.prefetched[chat.id], !cached.isEmpty {
+            messages = cached
+            hasOlder = true
+        }
         do {
             let result = try await API.shared.messages(chatId: chat.id, limit: 40)
             /* 不能只看条数和最后一条的 id：对方收款以后转账卡片还是同一条消息，

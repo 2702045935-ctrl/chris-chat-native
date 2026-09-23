@@ -1490,6 +1490,31 @@ final class API {
         return payload.chats
     }
 
+    /* ---------------- 登录后同步最近的聊天记录（微信那句「登录后同步最近的聊天记录」） ----------------
+       服务端支持一次把最近 N 个会话 + 每个会话最近 M 条消息带回来（/api/chats?withMessages=1），
+       同步下来的消息先铺在界面上（进会话不用等网络），随后再拉最新的。 */
+    struct SyncChat: Decodable {
+        var id: String
+        var title: String?
+        var messages: [Message]?
+    }
+    private struct SyncChatsPayload: Decodable {
+        var chats: [Chat]
+        var sync: Sync?
+        struct Sync: Decodable {
+            var chats: [SyncChat]?
+            var syncedAt: String?
+        }
+    }
+
+    func chatsWithRecentMessages(chats: Int = 10, limit: Int = 30) async throws -> (chats: [Chat], synced: [SyncChat], syncedAt: String) {
+        let n = max(1, min(30, chats))
+        let m = max(5, min(100, limit))
+        let p: SyncChatsPayload = try await get("/api/chats?withMessages=1&syncChats=\(n)&syncLimit=\(m)",
+                                                as: SyncChatsPayload.self)
+        return (p.chats, p.sync?.chats ?? [], p.sync?.syncedAt ?? "")
+    }
+
     /// 按「微信号 / 手机号」精确找人（转账页填收款账号用）
     func findUserByAccount(_ q: String) async throws -> User? {
         let payload: UsersPayload = try await get("/api/users?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)", as: UsersPayload.self)

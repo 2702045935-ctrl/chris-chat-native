@@ -1122,6 +1122,8 @@ struct ServiceView: View {
     /// 服务页上的「客服中心」：进真正的客服中心页
     @State private var showServiceSupport = false
     @State private var showBillsPage = false
+    /// 「收付款」那一页（付款码 + 收款码）
+    @State private var showPayCode = false
     @State private var detailChat: Chat?
     @State private var detailInfo: TransferInfo?
 
@@ -1218,6 +1220,7 @@ struct ServiceView: View {
         .navigationDestination(isPresented: $showWallet) { WalletView() }
         .sheet(isPresented: $showServiceSupport) { SupportView().environmentObject(app) }
         .navigationDestination(isPresented: $showBillsPage) { BillsView() }
+        .navigationDestination(isPresented: $showPayCode) { PayCodePage() }
         .confirmationDialog(Tr("服务"), isPresented: $showMore, titleVisibility: .hidden) {
             Button(Tr(bt.moreRefresh ?? "刷新账单")) { Task { await loadBills() } }
             Button(Tr(bt.moreRecharge ?? "充值")) { rechargeAmount = ""; showRecharge = true }
@@ -1438,7 +1441,7 @@ struct ServiceView: View {
         case "wallet":
             showWallet = true          // 进「钱包」页（照参考图做的那一页）
         case "pay":
-            app.show(soonTip(label))
+            showPayCode = true          // 收付款（付款码 + 收款码）
         default:
             /* 名字兜底：这几页都做好了，后台动作写成 soon 也能点进去 */
             if label.contains("客服") { showServiceSupport = true }

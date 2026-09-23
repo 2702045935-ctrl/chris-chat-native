@@ -80,6 +80,11 @@ struct MainTabView: View {
         }
         /* 接通 / 挂断弹的对话框（颜色圆角和聊天那个框一样），等用户点「确定」或超时自己关 */
         .overlay(CallDialogOverlay())
+        /* 扫到收付款码：不管在哪个页面扫的，都在最外层弹确认付款页 */
+        .sheet(item: $app.payScan) { info in
+            PayConfirmPage(target: info, scanText: app.payScanText)
+                .environmentObject(app)
+        }
     }
 }
 

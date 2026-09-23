@@ -243,6 +243,8 @@ struct ChatsView: View {
     @State private var path = NavigationPath()
     @State private var plusMenu = false
     @State private var showScan = false
+    /// 二楼「收付款」（我 → 服务 → 收付款 那一页）
+    @State private var showPayCode = false
     @State private var openRow: String?
     /// 下拉二楼：会话列表滚到最上面之后再往下拉，露出二楼；上滑回去
     @State private var topOffset: CGFloat = 0
@@ -435,7 +437,7 @@ struct ChatsView: View {
         case "刷新会话":
             Task { await app.loadChats() }
             app.show(Tr("会话已刷新"))
-        case "收付款": app.show(Tr("收付款在「我 → 服务 → 收付款」里"))
+        case "收付款": showPayCode = true
         case "朋友圈": app.show(Tr("去「发现 → 朋友圈」就能发"))
         case "视频号": app.show(Tr("去「发现 → 视频号」看视频"))
         case "收藏": app.show(Tr("去「我 → 收藏」看收藏的内容"))
@@ -667,6 +669,7 @@ struct ChatsView: View {
             Button(Tr("发起群聊")) { path.append("newGroup") }
             Button(Tr("添加朋友")) { path.append("addFriend") }
             Button(Tr("扫一扫")) { showScan = true }
+            Button(Tr("收付款")) { showPayCode = true }
             Button(Tr("取消"), role: .cancel) { }
         }
         .fullScreenCover(isPresented: $showScan) {
@@ -674,6 +677,10 @@ struct ChatsView: View {
         }
         .sheet(item: $botCardChat) { c in
             BotCardView(chat: c).environmentObject(app)
+        }
+        .sheet(isPresented: $showPayCode) {
+            NavigationStack { PayCodePage() }
+                .environmentObject(app)
         }
         .task {
             // 进页面先拉一次，之后每 4 秒自动刷新一次（这样别人发消息不用切页就能看到）

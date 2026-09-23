@@ -655,6 +655,34 @@ struct ServiceStyle: Decodable, Hashable {
 }
 
 /// 整页服务页的配置
+/// 收付款码（付款码 / 收款码都用这一个）
+struct PayCodeInfo: Decodable {
+    var code: String?
+    var grouped: String?          // 每 4 位空一格（银行卡那种排版）
+    var url: String?              // 二维码里装的内容
+    var expiresAt: Double?
+    var seconds: Int?
+    var rows: [String]?           // 二维码点阵
+    var size: Int?
+    var amount: Double?           // 收款码「设置金额」
+    var user: User?
+}
+
+/// 扫到的码是谁的、要收多少钱
+struct PayScanInfo: Decodable, Identifiable {
+    var kind: String              // pay = 付款码（我付给码的主人）/ receive = 收款码
+    var amount: Double?
+    var user: User?
+    var id: String { "\(kind)-\(user?.id ?? "")-\(amount ?? 0)" }
+}
+
+/// 付款结果
+struct PayCollectResult: Decodable {
+    var balance: Double?
+    var amount: Double?
+    var payee: User?
+}
+
 /// 服务页底部那块（账单卡 + 右上角「⋯」菜单）的文案：后台「服务页 → 底部」里配，
 /// 留空就用 App 里的默认值（以前这些字全都是写死在 App 里的）
 struct ServiceBottom: Decodable, Hashable {
@@ -3050,6 +3078,30 @@ final class API {
             "password": password,
             "face": face
         ])
+    }
+
+    /* ---------------- 收付款（付款码 / 收款码，微信那套） ---------------- */
+
+    /// 出一张付款码（18 位数字，60 秒有效；同一分钟内重复拉还是同一张）
+    func payCode() async throws -> PayCodeInfo {
+        try await post("/api/pay/code", [:], as: PayCodeInfo.self)
+    }
+
+    /// 我的收款码；amount > 0 就是「设置金额」那张（金额被服务器签名，改不了）
+    func receiveCode(amount: Double) async throws -> PayCodeInfo {
+        try await post("/api/pay/receive-code", ["amount": amount], as: PayCodeInfo.self)
+    }
+
+    /// 扫到的字符串先问一下服务器：这是谁的收付款码、金额多少
+    func payResolve(text: String) async throws -> PayScanInfo {
+        try await post("/api/pay/resolve", ["text": text], as: PayScanInfo.self)
+    }
+
+    /// 付款：钱当时到对方账上（商家收款即时到账）
+    func payCollect(text: String, amount: Double, password: String, face: Bool = false) async throws -> PayCollectResult {
+        try await post("/api/pay/collect", [
+            "text": text, "amount": amount, "password": password, "face": face
+        ], as: PayCollectResult.self)
     }
 
     func hasPayPassword() async -> Bool {

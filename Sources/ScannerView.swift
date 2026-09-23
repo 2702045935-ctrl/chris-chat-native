@@ -6,6 +6,24 @@ import CoreImage
 @MainActor
 func handleScanned(_ text: String, app: AppState) {
     let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    /* 收付款码：付款码（18 位数字 / pay.html?c=）和收款码（pay.html?u=）都在这里拦下来，
+       先问服务器「这是谁的码、要收多少钱」，再弹确认付款页 */
+    let isPayCode = (t.count == 18 && t.allSatisfy({ $0.isNumber }))
+        || (t.contains("pay.html") && (t.contains("?c=") || t.contains("&c=") || t.contains("?u=") || t.contains("&u=")))
+    if isPayCode {
+        Task { @MainActor in
+            do {
+                let info = try await API.shared.payResolve(text: t)
+                /* 扫一扫是整页盖在最上面的，等它收起来再弹付款页（不然会被盖住） */
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                app.payScanText = t
+                app.payScan = info
+            } catch {
+                app.show((error as? APIError)?.errorDescription ?? Tr("这不是收付款码"))
+            }
+        }
+        return
+    }
     /* 别人的个人二维码：链接里带 u=个人码 → 直接加好友 */
     if let r = t.range(of: "u="), t.contains("add.html") {
         var code = String(t[r.upperBound...])

@@ -50,6 +50,10 @@ final class AppState: ObservableObject {
     /// 服务器上配的默认聊天背景（自己没设时用它，和网页版一致）
     @Published var defaultChatBackground = ""
     @Published var toast: String?
+    /// 扫到收付款码之后要弹的确认付款页（扫一扫在哪个页面都能弹出来）
+    @Published var payScan: PayScanInfo?
+    /// 扫到码的原文（一起交给付款页，金额以服务器解析的为准）
+    @Published var payScanText: String = ""
     @Published var loadingChats = false
     @Published var loadError: String?
     /// 服务器上的界面配置变了就 +1，整个界面重建一次（不用重装 App）

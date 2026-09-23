@@ -246,38 +246,65 @@ struct ChatsView: View {
     @State private var openRow: String?
     /// 下拉二楼：会话列表滚到最上面之后再往下拉，露出二楼；上滑回去
     @State private var topOffset: CGFloat = 0
-    /// 二楼已经「停住」了（手指松开也保持在二楼，微信就是这样）
-    @State private var floorOpen = false
-    /// 手指往下拖的距离（只在自己滚到最顶上时才算数）
-    @State private var dragPull: CGFloat = 0
+    /* ---------------------------------------------------------------
+       下拉二楼：照微信官方那套状态机做
+         Idle →（拉过二级阈值）CanTwoLevel →（松手）TwoLevelOpening → TwoLeveling
+         TwoLeveling →（上滑 / 点里面的项）TwoLevelClosing → Idle
+       两个阈值分开：打开用 openAt，往回关用 closeAt（迟滞，不会在边界抖）
+       拉的距离直接取 UIScrollView 的 contentOffset（顶部往下拉是负数），
+       不再用 SwiftUI 的 DragGesture 去和滚动抢手势 —— 那正是以前「拉不出来」的原因。
+       --------------------------------------------------------------- */
+    @State private var floorOpen = false          // == TwoLeveling
+    @State private var pull: CGFloat = 0           // 手指下拉的距离（点）
+    /// 这一把手指最多拉到多少 —— 松手那一下按它判断
+    /// （松手时偏移可能已经弹回去了，光看当前值会判断不到）
+    @State private var maxPull: CGFloat = 0
+    @State private var dragging = false            // 手指正按着（UIScrollView.isDragging）
+    @State private var canOpen = false             // == CanTwoLevel（超过二级阈值了）
     /// 二楼这整页露出来时，是不是已经把底部标签栏收起来了（收/放要配对）
     @State private var floorHidTab = false
-    /// 拉开多少才算是「要停在二楼」：微信拇指轻轻下滑就出来了，门槛放低一点
-    private let floorOpenAt: CGFloat = 40
-    /// 震动过没有（微信二楼拉到底会「嗡」一下，只有一次）
+    /// 打开二级的阈值（微信：refresher-two-level-threshold）
+    private let floorOpenAt: CGFloat = 62
+    /// 往回关的阈值（微信：refresher-two-level-close-threshold）—— 比打开的小，形成迟滞
+    private let floorCloseAt: CGFloat = 34
+    /// 先出现「圆点」的距离（微信下拉时先冒一个小圆点，再出内容）
+    private let floorDotAt: CGFloat = 16
+    /// 震动过没有（微信拉过阈值会「嗡」一下，只有一次）
     @State private var floorHapticDone = false
-    /// 二楼拉到底那一下的震动
+    /// 拉过二级阈值那一下的震动
     private func floorHaptic() {
         guard !floorHapticDone else { return }
         floorHapticDone = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    /// 手指把二楼拉出来多少（点）—— 二楼是「从屏幕顶上往下让出来」，
-    /// 手指拉多少就露多少，松手拉够了才整页翻过去（微信的手感）
-    private var floorPull: CGFloat {
-        let byOffset = max(0, topOffset)
-        let byDrag = (topOffset <= 0.5) ? max(0, dragPull) : 0
-        return max(byOffset, byDrag)
-    }
-    /// 二楼露出多少：0 = 完全收起，1 = 全部露出。跟着手指走（拉的越多露的越多）
+    /// 二楼露出的比例：0 = 完全收起，1 = 全部露出
     private var floorProgress: CGFloat {
         if floorOpen { return 1 }
-        return min(1, floorPull / 130)
+        return min(1, pull / floorOpenAt)
+    }
+    /// 「圆点」阶段：还没到出内容的时候，只有一个小圆点跟着手指（微信就是这样）
+    private var dotProgress: CGFloat {
+        guard !floorOpen else { return 1 }
+        return min(1, pull / floorDotAt)
+    }
+    /// 手指松开那一下做判断（微信：CanTwoLevel → 打开；否则弹回）
+    private func floorRelease() {
+        if !floorOpen {
+            if maxPull >= floorOpenAt {
+                floorHaptic()
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { floorOpen = true }
+            } else {
+                floorHapticDone = false
+            }
+        }
+        maxPull = 0
     }
     /// 二楼收起（上滑 / 点完里面的项都走这里）
     private func closeFloor() {
-        dragPull = 0
+        pull = 0
+        maxPull = 0
+        canOpen = false
         withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = false }
     }
     /// 「搜索」整页
@@ -556,34 +583,26 @@ struct ChatsView: View {
                        这里把系统的下拉刷新去掉：一来更像微信，二来不会和二楼抢同一个下拉手势。
                        要刷新的地方放两处：二楼里的「刷新会话」、以及实时消息本来就会自动更新。 */
                     .coordinateSpace(name: "chatsScroll")
-                    /* 用 UIKit 实时拿滚动偏移（顶部时 contentOffset.y 是负数），
-                       下拉二楼就靠它判断「已经到最上面了」——比之前的 GeometryReader 稳 */
-                    .background(ScrollOffsetProbe { y in topOffset = y })
-                    /* 手指往下拖的时候直接算「拉了多远」：滚到最顶上才生效，松手弹回去 */
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 8)
-                            .onChanged { v in
-                                guard !floorOpen else { return }
-                                if v.translation.height > 0 && topOffset <= 1.5 {
-                                    dragPull = min(160, v.translation.height)
-                                    /* 拉够门槛那一下就震一下（微信二楼也是这样） */
-                                    if dragPull >= floorOpenAt { floorHaptic() }
-                                } else if v.translation.height < -4 {
-                                    dragPull = 0
-                                }
+                    /* 用 UIKit 实时拿滚动偏移 + 是否正在拖。
+                       顶部继续往下拉时 contentOffset.y 是负数（UIScrollView 的橡皮筋），
+                       这个负值就是微信里「拉了多远」，不用再自己抢手势。 */
+                    .background(ScrollOffsetProbe(
+                        onChange: { y in
+                            topOffset = y
+                            if !floorOpen {
+                                let now = max(0, -y)
+                                /* 直接跟着偏移走：拉的时候变大，松手回弹时自然缩回 0 */
+                                pull = now
+                                maxPull = max(maxPull, now)
+                                let over = now >= floorOpenAt
+                                if over && !canOpen { floorHaptic() }   // 拉过阈值震一下
+                                canOpen = over
                             }
-                            .onEnded { _ in
-                                /* 拉过一半就停在二楼（跟微信一样，松手不会自己缩回去）；
-                                   只拉一点点就弹回会话列表 */
-                                if floorPull >= floorOpenAt {
-                                    dragPull = 0
-                                    floorHaptic()
-                                    withAnimation(.spring(response: 0.40, dampingFraction: 0.86)) { floorOpen = true }
-                                } else {
-                                    dragPull = 0
-                                }
-                                floorHapticDone = false
-                            }
+                        },
+                        onDragChange: { d in
+                            dragging = d
+                            if !d { floorRelease() }        // 松手：过阈值就停在二楼
+                        })
                     )
                     /* 偏移统一由上面的 ScrollOffsetProbe 提供；这里不再用 PreferenceKey，
                        免得两个来源互相覆盖（以前就是这里不稳，导致二楼拉不下来） */
@@ -591,19 +610,34 @@ struct ChatsView: View {
             }
             /* 第一页面（会话列表）的底色跟通讯录统一：都用后台的「页面底色」pageBg，
                以前这里用的是 navBg，深色下比通讯录浅一档（#18181A vs #0B0B0D）。 */
+            /* 微信那个转场：二楼出来的时候，会话列表这一页会略微缩小 + 压暗一点（有层次） */
+            .scaleEffect(1 - 0.03 * floorProgress, anchor: .top)
+            .brightness(-0.05 * Double(floorProgress))
             .background(C.chatsPageBg.ignoresSafeArea(edges: .bottom))
             /* 下拉二楼：露出来的时候盖在最上面（上滑/点一下里面的项就回去） */
             .overlay(alignment: .top) {
-                /* 手指拉多少，这一整页就跟着下来多少（不缩放、不淡入）：
-                   拉过一半松手就整页停住；在这一页上往上滑才回会话列表。 */
+                /* 手指拉多少，二楼就露多少；拉过阈值松手就整页停住。
+                   另外按微信那样：还没拉到内容之前先出一个「圆点」。 */
                 GeometryReader { geo in
                     let full = max(geo.size.height, UIScreen.main.bounds.height)
-                    let reveal = floorOpen ? full : min(full, floorPull)
-                    secondFloorView(reveal)
-                        .frame(maxWidth: .infinity, alignment: .top)
-                        .clipped()
-                        .opacity(reveal > 1 ? 1 : 0)
-                        .allowsHitTesting(floorOpen)
+                    let reveal = floorOpen ? full : min(full, pull)
+                    ZStack(alignment: .top) {
+                        /* 圆点阶段（微信：下拉先冒一个圆点，继续拉才出内容） */
+                        if !floorOpen && pull > 0 {
+                            Circle()
+                                .fill(Color.dyn(0xB8B8BD, 0x8E8E93))
+                                .frame(width: 7, height: 7)
+                                .scaleEffect(0.4 + 0.6 * dotProgress)
+                                .opacity(Double(dotProgress) * 0.9)
+                                .padding(.top, L.navH + 6)
+                                .frame(maxWidth: .infinity)
+                        }
+                        secondFloorView(reveal)
+                            .frame(maxWidth: .infinity, alignment: .top)
+                            .clipped()
+                            .opacity(reveal > 1 ? 1 : 0)
+                            .allowsHitTesting(floorOpen)
+                    }
                 }
             }
             .sheet(isPresented: $showSearch) {

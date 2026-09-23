@@ -101,6 +101,10 @@ struct ChatDetailView: View {
             MsgAction(key: "copy", label: "复制", icon: "doc.on.doc"),
             MsgAction(key: "forward", label: "转发", icon: "arrowshape.turn.up.right")
         ]
+        /* 朗读：文字消息、通话记录、AI 回复都能念（微信里长按也有这一项） */
+        if readableText(m).isEmpty == false {
+            list.append(MsgAction(key: "speak", label: "朗读", icon: "speaker.wave.2"))
+        }
         if !m.isRecalled {
             list.append(MsgAction(key: "fav", label: "收藏", icon: "star"))
             list.append(MsgAction(key: "quote", label: "引用", icon: "text.quote"))
@@ -116,8 +120,20 @@ struct ChatDetailView: View {
         return list
     }
 
+    /// 这条消息能不能念、念什么（表格/卡片这类没文字的就不显示「朗读」）
+    private func readableText(_ m: Message) -> String {
+        if m.isCallRecord { return m.callText }
+        switch m.kindName {
+        case "text", "link": return m.body
+        default: return ""
+        }
+    }
+
     private func run(_ a: MsgAction, on m: Message) {
         switch a.key {
+        case "speak":
+            Speaker.shared.speak(readableText(m))
+            app.show(Tr("正在朗读…"))
         case "copy":
             UIPasteboard.general.string = m.kindName == "text" ? m.body : "[" + m.kindName + "]"
             app.show(Tr("已复制"))

@@ -2312,6 +2312,23 @@ final class API {
     }
 
     /// 群二维码：拿到邀请码和二维码 SVG
+    /// 群加人：把选中的好友拉进群（群里任何成员都能拉，群上限 500）
+    func addGroupMembers(chatId: String, userIds: [String]) async -> (added: [String], memberCount: Int, error: String?) {
+        struct Payload: Decodable {
+            var memberCount: Int?
+            var added: [Row]?
+            struct Row: Decodable { var id: String?; var name: String? }
+        }
+        do {
+            let p: Payload = try await post("/api/chats/\(chatId)/add-members",
+                                            ["userIds": userIds], as: Payload.self)
+            let names = (p.added ?? []).compactMap { $0.name }
+            return (names, p.memberCount ?? 0, nil)
+        } catch {
+            return ([], 0, (error as? APIError)?.errorDescription ?? "加人失败")
+        }
+    }
+
     /// 我的二维码（每个人一张，扫了能加好友）
     /* ---------------- 隐私 / 消息通知 ---------------- */
     func privacy() async -> PrivacySettings {

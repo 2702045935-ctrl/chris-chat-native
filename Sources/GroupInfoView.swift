@@ -34,6 +34,9 @@ struct GroupInfoView: View {
     @State private var showQR = false
     @State private var muteAll = false
     @State private var kickMode = "kick"          // kick = 移出群聊，mute = 禁言
+    /// 加人：选人面板 + 删除成员模式（微信群管理那个「＋ / －」）
+    @State private var showAdd = false
+    @State private var removing = false
 
     private var isOwner: Bool { !ownerId.isEmpty && ownerId == app.me?.id }
 
@@ -91,6 +94,15 @@ struct GroupInfoView: View {
         .sheet(isPresented: $showRename) { renameEditor }
         .sheet(isPresented: $showSearch) { ChatSearchView(chat: chat) }
         .sheet(isPresented: $showQR) { GroupQRView(chat: chat) }
+        .sheet(isPresented: $showAdd) {
+            GroupAddMembersView(chat: chat, existing: members.map { $0.id }) { names in
+                app.show(names.isEmpty ? Tr("没有新增成员") : (Tr("已邀请 ") + names.joined(separator: "、") + Tr(" 进群")))
+                Task {
+                    if let r = try? await API.shared.chatMembers(chatId: chat.id) { members = r.members }
+                    await app.loadChats()
+                }
+            }
+        }
         .confirmationDialog(Tr("清空聊天记录？"), isPresented: $confirmClear, titleVisibility: .visible) {
             Button(Tr("清空"), role: .destructive) { clearHistory() }
             Button(Tr("取消"), role: .cancel) { }
@@ -271,12 +283,36 @@ struct GroupInfoView: View {
 
     private var memberCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("群聊成员（\(members.count)）")
-                .font(pf(13))
-                .foregroundColor(C.subLabel)
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+            HStack(spacing: 6) {
+                Text("群聊成员（\(members.count)）")
+                    .font(pf(13))
+                    .foregroundColor(C.subLabel)
+                Spacer(minLength: 0)
+                /* 微信群管理那套：右上角一个「＋」加人、一个「－」切到删除模式（群主才有） */
+                Button {
+                    showAdd = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(C.label)
+                        .frame(width: 28, height: 24)
+                }
+                .buttonStyle(.plain)
+                if isOwner {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.15)) { removing.toggle() }
+                    } label: {
+                        Image(systemName: removing ? "checkmark" : "minus")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(removing ? C.green : C.label)
+                            .frame(width: 28, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
 
             if loading && members.isEmpty {
                 ProgressView().frame(maxWidth: .infinity).padding(.bottom, 18)
@@ -284,7 +320,23 @@ struct GroupInfoView: View {
                 LazyVGrid(columns: gridColumns, spacing: 14) {
                     ForEach(members) { u in
                         VStack(spacing: 5) {
-                            Avatar(path: u.avatarPath, size: 50, radius: 6)
+                            ZStack(alignment: .topLeading) {
+                                Avatar(path: u.avatarPath, size: 50, radius: 6)
+                                /* 删除模式：群主以外的人左上角挂一个红「－」，点它就移出 */
+                                if removing && isOwner && u.id != app.me?.id {
+                                    Button {
+                                        kickMode = "kick"
+                                        kickTarget = u
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(C.red)
+                                            .background(Circle().fill(Color.white))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .offset(x: -6, y: -6)
+                                }
+                            }
                             Text(u.name)
                                 .font(pf(10.5))
                                 .foregroundColor(C.subLabel)
@@ -310,6 +362,21 @@ struct GroupInfoView: View {
                                 Button { } label: { Label(Tr("只有群主能管理成员"), systemImage: "info.circle") }
                             }
                         }
+                    }
+                    /* 最后一个格子是「＋」：拉人进群（微信就是这样排的） */
+                    VStack(spacing: 5) {
+                        Button { showAdd = true } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(C.hairline, lineWidth: 1)
+                                    .frame(width: 50, height: 50)
+                                Image(systemName: "plus")
+                                    .font(.system(size: 20, weight: .light))
+                                    .foregroundColor(C.subLabel)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        Text(Tr("加人")).font(pf(10.5)).foregroundColor(C.subLabel)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -777,6 +844,104 @@ struct DirectChatInfoView: View {
             await app.loadChats()
             dismiss()
             app.show(Tr("已删除该聊天"))
+        }
+    }
+}
+
+/* ============================================================
+   群加人：从好友里多选，勾完点「完成」就拉进群。
+   已经在群里的人不显示（拉重复了服务端也会拒）。
+   ============================================================ */
+
+struct GroupAddMembersView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    let chat: Chat
+    /// 已经在群里的人（不列出来）
+    let existing: [String]
+    /// 加完后回调（新进来的名字）
+    var onDone: ([String]) -> Void
+
+    @State private var keyword = ""
+    @State private var picked: Set<String> = []
+    @State private var busy = false
+
+    private var candidates: [User] {
+        let set = Set(existing)
+        let base = app.contacts.filter { !set.contains($0.id) && $0.id != app.me?.id }
+        guard !keyword.isEmpty else { return base }
+        return base.filter { $0.name.contains(keyword) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NavBar(title: Tr("加人"), back: { dismiss() }) {
+                Button { submit() } label: {
+                    Text(busy ? Tr("加入中…") : Tr("完成"))
+                        .font(pf(17))
+                        .foregroundColor(picked.isEmpty ? C.subLabel : C.green)
+                        .frame(height: L.navH)
+                        .padding(.trailing, 16)
+                }
+                .buttonStyle(.plain)
+                .disabled(picked.isEmpty || busy)
+            }
+
+            SearchBoxCenter(text: $keyword)
+                .padding(L.searchPad)
+
+            if candidates.isEmpty {
+                Text(Tr("没有可以邀请的好友了"))
+                    .font(pf(14)).foregroundColor(C.subLabel)
+                    .padding(.top, 40)
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(candidates) { u in
+                            Button {
+                                if picked.contains(u.id) { picked.remove(u.id) } else { picked.insert(u.id) }
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Avatar(path: u.avatarPath, size: 40, radius: 4)
+                                    Text(u.name).font(pf(17)).foregroundColor(C.label).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: picked.contains(u.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(picked.contains(u.id) ? C.green : C.subLabel)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 60)
+                                .background(C.cardBg)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            HairLine(inset: 68)
+                        }
+                    }
+                }
+                .background(C.pageBg)
+            }
+        }
+        .background(C.pageBg.ignoresSafeArea(edges: .bottom))
+        .toolbar(.hidden, for: .navigationBar)
+        .swipeBack { dismiss() }
+    }
+
+    private func submit() {
+        guard !picked.isEmpty, !busy else { return }
+        busy = true
+        let ids = Array(picked)
+        Task {
+            let r = await API.shared.addGroupMembers(chatId: chat.id, userIds: ids)
+            busy = false
+            if let err = r.error {
+                app.show(err)
+                return
+            }
+            onDone(r.added)
+            dismiss()
         }
     }
 }

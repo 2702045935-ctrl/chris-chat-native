@@ -404,13 +404,23 @@ struct CallView: View {
                 }
                 .padding(.bottom, 40)
             } else {
-                /* 语音通话：微信是一行三颗（麦克风 / 挂断 / 扬声器），挂断居中 */
-                HStack(spacing: 51) {
-                    micKey
-                    hangupKey
-                    speakerKey
+                if call.phase == .active {
+                    /* 接通后（vx 参考图那张）：一行三颗 —— 麦克风 / 挂断 / 扬声器，挂断居中 */
+                    HStack(spacing: 51) {
+                        micKey
+                        hangupKey
+                        speakerKey
+                    }
+                    .padding(.bottom, 54)
+                } else {
+                    /* 还没接通（呼出中）：微信只有两颗 —— 麦克风 + 红色的「取消」。
+                       以前这里也摆三颗（扬声器也出来了），和微信不一致。 */
+                    HStack(spacing: 72) {
+                        micKey
+                        hangupKey
+                    }
+                    .padding(.bottom, 54)
                 }
-                .padding(.bottom, 54)
             }
         }
     }

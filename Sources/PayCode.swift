@@ -205,6 +205,9 @@ struct ReceiveCodePage: View {
     @State private var showSetAmount = false
     @State private var busy = false
 
+    /// 当前这张收款码带没带金额（0 = 普通收款码）
+    private var amt: Double { max(0, info?.amount ?? 0) }
+
     var body: some View {
         VStack(spacing: 0) {
             NavBar(title: Tr("二维码收款"), back: { dismiss() })
@@ -254,11 +257,11 @@ struct ReceiveCodePage: View {
                     .padding(.horizontal, 8)
 
                     VStack(spacing: 0) {
-                        row(Tr("设置金额"), a > 0 ? Tr("改一下") : Tr("填一个数，扫码的人直接按这个付")) {
+                        row(Tr("设置金额"), amt > 0 ? Tr("改一下") : Tr("填一个数，扫码的人直接按这个付")) {
                             amountText = (info?.amount ?? 0) > 0 ? String(format: "%.2f", info?.amount ?? 0) : ""
                             showSetAmount = true
                         }
-                        if (info?.amount ?? 0) > 0 {
+                        if amt > 0 {
                             HairLine(inset: 16)
                             row(Tr("清除金额"), Tr("回到普通收款码")) {
                                 Task { await load(amount: 0) }

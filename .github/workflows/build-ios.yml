@@ -150,6 +150,22 @@ jobs:
           done
           if [ "$MISSING" != "0" ]; then echo "自检没通过：包里的动态库不全"; exit 1; fi
           echo "自检通过：包里所有 @rpath 依赖都在"
+
+          # 瘦身：① 头文件/模块映射只有编译时才用，运行时不需要；
+          #       ② 剥掉符号表（保留动态符号），主程序能从 26MB 掉一大截。
+          # 目标：下载更快（用户反馈"包太大、下得慢"）。
+          for NAME in WebRTC TXLiteAVSDK_TRTC TXFFmpeg TXSoundTouch; do
+            rm -rf "$APP/Frameworks/$NAME.framework/Headers" \
+                   "$APP/Frameworks/$NAME.framework/Modules" \
+                   "$APP/Frameworks/$NAME.framework/PrivateHeaders"
+          done
+          strip -x "$APP/CHRIS" || true
+          for NAME in WebRTC TXLiteAVSDK_TRTC TXFFmpeg TXSoundTouch; do
+            [ -f "$APP/Frameworks/$NAME.framework/$NAME" ] && strip -x "$APP/Frameworks/$NAME.framework/$NAME" || true
+          done
+          echo "瘦身后："
+          ls -lh "$APP/CHRIS"
+          du -sh "$APP"
           zip -qry CHRISChat-unsigned.ipa Payload
           ls -lh CHRISChat-unsigned.ipa
           # 安装包加密：仓库是私有的，产物再加一层 AES-256，光有链接也装不了

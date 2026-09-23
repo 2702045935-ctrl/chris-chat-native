@@ -129,6 +129,25 @@ struct Message: Decodable, Identifiable, Hashable {
     }
     /// 视频通话（图标画摄像机）
     var isVideoCall: Bool { (call?.media ?? "").contains("video") || body.contains("视频") }
+    /// 这条通话记录是谁打出去的（服务端写的；老记录没有，空字符串）
+    var callFrom: String { call?.from ?? "" }
+    /// 通话记录显示成微信那样：「通话时长 00:12」（老记录的「通话结束 · 时长 0:15」也统一过来）
+    var callText: String {
+        var t = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        for pre in ["视频通话结束", "通话结束"] where t.hasPrefix(pre) {
+            if let r = t.range(of: "时长") { t = "通话时长" + String(t[r.upperBound...]) }
+            break
+        }
+        if t.hasPrefix("视频通话时长") { t = "通话时长" + String(t.dropFirst("视频通话时长".count)) }
+        if t.hasPrefix("通话时长") {
+            let rest = t.dropFirst("通话时长".count).trimmingCharacters(in: .whitespaces)
+            let p = rest.split(separator: ":")
+            if p.count == 2, let mm = Int(p[0]), let ss = Int(p[1]) {
+                t = String(format: "通话时长 %02d:%02d", mm, ss)
+            }
+        }
+        return t
+    }
 }
 
 /// 通话系统消息的附加信息：媒体类型、状态、时长
@@ -136,6 +155,9 @@ struct CallMeta: Decodable, Hashable {
     var media: String?
     var state: String?
     var secs: Int?
+    /// 谁打出去的（客户端靠它把这条记录摆到左边还是右边）
+    var from: String?
+    var to: String?
 }
 
 /* ============================================================ 附近的人 */

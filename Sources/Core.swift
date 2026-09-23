@@ -94,17 +94,18 @@ enum L {
     static var tabLabel: CGFloat { o("tabLabel", 11) }
 
     // 会话列表（微信页）：12 + 48 + 12 = 72
-    /* 会话列表一行：微信量出来是行高 76（下面一条细线）、头像 48 圆角 4、
-       头像左 16、头像与文字间 12、名字 17、预览 14、时间 12、未读徽标 18 */
-    static var rowH: CGFloat { o("chatRowH", 76) }
+    /* 会话列表一行：按 vx 参考图重新量的 —— 行高 72（行与行之间就靠这条细线分开）、
+       头像 48 圆角 4、头像左 16、头像与文字间 12、名字 17、预览 14、时间 12、未读徽标 18。
+       文字块（名字+预览）在行里是居中的：上留白 15、下留白 16 */
+    static var rowH: CGFloat { o("chatRowH", 72) }
     static var avatar: CGFloat { o("chatAvatar", v(44, 12.3, 48)) }
     static var rowPadL: CGFloat { o("chatPadL", 16) }
     static var rowPadR: CGFloat { o("chatPadR", 16) }
     static var rowGap: CGFloat { o("chatGap", 12) }
     /// 名字离行顶的距离（微信名字不在正中，稍微靠上）
-    static var rowPadTop: CGFloat { o("chatPadTop", 13) }
+    static var rowPadTop: CGFloat { o("chatPadTop", 15) }
     /// 名字和预览之间
-    static var rowTextGap: CGFloat { o("chatTextGap", 4) }
+    static var rowTextGap: CGFloat { o("chatTextGap", 5) }
     static var rowNameSize: CGFloat { o("chatNameSize", 17) }
     static var rowPreviewSize: CGFloat { o("chatPreviewSize", 14) }
     static var rowTimeSize: CGFloat { o("chatTimeSize", 12) }

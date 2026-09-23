@@ -563,8 +563,15 @@ struct ChatDetailView: View {
         VStack(spacing: 0) {
             if showTime(for: message) { timeLine(message) }
             if message.kindName == "system" {
-                SystemLine(message: message)
-                    .padding(.bottom, gapAfter(message))
+                /* 微信的通话记录是一条气泡，摆在哪边看「谁打的」：
+                   自己打出去的 → 右边（绿），对方打过来的 → 左边（白）。
+                   老记录里没有「谁打的」这个信息，就还是居中一行灰字。 */
+                if message.isCallRecord && !message.callFrom.isEmpty {
+                    callRow(message)
+                } else {
+                    SystemLine(message: message)
+                        .padding(.bottom, gapAfter(message))
+                }
             } else if message.isRecalled {
                 recallLine(message)
                     .padding(.bottom, gapAfter(message))
@@ -607,7 +614,7 @@ struct ChatDetailView: View {
     @ViewBuilder
     private func messageRow(_ message: Message) -> some View {
         MessageRow(message: message,
-                   mine: message.senderId == myId,
+                   mine: mineFor(message),
                    myId: myId,
                    senderName: senderNameFor(message),
                    showTail: isRunStart(message),
@@ -639,6 +646,34 @@ struct ChatDetailView: View {
                 Color.clear.preference(key: MsgFrameKey.self,
                                        value: [message.id: g.frame(in: .global)])
             })
+    }
+
+    /// 通话记录按「谁打的」定左右（其他消息还是看发送者）
+    private func mineFor(_ message: Message) -> Bool {
+        if message.isCallRecord && !message.callFrom.isEmpty { return message.callFrom == myId }
+        return message.senderId == myId
+    }
+
+    /// 通话记录那一行：头像 + 气泡（里面是电话/摄像机图标 +「通话时长 00:12」）
+    @ViewBuilder
+    private func callRow(_ message: Message) -> some View {
+        let mine = mineFor(message)
+        let callerAvatar = app.contact(for: message.callFrom)?.avatarPath ?? ""
+        HStack(alignment: .top, spacing: 0) {
+            if mine { Spacer(minLength: 0) }
+            if !mine {
+                Avatar(path: callerAvatar, size: L.chatAvatar, radius: 4)
+                Spacer().frame(width: L.chatGap)
+            }
+            CallRecordBubble(message: message, mine: mine)
+            if mine {
+                Spacer().frame(width: L.chatGap)
+                Avatar(path: callerAvatar, size: L.chatAvatar, radius: 4)
+            }
+            if !mine { Spacer(minLength: 0) }
+        }
+        .padding(.bottom, gapAfter(message))
+        .onLongPressGesture { openActions(message) }
     }
 
     private func indexOf(_ message: Message) -> Int? {
@@ -1204,6 +1239,36 @@ struct SystemLine: View {
         let t = message.body
         let bad = ["未接听", "已拒绝", "已取消", "无应答", "不在线", "忙线", "未接通", "无人接听"]
         return bad.contains(where: { t.contains($0) }) ? Color(hex: 0xFA5151) : C.msgTime
+    }
+}
+
+/// 通话记录的气泡：电话/摄像机小图标 +「通话时长 00:12」（微信里通话记录就是这么一条气泡，
+/// 自己打出去的在右边、对方打过来的在左边）
+struct CallRecordBubble: View {
+    let message: Message
+    let mine: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            CallIcon(key: message.isVideoCall ? "ui.callRecordVideo" : "ui.callRecord",
+                     symbol: message.isVideoCall ? "video.fill" : "phone.fill",
+                     builtin: message.isVideoCall ? I.callRecordVideo : I.callRecord,
+                     size: 15, color: ink)
+            Text(message.callText)
+                .font(pf(L.chatFontSize))
+                .foregroundColor(ink)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(BubbleShape(mine: mine).fill(mine ? C.bubbleMine : C.bubbleOther))
+        .frame(maxWidth: L.bubbleMaxW, alignment: mine ? .trailing : .leading)
+    }
+
+    /// 没接通的通话记录用红色（微信里「未接听 / 已取消 / 对方无应答」都是红的）
+    private var ink: Color {
+        let t = message.body
+        let bad = ["未接听", "已拒绝", "已取消", "无应答", "不在线", "忙线", "未接通", "无人接听"]
+        return bad.contains(where: { t.contains($0) }) ? Color(hex: 0xFA5151) : C.bubbleText
     }
 }
 

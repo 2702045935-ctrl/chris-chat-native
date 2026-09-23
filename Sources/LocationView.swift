@@ -72,7 +72,9 @@ struct MapSnapshotView: View {
     private func load() async {
         let key = "\(point.id)@\(Int(width))x\(Int(height))\(drawPin ? "p" : "")" as NSString
         if let hit = MapSnapshotView.cache.object(forKey: key) { image = hit; return }
-        let scale = UIScreen.main.scale
+        /* 新版 SDK 里 UIScreen.main 是 @MainActor 的，这里在后台异步上下文，
+           取屏幕缩放要回主线程取一下（不然编译报 "expression is 'async'"）。 */
+        let scale = await MainActor.run { UIScreen.main.scale }
         let opts = MKMapSnapshotter.Options()
         opts.region = MKCoordinateRegion(center: point.coord,
                                          span: MKCoordinateSpan(latitudeDelta: 0.004, longitudeDelta: 0.004))

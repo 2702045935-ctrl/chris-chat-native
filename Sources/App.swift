@@ -341,12 +341,34 @@ final class AppState: ObservableObject {
         loadingChats = true
         defer { loadingChats = false }
         do {
-            chats = try await API.shared.chats()
+            let fresh = try await API.shared.chats()
+            /* 只在内容真的变了才赋值。
+               以前每 4 秒（会话页的定时刷新）都无条件赋值一次，SwiftUI 会把整个
+               列表行（头像、左滑手势、角标）重建一遍 —— 这就是"看着卡卡的"的主因。 */
+            if !AppState.sameChats(chats, fresh) { chats = fresh }
             loadError = nil
         } catch {
             loadError = (error as? APIError)?.errorDescription ?? "加载失败"
         }
         syncIconBadge()
+    }
+
+    /// 两份会话列表内容是不是一样（用来避免无意义的重画）
+    static func sameChats(_ a: [Chat], _ b: [Chat]) -> Bool {
+        if a.count != b.count { return false }
+        for i in 0..<a.count {
+            let x = a[i], y = b[i]
+            if x.id != y.id { return false }
+            if x.unreadCount != y.unreadCount { return false }
+            if (x.pinned ?? false) != (y.pinned ?? false) { return false }
+            if (x.muted ?? false) != (y.muted ?? false) { return false }
+            if (x.title ?? "") != (y.title ?? "") { return false }
+            if (x.avatar ?? "") != (y.avatar ?? "") { return false }
+            if (x.moodIcon ?? "") != (y.moodIcon ?? "") { return false }
+            if (x.lastMessage?.preview ?? "") != (y.lastMessage?.preview ?? "") { return false }
+            if (x.lastMessage?.createdAt ?? "") != (y.lastMessage?.createdAt ?? "") { return false }
+        }
+        return true
     }
 
     /// 桌面图标右上角那个红点数字（微信也是这个数）：所有会话未读加一起。
@@ -366,7 +388,11 @@ final class AppState: ObservableObject {
 
     func loadContacts() async {
         if let r = try? await API.shared.contactsFull() {
-            contacts = r.friends
+            /* 同样只在变了才赋值：通讯录也是几百行，无条件重画同样会卡 */
+            let sameOrder = contacts.map { $0.id } == r.friends.map { $0.id }
+            let sameLook = contacts.count == r.friends.count
+                && zip(contacts, r.friends).allSatisfy { $0.avatarPath == $1.avatarPath && $0.name == $1.name }
+            if !(sameOrder && sameLook) { contacts = r.friends }
             friendRequests = r.incoming.count        // 别人加你好友 → 通讯录亮红点
         }
     }

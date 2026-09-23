@@ -29,21 +29,29 @@ struct MainTabView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             /* 登录后同步最近聊天记录：顶上挂一条小小的进度提示（同步是后台做的，不拦着用） */
-            .overlay(alignment: .top) {
+            /* 登录后同步：微信那种居中的「正在同步最近的聊天记录…」卡片
+               （同步很快，卡片是淡入淡出；不拦着用户操作） */
+            .overlay {
                 if app.syncing || !app.syncText.isEmpty {
-                    HStack(spacing: 8) {
-                        if app.syncing { ProgressView().scaleEffect(0.7) }
-                        Text(app.syncText.isEmpty ? "正在同步最近的聊天记录…" : app.syncText)
-                            .font(pf(13))
-                            .foregroundColor(C.label)
+                    ZStack {
+                        Color.black.opacity(0.16).ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            if app.syncing { ProgressView().scaleEffect(1.15) }
+                            Text(app.syncing ? "正在同步最近的聊天记录…"
+                                             : (app.syncText.isEmpty ? "已同步最近的聊天记录" : app.syncText))
+                                .font(pf(14))
+                                .foregroundColor(C.label)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, 26)
+                        .padding(.vertical, 22)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(C.cardBg))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(C.hairline, lineWidth: 0.5))
+                        .shadow(color: .black.opacity(0.18), radius: 16, y: 4)
                     }
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .background(Capsule().fill(C.cardBg))
-                    .overlay(Capsule().stroke(C.hairline, lineWidth: 0.5))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-                    .padding(.top, L.safeTop + 6)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
                 }
             }
 

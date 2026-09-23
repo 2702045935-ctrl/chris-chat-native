@@ -191,14 +191,7 @@ struct LiveRoomView: View {
             }
 
             /* 抖音那种：右侧竖排（点赞 / 礼物 / 分享），贴在输入栏上方 */
-            VStack {
-                Spacer(minLength: 0)
-                HStack {
-                    Spacer(minLength: 0)
-                    rightColumn
-                }
-                .padding(.bottom, 76)
-            }
+            rightOverlay
 
             /* 真视频层：观众看到主播画面；主播看到自己的预览（右下小窗） */
             if live.watching, live.remoteVideo != nil {
@@ -397,6 +390,18 @@ struct LiveRoomView: View {
         .padding(.top, 10)
         .padding(.bottom, max(10, L.safeBottom))
         .background(Color.black.opacity(0.35))
+    }
+
+    /// 右侧竖排那一层（单独拎出来，免得整段 body 的类型推断超时）
+    private var rightOverlay: some View {
+        VStack {
+            Spacer(minLength: 0)
+            HStack {
+                Spacer(minLength: 0)
+                rightColumn
+            }
+            .padding(.bottom, 76)
+        }
     }
 
     /* 抖音那种右侧竖排：点赞（带数字）/ 礼物 / 分享 / 更多 */

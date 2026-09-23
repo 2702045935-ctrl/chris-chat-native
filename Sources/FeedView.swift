@@ -20,7 +20,15 @@ struct FeedAuthor: Decodable, Hashable {
 struct FeedItem: Decodable, Identifiable, Hashable {
     var id: String
     var video: String?
+    /// 分片地址（服务器切好的 HLS）：有就用它 —— 拿到第一段就出画面，后面边看边下
+    var hls: String?
     var cover: String?
+
+    /// 播放地址：优先 HLS（先播放后加载），没有就退回整包 MP4
+    var playPath: String {
+        if let h = hls, !h.isEmpty { return h }
+        return video ?? ""
+    }
     var desc: String?
     var music: String?
     var tag: String?
@@ -839,20 +847,22 @@ struct FeedCell: View {
         likes = item.likes ?? 0
         favorited = item.favorited ?? false
         favorites = item.favorites ?? 0
-        guard player == nil, let url = API.shared.assetURL(item.video ?? "") else { return }
+        /* 播放地址：服务器切好了 HLS 就用分片（先播放后加载），没有才退回整包 MP4 */
+        let path = item.playPath
+        guard player == nil, let url = API.shared.assetURL(path) else { return }
         loadingVideo = true
         /* 边下边播：把鉴权头交给 AVPlayer，它自己用 Range 分片拉流。
            以前是「先整包下载到本地再播」，一条 5MB 视频要等 20 多秒才出画面。 */
         Task { @MainActor in
             do {
-                let asset = API.shared.streamingAsset(item.video ?? "") ?? AVURLAsset(url: url)
+                let asset = API.shared.streamingAsset(path) ?? AVURLAsset(url: url)
                 let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.isMuted = false
                 p.actionAtItemEnd = .none
                 /* 先缓冲再播：以前设成 false（几乎不缓冲就开播），网速一般时视频会一顿一顿。
-                   缓存 3 秒 + 让系统自己判断，起播只慢零点几秒，但基本不会卡顿。 */
+                   缓存压到 1.5 秒 + 让系统自己判断：先出画面，后面的边看边下。 */
                 p.automaticallyWaitsToMinimizeStalling = true
-                p.currentItem?.preferredForwardBufferDuration = 3
+                p.currentItem?.preferredForwardBufferDuration = 1.5
                 /* 每 0.1 秒回一次播放位置，驱动底部进度条 */
                 if let old = timeObserver, let oldP = player { oldP.removeTimeObserver(old) }
                 timeObserver = p.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { t in
@@ -989,15 +999,17 @@ struct FeedPlayerSheet: View {
     }
 
     private func load(_ w: FeedItem) {
-        guard let url = API.shared.assetURL(w.video ?? "") else { loading = false; return }
+        /* 同上：有分片就走分片，先出画面再慢慢加载 */
+        let path = w.playPath
+        guard let url = API.shared.assetURL(path) else { loading = false; return }
         loading = true
         Task { @MainActor in
             do {
-                let asset = API.shared.streamingAsset(w.video ?? "") ?? AVURLAsset(url: url)
+                let asset = API.shared.streamingAsset(path) ?? AVURLAsset(url: url)
                 let p = AVPlayer(playerItem: AVPlayerItem(asset: asset))
                 p.actionAtItemEnd = .none
                 p.automaticallyWaitsToMinimizeStalling = true
-                p.currentItem?.preferredForwardBufferDuration = 3
+                p.currentItem?.preferredForwardBufferDuration = 1.5
                 NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime,
                                                        object: p.currentItem, queue: .main) { _ in
                     p.seek(to: .zero); p.play()

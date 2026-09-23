@@ -2937,7 +2937,9 @@ final class API {
 
     /// 图片压完再传：返回服务器上的 /uploads/xxx.jpg
     func upload(image: UIImage) async throws -> String {
-        let data = image.resizedJPEG(maxSide: 1600, quality: 0.82)
+        /* 长边 1280 / 画质 0.75：手机上看着和 1600@0.82 没差，体积只有三分之一左右。
+           聊天气泡、朋友圈列表都是一屏好几张图，压小了翻起来才跟手。 */
+        let data = image.resizedJPEG(maxSide: 1280, quality: 0.75)
         return try await uploadData(data)
     }
 
@@ -2973,14 +2975,15 @@ final class API {
 
     /// 注意别设太大：一张 4800 万的相册原图直接按 4096 重绘会把内存打爆闪退。
     func uploadOriginal(image: UIImage) async throws -> String {
-        let data = image.resizedJPEG(maxSide: 2048, quality: 0.95)
+        // 「原图」也别给太大：1920 / 0.88 在手机上看不出区别，体积小一半以上
+        let data = image.resizedJPEG(maxSide: 1920, quality: 0.88)
         return try await uploadData(data)
     }
 
     /// 朋友圈封面：比聊天背景还要大一点（长边 2560、画质 0.95）。
     /// 封面要能缩放拖动裁切，2048 放大后还是会糊，所以单独给一档。
     func uploadCover(image: UIImage) async throws -> String {
-        let data = image.resizedJPEG(maxSide: 2560, quality: 0.95)
+        let data = image.resizedJPEG(maxSide: 1920, quality: 0.88)
         return try await uploadData(data)
     }
 

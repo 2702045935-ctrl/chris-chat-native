@@ -71,15 +71,22 @@ struct BotCardNew: View {
 
     private var hero: some View {
         VStack(spacing: 0) {
-            ZStack {
-                Circle().fill(aBlueBg).frame(width: 88, height: 88)
-                if isEyes {
-                    JarvisEyesAvatar(size: 56)
-                } else {
-                    Avatar(path: avatarPath, size: 56, radius: 28)
+            /* 官方号是「账号卡」：顶上一条品牌浅蓝 banner，logo 压在上面（跟好友人名卡区分开） */
+            ZStack(alignment: .bottom) {
+                LinearGradient(colors: [aBlueBg, aBlueBg.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 84)
+                ZStack {
+                    Circle().fill(Color.white).frame(width: 92, height: 92)
+                    if isEyes {
+                        JarvisEyesAvatar(size: 60)
+                    } else {
+                        Avatar(path: avatarPath, size: 60, radius: 30)
+                    }
                 }
+                .offset(y: 46)
             }
-            .padding(.top, 24)
+            .frame(height: 100)
+            .padding(.bottom, 46)
             HStack(spacing: 6) {
                 Text(name).font(pf(22, .medium)).foregroundColor(aInk)
                 Image(systemName: "checkmark.seal.fill").font(.system(size: 15)).foregroundColor(aBlue)

@@ -101,21 +101,29 @@ struct ContactCardNew: View {
 
     private var hero: some View {
         VStack(spacing: 0) {
-            ZStack(alignment: .bottomTrailing) {
-                Group {
-                    if isEyes {
-                        JarvisEyesAvatar(size: 88)
-                    } else {
-                        Avatar(path: avatarPath, size: 88, radius: 44)
+            /* 好友名片是「人名卡」：头像在左、名字和微信号在右，跟官方号的居中大 logo 区分开 */
+            HStack(alignment: .center, spacing: 16) {
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if isEyes {
+                            JarvisEyesAvatar(size: 72)
+                        } else {
+                            Avatar(path: avatarPath, size: 72, radius: 36)
+                        }
                     }
+                    .frame(width: 72, height: 72)
+                    Circle().fill(hGreen).frame(width: 14, height: 14)
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 }
-                .frame(width: 88, height: 88)
-                Circle().fill(hGreen).frame(width: 16, height: 16)
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(name).font(pf(20, .semibold)).foregroundColor(hInk)
+                    Text(idLine).font(pf(14)).foregroundColor(hInk3)
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.top, 24)
-            Text(name).font(pf(22, .medium)).foregroundColor(hInk).padding(.top, 16)
-            Text(idLine).font(pf(14)).foregroundColor(hInk3).padding(.top, 6)
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
             HStack(spacing: 12) {
                 Button { onMessage() } label: {
                     Text("发消息").font(pf(17, .medium)).foregroundColor(.white)
@@ -133,8 +141,7 @@ struct ContactCardNew: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 20)
-            .padding(.bottom, 24)
+            .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
         .background(Color.white)

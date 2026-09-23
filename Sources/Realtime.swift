@@ -63,6 +63,19 @@ final class Realtime: ObservableObject {
     private var tick = 0
     /// 是否走明文通道、连着失败几次了（见 start() 里的说明）
     private var plainFallback = false
+
+    /// 服务器是不是内网地址（192.168.x / 10.x / 172.16-31.x / 127.x / localhost）
+    /// —— 只有内网才允许走 5180 明文口（服务器那边也只放行内网）
+    static func isLanHost(_ host: String) -> Bool {
+        let h = (host.split(separator: ":").first.map(String.init) ?? host).lowercased()
+        if h == "localhost" || h == "127.0.0.1" || h == "::1" { return true }
+        if h.hasPrefix("10.") || h.hasPrefix("192.168.") { return true }
+        if h.hasPrefix("172.") {
+            let second = Int(h.split(separator: ".").dropFirst().first.map(String.init) ?? "") ?? 0
+            return second >= 16 && second <= 31
+        }
+        return false
+    }
     private var failCount = 0
     /// 推送洪水的节流：消息一秒钟来几千条时，不能每条都去通知界面（会把手机刷死）。
     /// 这里最多每 0.25 秒往界面发一次，攒着的那条在稍后合并发出去。
@@ -84,8 +97,12 @@ final class Realtime: ObservableObject {
            于是实时推送一直是断的：聊天页不刷新、通话记录/转账状态也收不到。
            现在默认 wss（和网页版一样），万一这个部署只开了明文口，再退回 ws://host:5180。 */
         let host = API.shared.server
+        /* 明文口（5180）已经在服务端关掉了：公网来的明文 ws 一律 403，
+           所以这里只在「服务器是内网地址」时才允许退回明文（内网调试用），
+           公网域名永远只走 wss —— 不然降级那一下，令牌和聊天内容就明着过网了。 */
         let plainHost = host.replacingOccurrences(of: ":5443", with: ":5180")
-        let raw = plainFallback ? "ws://\(plainHost)" : "wss://\(host)"
+        let lanOnly = Self.isLanHost(host)
+        let raw = (plainFallback && lanOnly) ? "ws://\(plainHost)" : "wss://\(host)"
         guard let url = URL(string: "\(raw)/?token=\(API.shared.token)") else { return }
         let task = API.shared.session.webSocketTask(with: url)
         socket = task
@@ -108,10 +125,10 @@ final class Realtime: ObservableObject {
                     // 断了：3 秒后重连
                     self.connected = false
                     if Task.isCancelled { break }
-                    /* 连着失败 3 次就换另一种协议再试：加密口握不上就退回明文 5180，
-                       明文也连不上再换回加密，来回自愈，不会卡死在一种上。 */
+                    /* 连着失败 3 次就换另一种协议再试；但只有内网地址才会真的退到明文口
+                       （见上面 lanOnly 那段）。 */
                     self.failCount += 1
-                    if self.failCount % 3 == 0 { self.plainFallback.toggle() }
+                    if self.failCount % 3 == 0, lanOnly { self.plainFallback.toggle() }
                     /* 退避重连：1s → 2s → 3s → 最长 15s，避免疯狂重连刷屏、刷服务器 */
                     let wait = min(15.0, 1.0 + Double(self.failCount))
                     try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))

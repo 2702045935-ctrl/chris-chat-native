@@ -24,8 +24,27 @@ enum CrashCatcher {
             signal(sig, chrisSignalHandler)
         }
         /* 上次崩了但没发出去（崩的瞬间网络不通 / 进程被系统直接杀掉）：
-           这次一进来就补发一遍，这样电脑这边才看得到崩在哪。 */
+          这次一进来就补发一遍，这样电脑这边才看得到崩在哪。 */
         uploadPending()
+        /* 启动打点：每次打开 App 记一条。被系统直接杀掉（比如卡死被看门狗干掉）不会留崩溃栈，
+           但「这个时间点启动过、之后就没消息了」这条线索能说明问题。 */
+        launchBeacon()
+    }
+
+    private static func launchBeacon() {
+        let payload: [String: Any] = [
+            "kind": "launch",
+            "text": AppInfo.build,
+            "app": String(AppInfo.build.prefix(28))
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let url = URL(string: API.shared.base + "/api/clientlog") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 5
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        URLSession.shared.dataTask(with: req).resume()
     }
 
     /// 补发上次没送出去的崩溃信息（存成 kind\ntext\n\nstack 这种格式）

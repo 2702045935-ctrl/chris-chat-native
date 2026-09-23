@@ -27,6 +27,8 @@ struct ContactCardNew: View {
     let momentCount: Int
     let onClose: () -> Void
     let onMessage: () -> Void
+    let onVoice: () -> Void
+    let onVideo: () -> Void
     let onMoments: (() -> Void)?
 
     var body: some View {
@@ -46,8 +48,9 @@ struct ContactCardNew: View {
                                 }
                             }
                         }
-                        if momentCount > 0 {
-                            sectionTitle("朋友圈", trailing: "\(momentCount) 条")
+                        /* 朋友圈这一块一直在（朋友没发动态就写「暂无动态」），跟原来那版一致 */
+                        {
+                            sectionTitle("朋友圈", trailing: momentCount > 0 ? "\(momentCount) 条" : "")
                             card {
                                 Button {
                                     onMoments?()
@@ -58,7 +61,8 @@ struct ContactCardNew: View {
                                             .frame(width: 44, height: 44)
                                             .overlay(Image(systemName: "photo.on.rectangle.angled")
                                                 .font(.system(size: 18)).foregroundColor(hBlue))
-                                        Text("看 TA 的朋友圈").font(pf(16)).foregroundColor(hInk)
+                                        Text(momentCount > 0 ? "看 TA 的朋友圈" : "暂无朋友圈动态")
+                                            .font(pf(16)).foregroundColor(momentCount > 0 ? hInk : hInk3)
                                         Spacer()
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 13, weight: .semibold)).foregroundColor(hInk3)
@@ -67,7 +71,7 @@ struct ContactCardNew: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                        }
+                        }()
                         Spacer(minLength: 24)
                     }
                 }
@@ -124,21 +128,11 @@ struct ContactCardNew: View {
             .padding(.horizontal, 16)
             .padding(.top, 20)
             .padding(.bottom, 16)
-            HStack(spacing: 12) {
-                Button { onMessage() } label: {
-                    Text("发消息").font(pf(17, .medium)).foregroundColor(.white)
-                        .frame(maxWidth: .infinity).frame(height: 44)
-                        .background(Capsule().fill(hBlue))
-                }
-                .buttonStyle(.plain)
-                if let m = onMoments, momentCount > 0 {
-                    Button { m() } label: {
-                        Text("朋友圈").font(pf(17, .medium)).foregroundColor(hBlue)
-                            .frame(maxWidth: .infinity).frame(height: 44)
-                            .background(Capsule().stroke(hBlue, lineWidth: 1.5))
-                    }
-                    .buttonStyle(.plain)
-                }
+            /* 三枚按钮：发消息（主）· 语音通话 · 视频通话（次）—— 和原来那版一样多 */
+            HStack(spacing: 10) {
+                pill("发消息", primary: true, action: onMessage)
+                pill("语音", primary: false, action: onVoice)
+                pill("视频", primary: false, action: onVideo)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
@@ -182,5 +176,22 @@ struct ContactCardNew: View {
 
     private var line: some View {
         Rectangle().fill(hLine).frame(height: 1).padding(.leading, 16)
+    }
+
+    /// 胶囊按钮（主：品牌蓝底白字；次：品牌蓝描边）
+    private func pill(_ text: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button { action() } label: {
+            Text(text)
+                .font(pf(16, .medium))
+                .foregroundColor(primary ? .white : hBlue)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(
+                    Group {
+                        if primary { Capsule().fill(hBlue) } else { Capsule().stroke(hBlue, lineWidth: 1.5) }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
     }
 }

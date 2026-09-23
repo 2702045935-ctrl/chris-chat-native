@@ -360,6 +360,24 @@ struct ContactCardView: View {
                            momentCount: thumbs.count,
                            onClose: { dismiss() },
                            onMessage: { openChat() },
+                           onVoice: {
+                               if CallCenter.shared.phase != .idle {
+                                   app.show(Tr("正在通话中"))
+                               } else {
+                                   CallCenter.shared.start(peerId: u.id,
+                                                           name: u.nickname ?? u.username ?? "对方",
+                                                           avatar: u.avatar ?? "", video: false)
+                               }
+                           },
+                           onVideo: {
+                               if CallCenter.shared.phase != .idle {
+                                   app.show(Tr("正在通话中"))
+                               } else {
+                                   CallCenter.shared.start(peerId: u.id,
+                                                           name: u.nickname ?? u.username ?? "对方",
+                                                           avatar: u.avatar ?? "", video: true)
+                               }
+                           },
                            onMoments: hasMoments ? { onOpenMoments(u.id) } : nil)
         } else {
             cardBody

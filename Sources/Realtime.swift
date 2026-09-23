@@ -104,7 +104,11 @@ final class Realtime: ObservableObject {
         let lanOnly = Self.isLanHost(host)
         let raw = (plainFallback && lanOnly) ? "ws://\(plainHost)" : "wss://\(host)"
         guard let url = URL(string: "\(raw)/?token=\(API.shared.token)") else { return }
-        let task = API.shared.session.webSocketTask(with: url)
+        /* 带上版本号：服务器会把「主叫/被叫分别是哪个包」写进通话日志，
+           排查「对端太旧所以云通话进不来」这种问题一眼就能看到。 */
+        var req = URLRequest(url: url)
+        req.setValue(AppInfo.build, forHTTPHeaderField: "X-App-Build")
+        let task = API.shared.session.webSocketTask(with: req)
         socket = task
         task.resume()
         loop = Task { [weak self] in

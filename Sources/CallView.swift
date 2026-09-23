@@ -95,6 +95,10 @@ struct CallView: View {
     @State private var miniX: CGFloat? = nil
     @State private var miniY: CGFloat? = nil
     @State private var dragging: CGSize = .zero
+    /* 通话页里「自己那个小画面」（画中画）：默认贴右下角，可以拖着走，松手吸附到左右边 */
+    @State private var pipX: CGFloat? = nil
+    @State private var pipY: CGFloat? = nil
+    @State private var pipDrag: CGSize = .zero
 
     private var blurRadius: CGFloat { UIConfig.num("callBackdropBlur", 60) }
     private var tint: CGFloat { UIConfig.num("callGlassTint", 0.45) }
@@ -243,35 +247,32 @@ struct CallView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
                 Spacer()
-                HStack {
-                    Spacer()
-                    Group {
-                        if call.usingTRTC {
-                            TRTCVideoView(view: trtc.localView)
-                        } else {
-                            VideoSurface(track: call.localVideo)
-                        }
-                    }
-                        .frame(width: 104, height: 148)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.white.opacity(0.22), lineWidth: 1))
-                        /* 摄像头关了：本地小窗盖一层深色 + 一个斜杠图标（微信的「遮挡摄像头」） */
-                        .overlay {
-                            if call.cameraOff {
-                                ZStack {
-                                    Color.black.opacity(0.72)
-                                    Image(systemName: "video.slash.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.white.opacity(0.9))
+                /* 自己那个小画面（画中画）：默认贴右下角，**可以拖着走**，松手吸附到左右边。
+                   点一下还是切前后摄像头（拖动要移动超过 5pt 才算拖，不会误触）。 */
+                GeometryReader { geo in
+                    let w: CGFloat = 104
+                    let h: CGFloat = 148
+                    let maxX = max(8, geo.size.width - w - 12)
+                    let minY: CGFloat = 74                       // 别压住顶上的名字和按钮
+                    let maxY = max(minY, geo.size.height - h - 150)
+                    let homeX = geo.size.width - w - 16
+                    let homeY = geo.size.height - h - 150
+                    let x = min(max((pipX ?? homeX) + pipDrag.width, 8), maxX)
+                    let y = min(max((pipY ?? homeY) + pipDrag.height, minY), maxY)
+                    pipBody(w: w, h: h)
+                        .position(x: x + w / 2, y: y + h / 2)
+                        .gesture(
+                            DragGesture(minimumDistance: 5)
+                                .onChanged { v in pipDrag = v.translation }
+                                .onEnded { v in
+                                    let nx = (pipX ?? homeX) + v.translation.width
+                                    let ny = (pipY ?? homeY) + v.translation.height
+                                    /* 松手吸附：靠近哪边就贴哪边（和微信一样的手感） */
+                                    pipX = nx + w / 2 < geo.size.width / 2 ? 8 : maxX
+                                    pipY = min(max(ny, minY), maxY)
+                                    pipDrag = .zero
                                 }
-                            }
-                        }
-                        /* 微信：点画中画自己那个小窗 = 切前后摄像头 */
-                        .contentShape(Rectangle())
-                        .onTapGesture { call.flipCamera() }
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 150)
+                        )
                 }
             }
 
@@ -294,6 +295,34 @@ struct CallView: View {
                 Spacer(minLength: 0)
             }
         }
+    }
+
+    /// 画中画里的内容（自己的画面）：TRTC 或 Webrtc 两种来源；点一下切前后摄像头
+    private func pipBody(w: CGFloat, h: CGFloat) -> some View {
+        Group {
+            if call.usingTRTC {
+                TRTCVideoView(view: trtc.localView)
+            } else {
+                VideoSurface(track: call.localVideo)
+            }
+        }
+        .frame(width: w, height: h)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(Color.white.opacity(0.22), lineWidth: 1))
+        /* 摄像头关了：本地小窗盖一层深色 + 一个斜杠图标（微信的「遮挡摄像头」） */
+        .overlay {
+            if call.cameraOff {
+                ZStack {
+                    Color.black.opacity(0.72)
+                    Image(systemName: "video.slash.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { call.flipCamera() }
     }
 
     /// 右上角那种竖向小钮：宽 30、高 52、圆角 12，半透明白（开着是白底深图标）

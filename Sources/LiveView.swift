@@ -86,17 +86,6 @@ struct LiveListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
         .swipeBack { dismiss() }
-        /* 抖音那套：双击屏幕点赞（连点就飘心），退出前问一句 */
-        .simultaneousGesture(
-            TapGesture(count: 2).onEnded {
-                like()
-                popHeart()
-            }
-        )
-        .confirmationDialog(Tr("确定要退出直播吗？"), isPresented: $confirmExit, titleVisibility: .visible) {
-            Button(Tr("退出直播"), role: .destructive) { dismiss() }
-            Button(Tr("继续观看"), role: .cancel) { }
-        }
         .navigationDestination(for: LiveRoom.self) { r in
             LiveRoomView(room: r)
         }
@@ -232,6 +221,15 @@ struct LiveRoomView: View {
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
         .swipeBack { dismiss() }
+        /* 抖音那套：双击屏幕点赞（连点就飘心），退出前问一句 */
+        .simultaneousGesture(TapGesture(count: 2).onEnded {
+            like()
+            popHeart()
+        })
+        .confirmationDialog(Tr("确定要退出直播吗？"), isPresented: $confirmExit, titleVisibility: .visible) {
+            Button(Tr("退出直播"), role: .destructive) { dismiss() }
+            Button(Tr("继续观看"), role: .cancel) { }
+        }
         .onChange(of: realtime.event) { ev in
             guard ev.type == "live", ev.roomId == room.id else { return }
             switch ev.liveAction {

@@ -74,6 +74,8 @@ struct ChatDetailView: View {
     @State private var showChatInfo = false
     @State private var showFile = false
     @State private var showCall = false
+    /// 点「视频通话」以后弹的那个「语音通话 / 视频通话」选择（微信就是这样）
+    @State private var showCallChoice = false
     @State private var billInfo: TransferInfo?
     @State private var uploading = false
     /// 点开聊天里的图片：paths = 这个会话里所有图片，index = 点的那张
@@ -415,6 +417,12 @@ struct ChatDetailView: View {
         .sheet(isPresented: $showForward) {
             ForwardPickerView(items: forwardItems) { }
                 .environmentObject(app)
+        }
+        /* 点「视频通话」→ 微信那样弹「语音通话 / 视频通话」两个选择 */
+        .confirmationDialog(Tr("音视频通话"), isPresented: $showCallChoice, titleVisibility: .hidden) {
+            Button(Tr("语音通话")) { startRealCall(video: false) }
+            Button(Tr("视频通话")) { startRealCall(video: true) }
+            Button(Tr("取消"), role: .cancel) { }
         }
         /* 右上「⋯」进的是聊天信息页（微信那套）；页里能打语音/视频、免打扰、置顶、
            查记录、换背景、清空、删除 —— 见 DirectChatInfoView */
@@ -973,7 +981,8 @@ struct ChatDetailView: View {
             if (chat.botRank ?? 9) < 9 {
                 showCall = true                       // 机器人：走 AI 通话
             } else {
-                startRealCall(video: true)            // 真人：真·视频通话（WebRTC）
+                /* 微信的写法：点「视频通话」不是直接拨，而是弹出「语音通话 / 视频通话」两个选择 */
+                showCallChoice = true
             }
         case "voice":
             panel = .none

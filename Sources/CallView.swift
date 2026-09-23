@@ -254,7 +254,17 @@ struct CallView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.white.opacity(0.22), lineWidth: 1))
-                        .opacity(call.cameraOff ? 0.12 : 1)
+                        /* 摄像头关了：本地小窗盖一层深色 + 一个斜杠图标（微信的「遮挡摄像头」） */
+                        .overlay {
+                            if call.cameraOff {
+                                ZStack {
+                                    Color.black.opacity(0.72)
+                                    Image(systemName: "video.slash.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                            }
+                        }
                         .padding(.trailing, 16)
                         .padding(.bottom, 150)
                 }
@@ -290,28 +300,45 @@ struct CallView: View {
     /* ---------------------------------------------------------- 底部三个圆按钮 */
 
     private var bottomBar: some View {
-        HStack(spacing: 51) {
-            if call.phase == .incoming {
-                // 来电：拒接 + 接听
-                roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
-                roundKey(label: "接听", bg: Color(hex: 0x07C160), ink: .white,
-                         action: { call.accept() }) {
-                    Image(systemName: "phone.fill")
-                        .font(.system(size: 27, weight: .medium))
+        VStack(spacing: 24) {
+            /* 视频通话多一行（微信那套）：摄像头遮挡 + 翻转。语音通话不显示这一行。 */
+            if call.phase != .incoming && call.isVideo {
+                HStack(spacing: 51) {
+                    roundKey(key: call.cameraOff ? "ui.callCamOff" : "ui.callCam",
+                             symbol: call.cameraOff ? "video.slash.fill" : "video.fill",
+                             builtin: nil,
+                             label: call.cameraOff ? "摄像头已关" : "摄像头已开",
+                             engaged: call.cameraOff) { call.toggleCamera() }
+                    roundKey(key: "ui.callFlip",
+                             symbol: "arrow.triangle.2.circlepath.camera",
+                             builtin: nil,
+                             label: "翻转",
+                             engaged: false) { call.flipCamera() }
                 }
-            } else {
-                roundKey(key: call.muted ? "ui.callMicOff" : "ui.callMic",
-                         symbol: call.muted ? "mic.slash.fill" : "mic.fill",
-                         builtin: call.muted ? I.callMicOff : I.callMic,
-                         label: call.muted ? "麦克风已关" : "麦克风已开",
-                         engaged: call.muted) { call.toggleMute() }
-                roundKey(label: call.phase == .active ? "挂断" : "取消",
-                         bg: Color(hex: 0xFA5151)) { call.hangup() }
-                roundKey(key: call.speakerOn ? "ui.callSpeaker" : "ui.callSpeakerOff",
-                         symbol: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
-                         builtin: call.speakerOn ? I.callSpeaker : I.callSpeakerOff,
-                         label: call.speakerOn ? "扬声器已开" : "扬声器已关",
-                         engaged: call.speakerOn) { call.toggleSpeaker() }
+            }
+            HStack(spacing: 51) {
+                if call.phase == .incoming {
+                    // 来电：拒接 + 接听
+                    roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
+                    roundKey(label: "接听", bg: Color(hex: 0x07C160), ink: .white,
+                             action: { call.accept() }) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 27, weight: .medium))
+                    }
+                } else {
+                    roundKey(key: call.muted ? "ui.callMicOff" : "ui.callMic",
+                             symbol: call.muted ? "mic.slash.fill" : "mic.fill",
+                             builtin: call.muted ? I.callMicOff : I.callMic,
+                             label: call.muted ? "麦克风已关" : "麦克风已开",
+                             engaged: call.muted) { call.toggleMute() }
+                    roundKey(label: call.phase == .active ? "挂断" : "取消",
+                             bg: Color(hex: 0xFA5151)) { call.hangup() }
+                    roundKey(key: call.speakerOn ? "ui.callSpeaker" : "ui.callSpeakerOff",
+                             symbol: call.speakerOn ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                             builtin: call.speakerOn ? I.callSpeaker : I.callSpeakerOff,
+                             label: call.speakerOn ? "扬声器已开" : "扬声器已关",
+                             engaged: call.speakerOn) { call.toggleSpeaker() }
+                }
             }
         }
         .padding(.bottom, 54)

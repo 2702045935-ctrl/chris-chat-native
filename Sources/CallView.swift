@@ -159,16 +159,18 @@ struct CallView: View {
 
     private var avatarLayer: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: max(40, 251 - L.safeTop))
-            Avatar(path: call.peerAvatar, size: 96, radius: 12)
+            /* 位置是照着 vx 里那张「未接通」参考图量的：
+               头像 70pt、中心在 y≈167；名字 17pt 紧贴下面（y≈199） */
+            Spacer().frame(height: max(30, 132 - L.safeTop))
+            Avatar(path: call.peerAvatar, size: 70, radius: 10)
             Text(call.peerName)
-                .font(pfExact(22, .medium))
+                .font(pfExact(17, .medium))
                 .foregroundColor(.white)
-                .padding(.top, 20)
+                .padding(.top, 12)
             Text(statusText)
-                .font(pfExact(15))
+                .font(pfExact(13.5))
                 .foregroundColor(.white.opacity(0.7))
-                .padding(.top, 6)
+                .padding(.top, 5)
                 .opacity(call.phase == .outgoing ? 0 : 1)
             if call.phase == .outgoing {
                 /* 打不通就别再滚「正在等待…」了，直接把原因写在屏幕上
@@ -348,15 +350,27 @@ struct CallView: View {
                 }
                 .padding(.bottom, 54)
             } else if call.isVideo {
-                /* 微信视频通话是「倒三角」：上面一行左边麦克风、右边扬声器，
-                   挂断单独居中、位置更低（照参考图量的：两颗 y≈717，挂断 y≈830）。 */
+                /* 视频通话：**接通前后两种布局**（都是照 vx 里那两张参考图量的）
+                   接通前 y≈717 是「麦克风 / 翻转 / 摄像头」三颗，
+                   接通后 y≈717 是「麦克风 / 扬声器」两颗（翻转、摄像头挪到右上角小钮），
+                   两种情况的红色按钮都在 y≈830、居中、更靠下。 */
                 VStack(spacing: 16) {
                     HStack(spacing: 0) {
-                        micKey
-                        Spacer(minLength: 0)
-                        speakerKey
+                        if call.phase == .active {
+                            micKey
+                            Spacer(minLength: 0)
+                            speakerKey
+                        } else {
+                            HStack(spacing: 0) {
+                                micKey
+                                Spacer(minLength: 0)
+                                flipKey
+                                Spacer(minLength: 0)
+                                cameraKey
+                            }
+                        }
                     }
-                    .padding(.horizontal, 48)
+                    .padding(.horizontal, call.phase == .active ? 48 : 16)
                     hangupKey
                 }
                 .padding(.bottom, 40)
@@ -391,6 +405,28 @@ struct CallView: View {
     private var hangupKey: some View {
         roundKey(label: call.phase == .active ? "挂断" : "取消",
                  bg: Color(hex: 0xFA5151)) { call.hangup() }
+    }
+
+    /// 接通前视频通话底部中间那颗：翻转摄像头（参考图里它在中间）
+    private var flipKey: some View {
+        roundKey(label: "翻转",
+                 bg: Color.white.opacity(0.18),
+                 ink: .white,
+                 action: { call.flipCamera() }) {
+            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                .font(.system(size: 26, weight: .medium))
+        }
+    }
+
+    /// 接通前视频通话底部右边那颗：摄像头开 / 关（遮挡）
+    private var cameraKey: some View {
+        roundKey(label: call.cameraOff ? "摄像头已关" : "摄像头已开",
+                 bg: call.cameraOff ? Color.white : Color.white.opacity(0.18),
+                 ink: call.cameraOff ? .black : .white,
+                 action: { call.toggleCamera() }) {
+            Image(systemName: call.cameraOff ? "video.slash.fill" : "video.fill")
+                .font(.system(size: 26, weight: .medium))
+        }
     }
 
     /// 左右两颗（麦克风 / 扬声器）：打开时**变白底 + 深色图标**（和微信一样），

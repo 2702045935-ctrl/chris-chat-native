@@ -49,8 +49,7 @@ struct ContactCardNew: View {
                             }
                         }
                         /* 朋友圈这一块一直在（朋友没发动态就写「暂无动态」），跟原来那版一致 */
-                        {
-                            sectionTitle("朋友圈", trailing: momentCount > 0 ? "\(momentCount) 条" : "")
+                        sectionTitle("朋友圈", trailing: momentCount > 0 ? "\(momentCount) 条" : "")
                             card {
                                 Button {
                                     onMoments?()
@@ -71,7 +70,6 @@ struct ContactCardNew: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                        }()
                         Spacer(minLength: 24)
                     }
                 }

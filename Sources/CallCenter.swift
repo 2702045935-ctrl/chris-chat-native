@@ -520,6 +520,14 @@ final class CallCenter: NSObject, ObservableObject {
                 sendCall(["action": "invite", "toUserId": peerId, "media": "audio"])
                 tip = "正在呼叫…"
             } else {
+                /* ⚠ 关键：必须告诉服务器「我接了」。
+                   服务端只有把通话置成 active 才会转发音频帧（它是靠这个挡住
+                   「没接通就往对方耳朵里灌声音」的），同时才会给主叫回一条
+                   accepted —— 少了这一条，主叫那头会一直停在「正在呼叫…」，
+                   而我们两边都在推帧、服务端一帧都不转，结果就是「都在通话中，
+                   但一个字都听不见」（线上语音一直不通就是这个原因）。
+                   语音走服务器转发，不需要 WebRTC 的 SDP，所以只发 accept 本身。 */
+                sendCall(["action": "accept"])
                 /* 被叫点了接听：直接进「通话中」并开始计时（语音这条路不依赖 ICE） */
                 Ringtone.shared.stop()
                 phase = .active

@@ -3391,13 +3391,6 @@
         if (!call.candTypes) call.candTypes = [];
         call.candTypes.push(e.candidate.type + '/' + ((e.candidate.protocol) || '?'));
       }
-      /* 拿到中继候选就把状态里标出来：外网连不上时全靠它（排查用，一眼能看见） */
-      if (e.candidate && e.candidate.type === 'relay') {
-        var els = callEls();
-        if (els.status && els.status.textContent.indexOf('中继') < 0) {
-          els.status.textContent = els.status.textContent + ' · 通道：中继 ✓';
-        }
-      }
       // 只在 invite / accept 已经发出去之后再补候选，否则服务器收到的是「不存在的通话」
       if (e.candidate && call && (call.inviteSent || call.answerSent)) {
         wsSend({ type: 'call', action: 'ice', callId: call.id, candidate: e.candidate });

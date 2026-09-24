@@ -179,7 +179,8 @@ final class CallCenter: NSObject, ObservableObject {
         startRingTimeout()
         Ringtone.shared.startRingback()        // 等对方接的时候放回铃音（嘟——）
         Task { await beginMedia() }
-        Task { await startTRTCIfPossible() }   // 能进腾讯云就交给腾讯云（两边都拨进来以后音视频才真正通）
+        /* 视频才交给腾讯云；语音不进 TRTC（进了就把我们自己的采集挤掉，见 startTRTCIfPossible） */
+        if video { Task { await startTRTCIfPossible() } }
     }
 
     /// 接听（来电界面点绿键）
@@ -190,7 +191,7 @@ final class CallCenter: NSObject, ObservableObject {
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
-        Task { await startTRTCIfPossible() }
+        if isVideo { Task { await startTRTCIfPossible() } }   // 语音不进 TRTC（同上）
         startConnectWatch()
         /* 注意：这里**不能**直接开始采集。
            麦克风权限是在 beginMedia() 里现申请的（第一次会弹窗），
@@ -932,6 +933,14 @@ extension CallCenter: RTCPeerConnectionDelegate {
            WebRTC（视频）+ 服务器转发语音，通话照样通，不会变哑巴。 */
 
     private func startTRTCIfPossible() async {
+        /* 语音通话**不进** TRTC。
+           原因：TRTC 用 role=anchor 进房时，它自己就会开本地音频采集（这也是下面
+           standByForLocalMedia 存在的原因）。可它那种「抢麦」会让我们的
+           AVCaptureSession 变成一个空壳 —— isRunning=true、采集=ok，却一个
+           音频 buffer 都不回调。线上表现就是：两边界面都写着通话中，
+           服务器却一帧音频都收不到，一个字都听不见（语音一直不通就是这个）。
+           语音只有「服务器转发」这一条路，把麦克风完整留给它；视频照旧交给 TRTC。 */
+        guard isVideo else { return }
         guard !trtcJoined, !usingTRTC, !callId.isEmpty else { return }
         let bridge = TRTCBridge.shared
         bridge.onJoined = { [weak self] ok in

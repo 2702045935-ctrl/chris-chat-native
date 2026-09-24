@@ -7115,6 +7115,69 @@ function blockedByRealName(res, user) {
     return true;
   } catch (e) { return false; }
 }
+
+/* 昵称规范（照微信来）：返回 '' 表示通过，否则返回给用户看的原因。
+   ① 1~16 个「字符」（一个汉字、一个 emoji 都算 1 个）
+   ② 首尾不能有空格、不能只有空格
+   ③ 不允许 < > " ' / \ 这类符号（微信也不让用，顺带防注入/排版错乱）
+   ④ 不能含敏感词，也不能冒用「微信 / 官方 / 客服 / 管理员」这类身份 */
+function checkNickname(raw) {
+  const s = String(raw == null ? '' : raw);
+  const t = s.trim();
+  if (!t) return '昵称不能为空';
+  if (t !== s) return '昵称前后不能有空格';
+  if (Array.from(t).length > 16) return '昵称最长 16 个字符';
+  if (/[<>"'/\\]/.test(t)) return '昵称里有不允许的符号（< > " \' / \\）';
+  if (/[\u0000-\u001f\u007f]/.test(t)) return '昵称里有不允许的字符';
+  if (!/[\u4e00-\u9fa5A-Za-z0-9]/.test(t)) return '昵称至少要有一个汉字、字母或数字';
+  if (sensitiveHit(t)) return '昵称里含有不允许的词语';
+  if (/微信|weixin|wechat|腾讯|tencent|官方|客服|管理员|系统消息|root|admin/i.test(t)) {
+    return '昵称不能冒用官方、客服这类身份';
+  }
+  return '';
+}
+
+/** 手机号绑定后一年内只能换一次（和微信一样）。返回还要等几天，0 = 可以换 */
+function phoneChangeWaitDays(user) {
+  const t = user && user.phoneChangedAt ? Date.parse(user.phoneChangedAt) : 0;
+  if (!t || isNaN(t)) return 0;
+  const days = 365 - Math.floor((Date.now() - t) / 86400000);
+  return days > 0 ? days : 0;
+}
+
+/* 省 / 市（地区选择用：和微信一样是两个滚轮，上下滑着选）。列到地级市，省得拉一个大文件。 */
+const REGIONS = [
+  ['北京', '北京'], ['天津', '天津'], ['上海', '上海'], ['重庆', '重庆'],
+  ['河北', '石家庄 唐山 秦皇岛 邯郸 邢台 保定 张家口 承德 沧州 廊坊 衡水'],
+  ['山西', '太原 大同 阳泉 长治 晋城 朔州 晋中 运城 忻州 临汾 吕梁'],
+  ['内蒙古', '呼和浩特 包头 乌海 赤峰 通辽 鄂尔多斯 呼伦贝尔 巴彦淖尔 乌兰察布 兴安盟 锡林郭勒盟 阿拉善盟'],
+  ['辽宁', '沈阳 大连 鞍山 抚顺 本溪 丹东 锦州 营口 阜新 辽阳 盘锦 铁岭 朝阳 葫芦岛'],
+  ['吉林', '长春 吉林 四平 辽源 通化 白山 松原 白城 延边'],
+  ['黑龙江', '哈尔滨 齐齐哈尔 鸡西 鹤岗 双鸭山 大庆 伊春 佳木斯 七台河 牡丹江 黑河 绥化 大兴安岭'],
+  ['江苏', '南京 无锡 徐州 常州 苏州 南通 连云港 淮安 盐城 扬州 镇江 泰州 宿迁'],
+  ['浙江', '杭州 宁波 温州 嘉兴 湖州 绍兴 金华 衢州 舟山 台州 丽水'],
+  ['安徽', '合肥 芜湖 蚌埠 淮南 马鞍山 淮北 铜陵 安庆 黄山 滁州 阜阳 宿州 六安 亳州 池州 宣城'],
+  ['福建', '福州 厦门 莆田 三明 泉州 漳州 南平 龙岩 宁德'],
+  ['江西', '南昌 景德镇 萍乡 九江 新余 鹰潭 赣州 吉安 宜春 抚州 上饶'],
+  ['山东', '济南 青岛 淄博 枣庄 东营 烟台 潍坊 济宁 泰安 威海 日照 临沂 德州 聊城 滨州 菏泽'],
+  ['河南', '郑州 开封 洛阳 平顶山 安阳 鹤壁 新乡 焦作 濮阳 许昌 漯河 三门峡 南阳 商丘 信阳 周口 驻马店 济源'],
+  ['湖北', '武汉 黄石 十堰 宜昌 襄阳 鄂州 荆门 孝感 荆州 黄冈 咸宁 随州 恩施 仙桃 潜江 天门 神农架'],
+  ['湖南', '长沙 株洲 湘潭 衡阳 邵阳 岳阳 常德 张家界 益阳 郴州 永州 怀化 娄底 湘西'],
+  ['广东', '广州 韶关 深圳 珠海 汕头 佛山 江门 湛江 茂名 肇庆 惠州 梅州 汕尾 河源 阳江 清远 东莞 中山 潮州 揭阳 云浮'],
+  ['广西', '南宁 柳州 桂林 梧州 北海 防城港 钦州 贵港 玉林 百色 贺州 河池 来宾 崇左'],
+  ['海南', '海口 三亚 三沙 儋州'],
+  ['四川', '成都 自贡 攀枝花 泸州 德阳 绵阳 广元 遂宁 内江 乐山 南充 眉山 宜宾 广安 达州 雅安 巴中 资阳 阿坝 甘孜 凉山'],
+  ['贵州', '贵阳 六盘水 遵义 安顺 毕节 铜仁 黔西南 黔东南 黔南'],
+  ['云南', '昆明 曲靖 玉溪 保山 昭通 丽江 普洱 临沧 楚雄 红河 文山 西双版纳 大理 德宏 怒江 迪庆'],
+  ['西藏', '拉萨 日喀则 昌都 林芝 山南 那曲 阿里'],
+  ['陕西', '西安 铜川 宝鸡 咸阳 渭南 延安 汉中 榆林 安康 商洛'],
+  ['甘肃', '兰州 嘉峪关 金昌 白银 天水 武威 张掖 平凉 酒泉 庆阳 定西 陇南 临夏 甘南'],
+  ['青海', '西宁 海东 海北 黄南 海南 果洛 玉树 海西'],
+  ['宁夏', '银川 石嘴山 吴忠 固原 中卫'],
+  ['新疆', '乌鲁木齐 克拉玛依 吐鲁番 哈密 昌吉 博尔塔拉 巴音郭楞 阿克苏 克孜勒苏 喀什 和田 伊犁 塔城 阿勒泰 石河子'],
+  ['台湾', '台北 新北 桃园 台中 台南 高雄 基隆 新竹 嘉义'],
+  ['香港', '香港'], ['澳门', '澳门']
+].map((r) => [r[0], r[1].split(' ')]);
 const unbanHits = new Map();
 function unbanRateAllow(ip) {
   const t = Date.now();
@@ -9746,7 +9809,12 @@ async function handleApi(req, res, pathname, query) {
   if (parts[0] === 'register' && method === 'POST') {
     const body = await readBody(req);
     const username = str(body.username, 24);
-    const nickname = str(body.nickname, 24) || username;
+    const nickRaw = str(body.nickname, 24);
+    if (nickRaw) {
+      const bad = checkNickname(nickRaw);
+      if (bad) return fail(res, 422, bad);
+    }
+    const nickname = nickRaw || username;
     const password = String(body.password || '');
     if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) return fail(res, 422, '用户名需为 3-24 位字母、数字或下划线');
     if (password.length < 6) return fail(res, 422, '密码至少 6 位');
@@ -10389,6 +10457,78 @@ async function handleApi(req, res, pathname, query) {
     audit(req, { username: user.username, name: user.nickname, role: '用户本人' },
       '实名认证', user.username, name + ' · ' + maskIdCard(idc));
     ok(res, { verified: true, realName: name, idMask: maskIdCard(idc), at: user.idCardVerifiedAt });
+    return;
+  }
+
+  /* 省 / 市（地区选择用）：和微信一样是两个滚轮，上下滑动选。数据不大，直接内置。 */
+  if (parts[0] === 'regions' && method === 'GET') {
+    ok(res, { regions: REGIONS.map((r) => ({ p: r[0], c: r[1] })) });
+    return;
+  }
+
+  /* 换手机号（和微信一个流程）：① 给新号发验证码 ② 提交新号 + 验证码 ③ 换绑成功。
+     手机号一年只能换一次（微信也是这规矩）；新号不能已经绑了别的账号；旧号自动解绑。 */
+  if (parts[0] === 'me' && parts[1] === 'phone' && parts[2] === 'code' && method === 'POST') {
+    const body = await readBody(req);
+    const phone = normalizePhone(body.phone);
+    if (!/^1[3-9]\d{9}$/.test(phone)) return fail(res, 422, '手机号格式不对，要 11 位手机号');
+    const wait = phoneChangeWaitDays(user);
+    if (wait > 0) return fail(res, 403, '手机号一年只能换一次，还要等 ' + wait + ' 天');
+    if (normalizePhone(user.phone) === phone) return fail(res, 409, '这就是你现在绑定的手机号');
+    const taken = db.users.find((u) => u.id !== user.id && normalizePhone(u.phone) === phone);
+    if (taken) return fail(res, 409, '这个手机号已经绑定了其它账号');
+    if (!phoneCodeRateAllow(clientInfo(req).ip)) {
+      strikeIp(clientInfo(req).ip, '狂刷换手机号验证码');
+      return fail(res, 429, '试得太频繁了，10 分钟后再试');
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    phoneCodes.set(phone, { code, userId: user.id, expiresAt: Date.now() + 5 * 60 * 1000 });
+    const smsCfg2 = readSmsCfg();
+    let sms2 = { ok: false, error: '短信没配置' };
+    if (smsReady(smsCfg2)) sms2 = await sendSmsCode(phone, code, smsCfg2);
+    if (smsReady(smsCfg2) && !sms2.ok) {
+      phoneCodes.delete(phone);
+      return fail(res, 502, '短信没发出去：' + sms2.error);
+    }
+    console.log('[换手机号] ' + phone + ' 验证码 ' + code + ' ← ' + clientInfo(req).ip);
+    /* 和安全口径一致：只有本机/局域网（你自己的手机）才把验证码直接显示出来 */
+    const lan2 = isLanAddress(peerIp(req));
+    if (sms2.ok) { ok(res, { sent: true, note: '验证码已发到手机，5 分钟内有效' }); return; }
+    ok(res, { sent: true, devCode: lan2 ? code : '', note: '验证码已发送，5 分钟内有效' });
+    return;
+  }
+
+  if (parts[0] === 'me' && parts[1] === 'phone' && method === 'POST') {
+    const body = await readBody(req);
+    const phone = normalizePhone(body.phone);
+    const code = str(body.code, 8);
+    if (!/^1[3-9]\d{9}$/.test(phone)) return fail(res, 422, '手机号格式不对，要 11 位手机号');
+    const wait = phoneChangeWaitDays(user);
+    if (wait > 0) return fail(res, 403, '手机号一年只能换一次，还要等 ' + wait + ' 天');
+    /* 没接短信通道时（后台「短信通道」还没配），验证码根本发不出去 ——
+       这种情况改用「当前登录密码」验证，不然这个功能对公网用户直接是废的。
+       配了短信通道就严格按验证码来。 */
+    if (!smsReady(readSmsCfg())) {
+      if (!verifyPassword(user, String(body.password || ''))) {
+        return fail(res, 422, '请填写当前账号的登录密码（还没配短信通道，用密码验证）');
+      }
+    } else {
+      const rec = phoneCodes.get(phone);
+      if (!rec || rec.userId !== user.id || rec.expiresAt < Date.now()) {
+        return fail(res, 422, '验证码过期了，请重新获取');
+      }
+      if (rec.code !== code) return fail(res, 422, '验证码不对');
+    }
+    const taken = db.users.find((u) => u.id !== user.id && normalizePhone(u.phone) === phone);
+    if (taken) return fail(res, 409, '这个手机号已经绑定了其它账号');
+    phoneCodes.delete(phone);
+    user.phone = phone;
+    user.phoneChangedAt = now();
+    saveUsers();
+    recordSecurity(user.id, req, 'phone-change', { phone });
+    audit(req, { username: user.username, name: user.nickname, role: '用户本人' },
+      '更换手机号', user.username, phone.slice(0, 3) + '****' + phone.slice(7));
+    ok(res, { phone: phone.slice(0, 3) + '****' + phone.slice(7) });
     return;
   }
 
@@ -11097,7 +11237,14 @@ async function handleApi(req, res, pathname, query) {
 
   if (parts[0] === 'me' && parts.length === 1 && method === 'PATCH') {
     const body = await readBody(req);
-    if (body.nickname !== undefined) user.nickname = str(body.nickname, 24) || user.nickname;
+    if (body.nickname !== undefined) {
+      const nn = str(body.nickname, 24);
+      if (nn && nn !== user.nickname) {
+        const bad = checkNickname(nn);
+        if (bad) return fail(res, 422, bad);
+      }
+      user.nickname = nn || user.nickname;
+    }
     if (body.bio !== undefined) user.bio = str(body.bio, 60);
     if (body.region !== undefined) user.region = str(body.region, 40);
     if (body.gender !== undefined) user.gender = normalizeGender(body.gender);

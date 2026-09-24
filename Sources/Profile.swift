@@ -15,6 +15,8 @@ struct ProfileEditView: View {
     @State private var phone = ""
     @State private var birthday = ""
     @State private var showBirthday = false
+    @State private var showRegion = false
+    @State private var showPhone = false
     @State private var showPhoto = false
     @State private var busy = false
     @State private var cropImage: UIImage?
@@ -54,6 +56,15 @@ struct ProfileEditView: View {
                         .buttonStyle(.plain)
                         HairLine(inset: 16)
                         field("昵称", $nickname)
+                        /* 昵称规范（和微信一致）：≤16 个字符、不能用 < > " ' / \ 这类符号、不能冒用官方/客服 */
+                        HStack(spacing: 8) {
+                            Text(Tr("最多 16 个字符；不能用 < > \" ' / \\ 等符号，不能冒用官方或客服"))
+                                .font(pf(12)).foregroundColor(C.subLabel)
+                            Spacer(minLength: 0)
+                            Text("\(nickname.count)/16")
+                                .font(pf(12)).foregroundColor(nickname.count > 16 ? C.red : C.subLabel)
+                        }
+                        .padding(.horizontal, 16).padding(.bottom, 10)
                         HairLine(inset: 16)
                         /* 星言号（只读）+ 我的二维码：和微信一样排在这一屏最上面 */
                         HStack(spacing: 12) {
@@ -84,7 +95,22 @@ struct ProfileEditView: View {
                         .padding(.horizontal, 16)
                         .frame(height: 56)
                         HairLine(inset: 16)
-                        field("地区", $region)
+                        /* 地区：和微信一样点开是两个滚轮（省 / 市），不再让人手打 */
+                        Button {
+                            showRegion = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(Tr("地区")).font(pf(17)).foregroundColor(C.label)
+                                Spacer()
+                                Text(region.isEmpty ? Tr("未设置") : region)
+                                    .font(pf(15)).foregroundColor(C.subLabel)
+                                Chevron(size: 9, line: 1.6).padding(.trailing, 3)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 56)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                         HairLine(inset: 16)
                         /* 生日（对应功能清单里的「生日」）：点一下弹出日期选择 */
                         Button {
@@ -113,7 +139,7 @@ struct ProfileEditView: View {
                         /* 手机号在个人信息里只看不改、中间打码（微信也是「138****8888」），
                            改号去「设置 → 账号与安全」 */
                         Button {
-                            app.show(Tr("手机号要改的话去「设置 → 账号与安全」"))
+                            showPhone = true
                         } label: {
                             HStack(spacing: 12) {
                                 Text(Tr("手机号"))
@@ -192,6 +218,12 @@ struct ProfileEditView: View {
         }
         .sheet(isPresented: $showBirthday) {
             BirthdayPickerSheet(birthday: $birthday)
+        }
+        .sheet(isPresented: $showRegion) {
+            RegionPickerSheet { r in region = r }
+        }
+        .sheet(isPresented: $showPhone) {
+            PhoneChangeSheet().environmentObject(app)
         }
         .sheet(isPresented: $showMyQR) { MyQRView() }
     }

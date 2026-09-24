@@ -2812,6 +2812,35 @@ final class API {
                             at: (d["at"] as? String) ?? "")
     }
 
+    /* ---------------- 地区（省 / 市）· 换手机号 ---------------- */
+
+    struct RegionRow: Decodable, Hashable {
+        var p: String            // 省 / 直辖市
+        var c: [String]          // 市
+    }
+
+    /// 省 / 市列表（地区选择用：和微信一样两个滚轮）。服务端内置，一次拉回。
+    func regions() async -> [RegionRow] {
+        guard let any = try? await request("GET", "/api/regions") else { return [] }
+        let d = (any as? [String: Any]) ?? [:]
+        return (try? decode(d["regions"] ?? [], as: [RegionRow].self)) ?? []
+    }
+
+    /// 换手机号第一步：给新号发验证码。没配短信通道时服务端回 devCode（本机/局域网直接显示）
+    func phoneChangeCode(phone: String) async throws -> String? {
+        let any = try await request("POST", "/api/me/phone/code", body: ["phone": phone])
+        return (any as? [String: Any])?["devCode"] as? String
+    }
+
+    /// 换手机号第二步：提交新号 + 验证码（没配短信通道时改用登录密码验证）
+    @discardableResult
+    func changePhone(phone: String, code: String, password: String) async throws -> String {
+        var body: [String: Any] = ["phone": phone, "code": code]
+        if !password.isEmpty { body["password"] = password }
+        let any = try await request("POST", "/api/me/phone", body: body)
+        return ((any as? [String: Any])?["phone"] as? String) ?? ""
+    }
+
     func changeBackground(_ path: String) async {
         await updateMe(["chatBackground": path])
     }

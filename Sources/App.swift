@@ -1292,6 +1292,8 @@ struct AccountLoginSheet: View {
     /// 登录滑动验证换来的一次性通行证 + 换题用的 key
     @State private var sliderTicket = ""
     @State private var captchaKey = 0
+    /// 安全验证的滑块是不是要「弹出来」（默认藏着，服务端判定有风险才弹 —— 微信就是这个体验）
+    @State private var showSlider = false
 
     var body: some View {
         NavigationStack {
@@ -1320,23 +1322,9 @@ struct AccountLoginSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 12)
                     }
-                    /* 登录滑动验证：只有账号密码登录要过这一关（手机号登录已经有短信验证码了） */
-                    if mode == .password && app.sliderLogin {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(Tr("安全验证"))
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(LoginTheme.ink(colorScheme))
-                            SliderCaptchaView(onTicket: { t in
-                                sliderTicket = t
-                                error = nil
-                            }, onFail: { msg in
-                                sliderTicket = ""
-                                error = msg
-                            })
-                            .id(captchaKey)
-                        }
-                        .padding(.top, 16)
-                    }
+                    /* 滑块**不常驻**在这一页上（微信也不是）：正常点登录就进去了，
+                       只有服务端判定这次有风险（新设备 / 密码错得多）才回 428，
+                       那时再把滑块以弹层形式滑出来 —— 见 submit() 和下面的 .sheet */
                     // 账号被禁用：直接给一个自助解封入口（填身份证号，服务器校验合法就解开）
                     if isBanned {
                         Button {
@@ -1388,6 +1376,14 @@ struct AccountLoginSheet: View {
                 ToolbarItem(placement: .navigationBarLeading) { Button(Tr("取消")) { dismiss() } }
             }
             .sheet(isPresented: $showReg) { RegisterSheet() }
+            /* 服务端说「这次要验证」时滑出来的安全验证（平时不占地方） */
+            .sheet(isPresented: $showSlider) {
+                SliderSheet(freshKey: captchaKey, onPass: { t in
+                    sliderTicket = t
+                    error = nil
+                    submit()            // 拿到票自动重试一次登录，不让用户再点一次
+                })
+            }
             .sheet(isPresented: $showReset) { ResetPasswordSheet() }
             .sheet(isPresented: $showUnban) {
                 UnbanSheet(preUser: username, prePass: password)
@@ -1431,17 +1427,22 @@ struct AccountLoginSheet: View {
                 } else {
                     let u = username.trimmingCharacters(in: .whitespaces)
                     if u.isEmpty || password.isEmpty { throw APIError.message("请填写账号和密码") }
-                    if app.sliderLogin && sliderTicket.isEmpty {
-                        throw APIError.message("请先拖动滑块完成安全验证")
-                    }
+                    /* 先直接登：上一次滑出来的票还在就带上，没有就空着 ——
+                       服务端默认放行，只有判定有风险才回 428（needSlider）。 */
                     try await app.login(username: u, password: password, sliderTicket: sliderTicket)
                 }
                 dismiss()
+            } catch APIError.needSlider {
+                /* 服务端判定这次登录有风险 → 把滑块「滑出来」，滑完自动重试 */
+                sliderTicket = ""
+                captchaKey += 1
+                showSlider = true
+                error = nil
             } catch {
                 let msg = (error as? APIError)?.errorDescription ?? "登录失败"
                 self.error = msg
                 /* 通行证是一次性的：这次没用上/过期了，就换一道新题重新滑 */
-                if msg.contains("滑动验证") {
+                if msg.contains("滑动验证") || msg.contains("安全验证") {
                     sliderTicket = ""
                     captchaKey += 1
                 }

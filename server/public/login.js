@@ -140,9 +140,9 @@
     modePwd.classList.toggle('hide', toCode);
     modeCode.classList.toggle('hide', !toCode);
     switchMode.textContent = toCode ? '用账号密码登录' : '用手机验证码登录';
-    /* 滑动验证只管账号密码登录；手机验证码那套有短信验证码，不需要 */
-    var sw = $('sliderWrap');
-    if (sw) sw.style.display = toCode ? 'none' : '';
+    /* 滑动验证只管账号密码登录，而且是**按需**才出现（服务端判定有风险才弹），
+       切过来的时候别把它翻出来 */
+    hideSliderBox();
   });
 
   /* 密码显示 / 隐藏 */
@@ -206,6 +206,22 @@
   var sliderTicket = '', sliderId = '', sliderX = 0, sliderMax = 0, sliderPiece = 44, sliderDone = false;
   /* 服务器没开滑动验证时，这一块直接收起来（开关在 data/security.json 的 sliderLogin） */
   var sliderOn = true;
+  /* 滑块默认藏着（跟微信一样）：只有服务端判定这次登录有风险才滑出来；
+     滑完自动把刚才被拦下的那次登录重试一遍，不用用户再点一次「登录」 */
+  var pendingLogin = false;
+  function showSliderBox() {
+    var sw = $('sliderWrap');
+    if (!sw || !sliderOn) return;
+    sw.classList.add('show');
+    sw.style.display = '';
+    if (typeof loadSlider === 'function') loadSlider();
+  }
+  function hideSliderBox() {
+    var sw = $('sliderWrap');
+    if (!sw) return;
+    sw.classList.remove('show');
+    sw.style.display = 'none';
+  }
 
   function sf(seed, i) {                 // 稳定的伪随机（同一个 seed 画出来一样）
     var x = (Math.imul(seed + i * 7 + 13, 2654435761) >>> 0);
@@ -282,6 +298,11 @@
         $('sliderHandle').classList.add('done');
         $('sliderHandle').textContent = '✓';
         $('sliderHint').textContent = '验证通过';
+        /* 这次验证是为「刚才被拦下的那次登录」做的：自动重试，不用再点一次登录 */
+        if (pendingLogin) {
+          pendingLogin = false;
+          setTimeout(function () { var b = $('btnLogin'); if (b) b.click(); }, 260);
+        }
         return true;
       })
       .catch(function (e) {
@@ -337,12 +358,8 @@
       var p = $('loginPass').value || '';
       if (!u) return toast('请填写微信号 / 用户名', 'bad');
       if (!p) return toast('请填写密码', 'bad');
-      /* 账号密码登录要先过滑动验证（通行证是一次性的，换来就随这次登录发过去） */
-      if (sliderOn && !sliderTicket) {
-        toast('请先拖动滑块完成安全验证', 'bad');
-        if (typeof loadSlider === 'function') loadSlider();
-        return;
-      }
+      /* 直接登：上次滑出来的票还在就带上。服务端默认放行，
+         只有判定有风险才回 428（needSlider），那时才把滑块滑出来 */
       url = '/api/login'; body = { username: u, password: p };
       if (sliderTicket) body.sliderTicket = sliderTicket;
     }
@@ -355,9 +372,19 @@
       setTimeout(goAfterLogin, 350);
     }).catch(function (e) {
       busy(btn, false);
-      toast(e.message, 'bad');
-      /* 通行证是一次性的：这次没生效（被别的请求用掉 / 过期）就换一道新题 */
-      if (/滑动验证/.test(String(e.message || '')) && typeof loadSlider === 'function') loadSlider();
+      if (e && e.needSlider) {
+        /* 服务端判定这次有风险：把滑块「滑出来」（平时它是收着的） */
+        toast('为确认是本人操作，请完成安全验证', 'bad');
+        pendingLogin = true;
+        showSliderBox();
+      } else {
+        toast(e.message, 'bad');
+        /* 通行证是一次性的：这次没生效（被别的请求用掉 / 过期）就换一道新题 */
+        if (/滑动验证|安全验证/.test(String(e.message || ''))) {
+          pendingLogin = true;
+          showSliderBox();
+        }
+      }
       /* 被封的账号：直接把自助解封那一页摊开，省得他自己找 */
       if (/禁用|封禁/.test(String(e.message || ''))) showUnban(true);
     });
@@ -572,8 +599,7 @@
     var L = b.login || {};
     /* 滑动验证开没开：服务器说了算（关了就把这一块收起来，也不用再交卷） */
     sliderOn = b.sliderLogin !== false;
-    var sw = $('sliderWrap');
-    if (sw && !sliderOn) sw.style.display = 'none';
+    hideSliderBox();          // 默认收着，服务端要了再滑出来
     THEME = L;
     if (L.appName || b.appName) {
       var name = L.appName || b.appName;

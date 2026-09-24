@@ -9,6 +9,49 @@ import SwiftUI
    注意：客户端**不自己判对错**，对不对由服务端说了算。
    ============================================================ */
 
+/// 登录时才滑出来的安全验证弹层。
+/// 微信那种体验：平时页面上什么都不占，服务端判定有风险了才从底部滑出来。
+struct SliderSheet: View {
+    /// 换题用的 key：每次弹出来都换一道新题
+    var freshKey: Int = 0
+    var onPass: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var err = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(Tr("为确认是本人操作，请拖动滑块把缺口补齐"))
+                    .font(.system(size: 13))
+                    .foregroundColor(C.subLabel)
+                SliderCaptchaView(onTicket: { t in
+                    onPass(t)
+                    dismiss()
+                }, onFail: { msg in
+                    err = msg
+                })
+                .id(freshKey)
+                if !err.isEmpty {
+                    Text(err).font(.system(size: 13)).foregroundColor(C.red)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .navigationTitle(Tr("安全验证"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(Tr("取消")) { dismiss() }
+                }
+            }
+        }
+        /* 从底部滑出来一小块就够（拼图 130 + 滑轨 44 + 文字），不铺满整屏 */
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 struct SliderCaptchaView: View {
     /// 验证通过：把一次性通行证交给登录
     let onTicket: (String) -> Void

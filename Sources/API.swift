@@ -997,10 +997,14 @@ private struct UploadPayload: Decodable {
 
 enum APIError: LocalizedError {
     case message(String)
+    /// 服务端判定这次登录有风险，要求补一次滑动验证（微信那种「需要时才弹」）
+    case needSlider
 
     var errorDescription: String? {
-        if case .message(let m) = self { return m }
-        return nil
+        switch self {
+        case .message(let m): return m
+        case .needSlider: return "请完成安全验证"
+        }
     }
 }
 
@@ -1126,6 +1130,8 @@ final class API {
         /* 报一下自己是哪一版（"B456 · 09-23 21:08" 这种）——
            排查「两台手机版本不一样」时，服务器日志里一眼就能看出来 */
         req.setValue(AppInfo.build, forHTTPHeaderField: "X-App-Build")
+        /* 设备标识：服务器拿它判断「这次是不是换了设备」，只有换了设备才弹滑动验证 */
+        req.setValue(AppInfo.deviceId, forHTTPHeaderField: "X-Device-Id")
         if !token.isEmpty {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -1159,6 +1165,11 @@ final class API {
         }
         if (dict["ok"] as? Bool) != true {
             let msg = (dict["error"] as? String) ?? "请求失败"
+            /* 428 + details.needSlider：服务端要补一次滑动验证（正常登录不会走到这里）。
+               单独抛一个类型出来，让登录页能把滑块「弹出来」而不是弹个错误。 */
+            if let det = dict["details"] as? [String: Any], (det["needSlider"] as? Bool) == true {
+                throw APIError.needSlider
+            }
             throw APIError.message(msg)
         }
         return dict["data"] ?? [String: Any]()

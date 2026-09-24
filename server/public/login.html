@@ -185,7 +185,9 @@
 .toast.bad{background:rgba(230,67,64,.92)}
 
 /* ── 登录滑动验证（拖滑块补缺口） ─────────── */
-.sliderWrap{margin:16px 0 0;user-select:none;-webkit-user-select:none}
+.sliderWrap{margin:16px 0 0;user-select:none;-webkit-user-select:none;display:none;animation:sliderIn .22s ease}
+.sliderWrap.show{display:block}
+@keyframes sliderIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .sliderTitle{font-size:13px;font-weight:600;color:var(--txt);margin:0 0 8px}
 .sliderPuzzle{
   position:relative;overflow:hidden;border-radius:8px;

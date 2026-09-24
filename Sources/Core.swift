@@ -11,6 +11,16 @@ enum AppInfo {
         let d = (Bundle.main.infoDictionary?["BuildDate"] as? String) ?? ""
         return d.isEmpty ? ("B" + n) : ("B" + n + " · " + d)
     }()
+    /// 这台设备的唯一标识：第一次跑就生成，存 Keychain（删 App 重装也还在）。
+    /// 登录时随请求发给服务器（X-Device-Id），服务器用它判断「是不是换了设备」——
+    /// 只有换设备时才弹滑动验证（微信就是这么认设备的，比拿 UA/IP 猜准得多）。
+    static let deviceId: String = {
+        let key = "chris.device.id"
+        if let v = Keychain.get(key), !v.isEmpty { return v }
+        let v = UUID().uuidString
+        Keychain.set(v, for: key)
+        return v
+    }()
 }
 
 /* ============================================================

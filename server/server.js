@@ -2997,7 +2997,12 @@ function clientInfo(req) {
     if (fwd) ip = fwd.replace('::ffff:', '').trim();
   }
   ip = ip.replace('::ffff:', '').replace('::1', '127.0.0.1');
-  return { ip, device: describeDevice(ua) };
+  /* 客户端自带的设备标识（iOS 端把 UUID 存 Keychain，请求头 X-Device-Id 带上来）。
+     用它可以准确判断「是不是换了设备」，比拿 UA + IP 猜靠谱得多：
+     UA 是几百万台 iPhone 共用的，同 UA 不算同一台设备。 */
+  const deviceId = String((req && req.headers && req.headers['x-device-id']) || '')
+    .replace(/[^0-9A-Za-z\-]/g, '').slice(0, 64);
+  return { ip, device: describeDevice(ua), deviceId };
 }
 
 /** 记一条登录 / 安全事件 */
@@ -9822,6 +9827,8 @@ async function handleApi(req, res, pathname, query) {
     if (!user) return fail(res, 404, '账号不存在');
     if (user.banned) return fail(res, 403, banMsg(user));
     phoneCodes.delete(phone);
+    rememberDevice(user, req);      // 短信登录也记设备（换设备登录才会被要求验证）
+    saveUsers();
     noteLoginRisk(user, req);   // 风控：新设备 / 同 IP 多账号（要在记安全事件之前算）
     recordSecurity(user.id, req, 'login');
     ok(res, { user: publicUser(user) },
@@ -9831,13 +9838,18 @@ async function handleApi(req, res, pathname, query) {
 
   if (parts[0] === 'login' && method === 'POST') {
     const body = await readBody(req);
-    /* 滑动验证：开了就必须带一次性通行证（先验票，再谈密码，绕不过去）。
-       票是 /api/slider/verify 滑对了才发的，用一次就作废。
-       想去掉这层：data/security.json 里写 "sliderLogin": 0。 */
-    if (secCfg().sliderLogin && !consumeSliderTicket(body.sliderTicket)) {
-      return fail(res, 428, '请先完成滑动验证');
-    }
     const rawName = str(body.username, 24);
+    /* 滑动验证：**默认不弹**（正常登录一路过，跟微信一样）。
+       票是一次性的（/api/slider/verify 滑对才发、用过即废）；
+       只有 loginNeedsSlider() 判定有风险才回 428，
+       客户端看到 details.needSlider 再把滑块「弹出来」。
+       想整层关掉：data/security.json 里写 "sliderLogin": 0。 */
+    if (!consumeSliderTicket(body.sliderTicket) && secCfg().sliderLogin) {
+      const guess = findUserByName(rawName);
+      if (guess && !guess.banned && loginNeedsSlider(req, guess)) {
+        return fail(res, 428, '请完成安全验证', { needSlider: true });
+      }
+    }
     const ip = clientInfo(req).ip;
     const kUser = 'u:' + rawName.toLowerCase();
     const kIp = 'ip:' + ip;
@@ -9851,6 +9863,8 @@ async function handleApi(req, res, pathname, query) {
     }
     if (user.banned) return fail(res, 403, banMsg(user));
     clearLoginFails([kUser, kIp]);
+    rememberDevice(user, req);      // 这台设备登过这个账号了：下次同一台设备直接过
+    saveUsers();
     noteLoginRisk(user, req);   // 风控：新设备 / 同 IP 多账号（要在记安全事件之前算）
     recordSecurity(user.id, req, 'login');
     ok(res, { user: publicUser(user) },
@@ -14023,6 +14037,69 @@ function isNewDevice(user, req) {
     if (!seen.length) return false;
     return !seen.some((l) => l.ip === info.ip || l.device === info.device);
   } catch (e) { return false; }
+}
+
+/* 每个账号自己记「登过的设备」（最多 10 条，最近的排前面）。
+   滑动验证的「新设备」判断靠这张表 —— 全局的 security.logins 只有 600 条，
+   用户一多就被别人的记录挤掉了，拿它判断等于永远不弹。 */
+function rememberDevice(user, req) {
+  try {
+    if (!user) return;
+    const info = clientInfo(req);
+    const key = deviceKeyOf(info);
+    const list = (Array.isArray(user.devices) ? user.devices : [])
+      .filter((d) => deviceKeyOf(d) !== key);
+    list.unshift({ id: info.deviceId || '', ip: info.ip, device: info.device, at: now() });
+    if (list.length > 10) list.length = 10;
+    user.devices = list;
+    user.deviceUpdatedAt = now();
+  } catch (e) { }
+}
+
+/** 一条设备记录 / 一次请求的「设备身份」：有设备 id 就用 id，没有才退回 IP+UA */
+function deviceKeyOf(d) {
+  if (d && d.deviceId) return 'id:' + String(d.deviceId);
+  if (d && d.id) return 'id:' + String(d.id);
+  return String((d && d.ip) || '') + '|' + String((d && d.device) || '');
+}
+
+/** 这台设备 / 这个出口 IP 在这个账号的设备表里见过吗 */
+function knownDevice(user, req) {
+  try {
+    const info = clientInfo(req);
+    const list = Array.isArray(user.devices) ? user.devices : [];
+    if (!list.length) return true;            // 老账号还没这张表：不弹（别吓着老用户）
+    if (info.deviceId) {
+      /* 带设备 id 的表：认 id。表里全是老记录（还没有 id）时才退回 IP/UA 判断 */
+      if (list.every((d) => !d.id)) {
+        return list.some((d) => d.ip === info.ip || d.device === info.device);
+      }
+      return list.some((d) => d.id === info.deviceId);
+    }
+    return list.some((d) => d.ip === info.ip || d.device === info.device);
+  } catch (e) { return true; }
+}
+
+/* 登录要不要弹滑动验证。跟微信一个思路：**默认不弹**，正常登录一路过；
+   只有出现风险信号才要求补一次验证：
+     ① 这台设备 / 这个出口 IP 从没登录过这个账号（新设备、异地登录）
+     ② 最近 10 分钟内这个账号（≥3 次）或这个 IP（≥5 次）密码错得多
+   想整层关掉：data/security.json 里写 "sliderLogin": 0。 */
+function loginNeedsSlider(req, user) {
+  try {
+    if (!user) return false;
+    const info = clientInfo(req);
+    const t = Date.now();
+    const byUser = LOGIN_FAILS.get('u:' + String(user.username || '').toLowerCase());
+    if (byUser && t - byUser.first <= LOGIN_WINDOW_MS && byUser.n >= 3) return true;
+    const byIp = LOGIN_FAILS.get('ip:' + info.ip);
+    if (byIp && t - byIp.first <= LOGIN_WINDOW_MS && byIp.n >= 5) return true;
+    /* 这台设备 / 这个 IP 从没见过 → 弹一次。
+       设备表为空（老账号第一次用新版）等于「还不知道」，这时候不弹，
+       免得所有老用户一升级就被要求验证。 */
+    if (!knownDevice(user, req)) return true;
+  } catch (e) { /* 风控出问题不能挡住正常登录 */ }
+  return false;
 }
 
 /* 违规告警：以前只调不定义（命中敏感词会直接报错），这里补上 ——

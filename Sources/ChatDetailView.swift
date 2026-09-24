@@ -878,18 +878,40 @@ struct ChatDetailView: View {
                 )
 
                 HStack(spacing: 0) {
-                    TextField("", text: $input)
-                        .focused($focused)
-                        .font(pf(17))
-                        .foregroundColor(C.label)
-                        .onTapGesture { panel = .none }
+                    if recorder.recording {
+                        /* 录音时把输入框整条收起来（微信就是这样）：
+                           不然刚打的字一直露在框里，还和录音按钮混在一起。
+                           松手立刻恢复，原来打的字还在（草稿）。 */
+                        HStack(spacing: 7) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(recorder.willCancel ? C.red : C.green)
+                            Text(recorder.willCancel ? Tr("松开手指，取消发送") : Tr("松开 发送"))
+                                .font(pf(15.5))
+                                .foregroundColor(recorder.willCancel ? C.red : C.label)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        TextField("", text: $input)
+                            .focused($focused)
+                            .font(pf(17))
+                            .foregroundColor(C.label)
+                            .onTapGesture { panel = .none }
+                    }
                 }
                 .padding(.horizontal, 8)
                 .frame(height: L.inputH)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.dyn(0xFFFFFF, 0x2C2C2E)))
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(recorder.recording
+                              ? (recorder.willCancel ? Color.dyn(0xFFF1F1, 0x3A2A2A) : Color.dyn(0xF2F2F2, 0x242427))
+                              : Color.dyn(0xFFFFFF, 0x2C2C2E))
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.dyn(0xE8E8E8, 0x3A3A3C), lineWidth: 0.5)
+                        .stroke(recorder.recording
+                                ? (recorder.willCancel ? C.red.opacity(0.35) : C.green.opacity(0.35))
+                                : Color.dyn(0xE8E8E8, 0x3A3A3C), lineWidth: 0.5)
                 )
 
                 if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

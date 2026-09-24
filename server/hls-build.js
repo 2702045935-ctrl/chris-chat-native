@@ -38,6 +38,24 @@ fs.mkdirSync(HLS, { recursive: true });
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const force = process.argv.indexOf('--force') >= 0;
 
+/* 这次是按什么规格切的。每个 HLS 目录里存一份（封存）build.json。
+   为什么必须有它：目录名是按视频文件名取的，只判「目录存在就跳过」的话，
+   以前用 -c copy 切出来的高码率目录会一直活着 —— 后面任何一次自动切片
+   都会把 feed 指回那个旧目录，用户那边视频又变成 3.6Mbps（线上真出过）。
+   现在只有「目录存在 且 规格标记和当前 POLICY 一致」才跳过，否则重建。 */
+const POLICY = 'v2-800k-1024';
+function markerOk(dir) {
+  try {
+    const raw = fs.readFileSync(dir + 'build.json');
+    let txt = raw;
+    if (raw.length >= 20 && raw.subarray(0, 4).equals(MAGIC)) {
+      const d = crypto.createDecipheriv('aes-256-ctr', key('build.json'), raw.subarray(4, 20));
+      txt = Buffer.concat([d.update(raw.subarray(20)), d.final()]);
+    }
+    return JSON.parse(txt.toString('utf8')).policy === POLICY;
+  } catch (e) { return false; }
+}
+
 const f = JSON.parse(fs.readFileSync(D + 'feed.json', 'utf8'));
 const items = (f.posts || []).concat(f.items || []);
 const jobs = [];
@@ -60,10 +78,13 @@ for (const name of jobs) {
   const id = name.replace(/\.[A-Za-z0-9]+$/, '').replace(/[^A-Za-z0-9._-]/g, '');
   /* 重建时换一个目录名：分片是 immutable 缓存的，同名新内容会让已经缓存过旧分片的
      播放器拿到错的数据（花屏/卡住）。换名字之后新的播放列表指向全新的分片。 */
-  const id2 = force ? (id + '-t' + Date.now().toString(36)) : id;
+  const baseDir = HLS + id + '/';
+  const canSkip = !force && fs.existsSync(baseDir + 'index.m3u8') && markerOk(baseDir);
+  if (canSkip) { made.set(name, '/hls/' + id + '/index.m3u8'); skip += 1; continue; }
+  /* 旧目录还在（说明是过时规格）→ 这次用带后缀的新目录名，别复用它的 URL */
+  const id2 = fs.existsSync(baseDir) ? (id + '-t' + Date.now().toString(36)) : id;
   const dir = HLS + id2 + '/';
   const play = dir + 'index.m3u8';
-  if (!force && fs.existsSync(play)) { made.set(name, '/hls/' + id2 + '/index.m3u8'); skip += 1; continue; }
   const src = TMP + name;
   try { fs.writeFileSync(src, openName(name)); } catch (e) { log('解密失败', name); fail += 1; continue; }
   fs.rmSync(dir, { recursive: true, force: true });
@@ -104,6 +125,14 @@ for (const name of jobs) {
     if (/\.ts$/.test(fn)) segs += 1;
     seal(p, fn);
   });
+  /* 记下这次的规格（封存）：下次判断「能不能跳过」就靠它，光看目录存在不行 */
+  try {
+    fs.writeFileSync(dir + 'build.json',
+      Buffer.from(JSON.stringify({ policy: POLICY, srcBits: br, at: new Date().toISOString() })));
+    seal(dir + 'build.json', 'build.json');
+  } catch (e) { }
+  /* 过时规格的旧目录留着只会再把 feed 指回去，重建成功后删掉（新目录名已经不同） */
+  if (id2 !== id) { try { fs.rmSync(baseDir, { recursive: true, force: true }); } catch (e) { } }
   made.set(name, '/hls/' + id2 + '/index.m3u8');
   ok += 1;
   log('分片 ' + name + ' → ' + segs + ' 段 / ' + (bytes / 1048576).toFixed(1) + 'MB  http://…/hls/' + id2 + '/index.m3u8');

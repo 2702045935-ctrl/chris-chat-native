@@ -13053,6 +13053,21 @@ function scheduleHlsBuild() {
   } catch (e) { }
 }
 
+/** 找同一个视频「重建后」的分片目录（<id>-t<时间戳>），多个就取最新的；没有返回 '' */
+function findRebuiltHlsDir(id) {
+  try {
+    const prefix = String(id) + '-t';
+    const list = fs.readdirSync(HLS_DIR).filter((d) => d.indexOf(prefix) === 0);
+    if (!list.length) return '';
+    list.sort((a, b) => {
+      const ta = fs.statSync(path.join(HLS_DIR, a)).mtimeMs;
+      const tb = fs.statSync(path.join(HLS_DIR, b)).mtimeMs;
+      return tb - ta;
+    });
+    return list[0];
+  } catch (e) { return ''; }
+}
+
 function serveHls(req, res, rel) {
   const parts = String(rel).split('/').filter(Boolean);      // ['hls', id, 文件名]
   if (parts.length !== 3) return fail(res, 404, '文件不存在');
@@ -13069,6 +13084,16 @@ function serveHls(req, res, rel) {
     if (!(q && uploadSigOk(name, q.get('e'), q.get('s')))) {
       strikeIp(clientInfo(req).ip, '裸链访问 HLS');
       return fail(res, 403, '这个文件需要登录或签名链接才能访问');
+    }
+  }
+  /* 分片重建过（目录名换成 <id>-t<时间戳>）时，客户端手里可能还拿着老 URL。
+     老目录已经删掉了，直接 404 的话客户端会退回整包 MP4（又变重）——
+     所以这里 302 到重建后的同名视频目录，播放列表和分片都走新的。 */
+  if (!fs.existsSync(file)) {
+    const alt = findRebuiltHlsDir(id);
+    if (alt) {
+      res.writeHead(302, { Location: '/hls/' + alt + '/' + name, 'Cache-Control': 'no-store' });
+      return res.end();
     }
   }
   if (!fs.existsSync(file)) return fail(res, 404, '文件不存在');

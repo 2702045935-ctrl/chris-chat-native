@@ -131,12 +131,6 @@ final class CallCenter: NSObject, ObservableObject {
     /// 「正在接通」时的 12 秒观察（连不上就给提示）
     private var connectTimer: Timer?
     private var sub: AnyCancellable?
-    /// 走「我们自己的通道」（服务器 data/call.json 的 mode = "self"）：
-    /// 语音/视频都优先用 WebRTC（P2P 打洞 → 我们自己的 TURN），连不上再回落
-    /// （语音退服务器转发、视频退腾讯云）—— 这条路上不依赖腾讯也能通。
-    private var preferSelfChannel = false
-    /// 我们自己的通道：语音的兜底定时器（WebRTC N 秒没连上就切服务器转发）
-    private var selfFallbackTimer: Timer?
     /* 打洞 / 中转服务器。默认这套是国内能连上的 STUN + 一个公共 TURN：
        同一个 Wi-Fi 里其实用不到它们，但**跨网络**（4G/别人家宽带）必须靠 TURN 中转，
        不然对称 NAT 下两边根本连不上。后台「语音通话」里填了 iceServers 就用后台的。 */
@@ -185,12 +179,11 @@ final class CallCenter: NSObject, ObservableObject {
         startRingTimeout()
         Ringtone.shared.startRingback()        // 等对方接的时候放回铃音（嘟——）
         Task { await beginMedia() }
-        /* 走腾讯云的模式：语音/视频都先进 TRTC 房间（进房不采集，等对端也在同一个房里
+        /* 视频交给腾讯云；语音也**先进 TRTC 房间**（进房不采集，等对端也在同一个房里
            才切过去，切之前一直用服务器转发通道兜着 —— 见 startTRTCIfPossible /
-           switchMediaToTRTC）。
-           走「我们自己的通道」模式：不进腾讯，交给下面的 WebRTC（语音连不上回落转发、
-           视频连不上再兜腾讯）。 */
-        if !preferSelfChannel { Task { await startTRTCIfPossible() } }
+           switchMediaToTRTC）。结果：两台新包走腾讯，对端是旧版或网页版就自动留在
+           自建转发，不会因为改了这条而打不通。 */
+        Task { await startTRTCIfPossible() }
     }
 
     /// 接听（来电界面点绿键）
@@ -201,7 +194,7 @@ final class CallCenter: NSObject, ObservableObject {
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
-        if !preferSelfChannel { Task { await startTRTCIfPossible() } }
+        Task { await startTRTCIfPossible() }   // 语音也进 TRTC 房间（进房不采集，等对端也在房里才切）
         startConnectWatch()
         /* 注意：这里**不能**直接开始采集。
            麦克风权限是在 beginMedia() 里现申请的（第一次会弹窗），
@@ -391,7 +384,7 @@ final class CallCenter: NSObject, ObservableObject {
             if isVideo {
                 phase = .connecting
                 tip = "正在接通…"
-            } else if !preferSelfChannel {
+            } else {
                 /* 语音：对方接了 —— 通道已经起来就直接进「通话中」开计时；
                    万一拨号那次因权限没批起来失败过，这里再兜一次（start() 幂等）。 */
                 if !serverAudioOn { CallAudioPipe.shared.start(); serverAudioOn = true }
@@ -405,19 +398,6 @@ final class CallCenter: NSObject, ObservableObject {
                     startTimer()
                 }
                 reportMicState(prefix: "App 语音走服务器转发（对方已接）")
-            } else {
-                /* 我们自己的通道：对方接了 —— 现在才开始等 WebRTC（6 秒连不上就回落转发）。
-                   主叫这边的计时从这一刻起算，和被叫接听时刻基本一致，两边切换几乎同步。 */
-                if phase != .active {
-                    phase = .active
-                    tip = "通话中"
-                    ringTimer?.invalidate()
-                    ringTimer = nil
-                    connectTimer?.invalidate()
-                    connectTimer = nil
-                    startTimer()
-                }
-                startSelfFallbackWatch()
             }
 
         case "audio":
@@ -479,13 +459,8 @@ final class CallCenter: NSObject, ObservableObject {
                                                        "turn:\(hostOnly):3478?transport=udp"],
                                            username: "chris", credential: "chris1234"), at: 0)
         }
-        guard let b = await API.shared.branding() else { return }
-        /* 通话走谁的通道：服务器 data/call.json 里 { "mode": "self" | "trtc" }，默认腾讯。
-           self = 我们自己的 WebRTC（P2P 打洞 → 我们自己的 TURN）+ 自建转发兜底。
-           改完重开一次 App 生效（和别的界面配置一个口径）。 */
-        preferSelfChannel = (b.callMode == "self")
-        note("通话通道模式=" + (preferSelfChannel ? "self（我们自己的 WebRTC／转发）" : "trtc（腾讯云）"))
-        guard let raw = b.iceServers?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let b = await API.shared.branding(),
+              let raw = b.iceServers?.trimmingCharacters(in: .whitespacesAndNewlines),
               !raw.isEmpty else { return }
         /* 两种写法都认：
            ① JSON（推荐，能带 TURN 的账号密码）
@@ -532,13 +507,11 @@ final class CallCenter: NSObject, ObservableObject {
         speakerOn = isVideo                    // 视频通话默认外放，语音默认听筒
         applySpeaker()
 
-        /* 语音有两条路：
-           ① 腾讯模式（默认）：只听服务器转发，**完全不建 WebRTC** ——
-              因为 WebRTC 会占住音频会话，把我们自己的采集引擎挤没（日志里
-              「网页在发帧、手机一帧都没发」就是这个原因）；
-           ② 我们自己的通道模式（比着微信的路子）：先建 WebRTC（Opus、抖动缓冲、
-              回声消除都是现成的），走 P2P 打洞或我们自己的 TURN；6 秒连不上再回落转发。 */
-        if !isVideo && !preferSelfChannel {
+        /* 语音通话：只听服务器转发，**完全不建 WebRTC**。
+           原因：WebRTC 会占住音频会话，导致我们自己的采集引擎起不来
+           （日志里网页在发帧、手机一帧都没发就是这个问题）。
+           视频通话还是走 WebRTC，语音这条路不依赖 TURN/直连，运营商挡不住。 */
+        if !isVideo {
             serverAudioOn = true
             CallAudioPipe.shared.onFrame = { [weak self] data in
                 guard let self = self, !self.muted else { return }
@@ -573,24 +546,6 @@ final class CallCenter: NSObject, ObservableObject {
             }
             reportMicState(prefix: "App 语音走服务器转发")
             return
-        }
-        /* 我们自己的通道：语音也走下面那段 WebRTC（只加音频轨），
-           邀请/接听带 SDP 由那段代码统一发；服务器转发等 6 秒连不上再起来兜底。 */
-        if !isVideo && preferSelfChannel {
-            if iAmCaller {
-                tip = "正在呼叫…"
-            } else {
-                Ringtone.shared.stop()
-                phase = .active
-                tip = "通话中"
-                ringTimer?.invalidate()
-                ringTimer = nil
-                connectTimer?.invalidate()
-                connectTimer = nil
-                startTimer()
-                startSelfFallbackWatch()        // 被叫：从接听这一刻开始等 WebRTC
-            }
-            reportMicState(prefix: "App 语音：优先走我们自己的 WebRTC")
         }
 
         let f = makeFactory()
@@ -635,19 +590,6 @@ final class CallCenter: NSObject, ObservableObject {
             pc.add(vt, streamIds: ["chris"])
             localVideo = vt
             startCapture(src)
-        }
-
-        /* 自建模式下视频没有「服务器转发」这种退路：WebRTC 8 秒还没连上就兜腾讯云，
-           不然可能一直黑屏。语音不需要这条（它有转发兜底）。 */
-        if isVideo && preferSelfChannel {
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                guard let self = self, self.phase != .idle, !self.callId.isEmpty, !self.usingTRTC else { return }
-                if self.pc?.connectionState != .connected {
-                    self.note("自建通道 8 秒没连上 → 视频兜底走腾讯云")
-                    await self.startTRTCIfPossible()
-                }
-            }
         }
 
         if iAmCaller {
@@ -699,46 +641,6 @@ final class CallCenter: NSObject, ObservableObject {
         guard let pc = pc, pc.remoteDescription != nil else { return }
         pendingIce.forEach { pc.add($0) { _ in } }
         pendingIce.removeAll()
-    }
-
-    /* ---------------- 我们自己的通道：语音在「WebRTC ↔ 服务器转发」之间互切 ---------------- */
-
-    /// 我们自己的通道：给语音一个兜底 —— WebRTC 6 秒还没连上就切服务器转发。
-    /// 两端都从「接通那一刻」开始计时（主叫在收到 accepted 时、被叫在接听时），
-    /// 所以基本同时切，不会出现一边 WebRTC、一边转发互相听不见的局面。
-    private func startSelfFallbackWatch() {
-        selfFallbackTimer?.invalidate()
-        selfFallbackTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { _ in
-            Task { @MainActor [weak self] in
-                guard let self = self, self.phase != .idle, !self.callId.isEmpty else { return }
-                if self.pc?.connectionState == .connected { return }
-                self.note("WebRTC 6 秒没连上 → 语音切服务器转发兜底")
-                self.startRelayFallback()
-            }
-        }
-    }
-
-    /// WebRTC 没连上（或中途断了）：把语音切回服务器转发（这条路至少能通）
-    private func startRelayFallback() {
-        guard !serverAudioOn else { return }
-        serverAudioOn = true
-        CallAudioPipe.shared.onFrame = { [weak self] data in
-            guard let self = self, !self.muted else { return }
-            self.sendCall(["action": "audio", "data": data.base64EncodedString()])
-        }
-        CallAudioPipe.shared.start()
-        audioTrack?.isEnabled = false        // 别让 WebRTC 那一路再叠一份声音上来
-        reportMicState(prefix: "App 语音回落服务器转发")
-    }
-
-    /// WebRTC 连上了：把服务器转发停掉（省服务器带宽，延迟也更低）
-    private func stopRelayForWebRTC() {
-        guard serverAudioOn else { return }
-        CallAudioPipe.shared.onFrame = nil
-        CallAudioPipe.shared.stop()
-        serverAudioOn = false
-        audioTrack?.isEnabled = true
-        note("WebRTC 已连上 → 语音改走我们自己的直连／中继")
     }
 
     private func startCapture(_ source: RTCVideoSource) {
@@ -946,20 +848,7 @@ extension CallCenter: RTCPeerConnectionDelegate {
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCSignalingState) { }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange state: RTCIceConnectionState) {
-        Task { @MainActor in
-            self.note("ice=" + CallCenter.iceName(state))
-            /* 我们自己的通道：WebRTC 一旦连上，语音就不必再走服务器转发 */
-            if (state == .connected || state == .completed), !self.isVideo, self.preferSelfChannel {
-                self.selfFallbackTimer?.invalidate()
-                self.selfFallbackTimer = nil
-                if self.serverAudioOn { self.stopRelayForWebRTC() }
-            }
-            /* 彻底失败（不是 momentary 的 disconnected）：把转发接回来兜底 */
-            if state == .failed, !self.isVideo, self.preferSelfChannel {
-                self.note("WebRTC 失败 → 语音回落服务器转发")
-                self.startRelayFallback()
-            }
-        }
+        Task { @MainActor in self.note("ice=" + CallCenter.iceName(state)) }
     }
 
     nonisolated func peerConnection(_ pc: RTCPeerConnection, didChange newState: RTCIceGatheringState) {

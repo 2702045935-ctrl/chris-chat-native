@@ -223,6 +223,7 @@ struct ChatDetailView: View {
     @State private var hasOlder = false          // 上面还有更早的记录
     @State private var loadingOlder = false
     @State private var holdScroll = false        // 上翻加载时不要自动跳到底部
+    @State private var atBottom = true           // 列表是不是已经到底（没到底就别跟着新消息硬滚）
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -561,6 +562,13 @@ struct ChatDetailView: View {
                         messageBlock(message)
                             .id(message.id)
                     }
+                    /* 底部哨兵：它在屏幕上就说明「已经到底了」。
+                       只有到底了才允许跟着新消息自动滚 —— 不然你正往上翻旧消息时
+                       来一条新消息，列表会被硬拽到底，手感上就是「卡住划不动」。 */
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear { atBottom = true }
+                        .onDisappear { atBottom = false }
                     if loading && messages.isEmpty {
                         ProgressView().padding(.top, 40)
                     }
@@ -568,8 +576,17 @@ struct ChatDetailView: View {
                 .padding(L.msgPad)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.count) { _ in if !holdScroll { scrollToEnd(proxy, animated: true) } }
-            .onChange(of: scrollTick) { _ in scrollToEnd(proxy, animated: true) }
+            .onChange(of: messages.count) { _ in
+                /* 只有「已经到底了」或者「刚才是自己发的」才跟着滚；
+                   而且不用动画 —— 动画会和正在拖动的手势打架（就是那个「划不动」）。 */
+                guard !holdScroll else { return }
+                guard atBottom || messages.last?.senderId == myId else { return }
+                scrollToEnd(proxy, animated: false)
+            }
+            .onChange(of: scrollTick) { _ in
+                atBottom = true                       // 用户自己点的「回到底部」
+                scrollToEnd(proxy, animated: true)
+            }
             .onAppear { scrollToEnd(proxy, animated: false) }
         }
     }

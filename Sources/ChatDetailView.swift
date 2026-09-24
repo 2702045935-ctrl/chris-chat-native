@@ -236,9 +236,17 @@ struct ChatDetailView: View {
     }
 
     /// 一对一会话里的对方 id（真人语音/视频通话要用它去呼叫）
+    /// ⚠️ 以前是 `ids.first(where: { $0 != myId })`：万一这一刻 myId 还没加载出来（空串），
+    /// 条件永远成立，就会返回名单里的**第一个人** —— 可能是我自己，也可能是机器人或
+    /// 群里的其他人，而且完全没检查这个会话是不是「两个人」。
+    /// 线上表现就是「电话打给了另一个人」。现在必须同时满足：
+    /// ① 我自己的 id 已经知道 ② 这个会话恰好两个人 ③ 我在名单里 ④ 对方不是我自己。
     private var peerUserId: String? {
-        guard let ids = chat.memberIds else { return nil }
-        return ids.first(where: { $0 != myId })
+        let me = myId
+        guard !me.isEmpty else { return nil }
+        guard let ids = chat.memberIds, ids.count == 2, ids.contains(me) else { return nil }
+        guard let other = ids.first(where: { $0 != me }), !other.isEmpty else { return nil }
+        return other
     }
 
     /// 这通电话是不是就跟当前这个会话的人在打（是的话聊天页顶部挂提示条）
@@ -268,7 +276,10 @@ struct ChatDetailView: View {
            不然用户会「打不出去」：点拨打只弹一句「正在通话中」。 */
         CallCenter.shared.resetIfStale()
         if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
-        CallCenter.shared.start(peerId: peer, name: chat.name, avatar: chat.avatar ?? "", video: video)
+        /* 呼叫时带的名字/头像用「这个 peer 自己的」，不要用会话名 ——
+           会话名可能是群名或者是上一次同步下来的旧值，就会显示成别人。 */
+        let peerName = app.contact(for: peer)?.name ?? chat.name
+        CallCenter.shared.start(peerId: peer, name: peerName, avatar: chat.avatar ?? "", video: video)
     }
 
     private func displayName(_ message: Message) -> String {

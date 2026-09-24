@@ -3878,6 +3878,18 @@ function secCfg() {
   return cfg;
 }
 
+/* 通话走谁的通道：data/call.json 里写 { "mode": "self" } 就切到我们自己的通道
+   （客户端优先 WebRTC：P2P 打洞 → 我们自己的 TURN；语音连不上回落服务器转发、
+   视频连不上再兜腾讯云）。不写或写 "trtc" 就是腾讯云。
+   改完客户端重开一次 App 生效；要一键切回去就改这个文件，不用重新出包。 */
+const CALL_FILE = path.join(DATA_DIR, 'call.json');
+function callMode() {
+  try {
+    const j = readJson(CALL_FILE, {});
+    return j && j.mode === 'self' ? 'self' : 'trtc';
+  } catch (e) { return 'trtc'; }
+}
+
 /* ------------------------------------------------ 上传文件的「签名链接」
    以前 /uploads/xxx.jpg 谁拿到链接都能看。现在只有两种人能看：
      1) 带正确签名的链接（服务器发出去的每个路径都自动带上，客户端无感）
@@ -8598,6 +8610,8 @@ async function handleApi(req, res, pathname, query) {
     /* 登录滑动验证开着没：客户端按它决定要不要先让用户拖滑块
        （关掉的开关在 data/security.json 的 sliderLogin） */
     b.sliderLogin = !!secCfg().sliderLogin;
+    /* 通话通道模式：trtc（腾讯云，默认）／self（我们自己的 WebRTC + 自建转发兜底） */
+    b.callMode = callMode();
     ok(res, { branding: b });
     return;
   }

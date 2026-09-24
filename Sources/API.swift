@@ -422,6 +422,8 @@ struct BrandInfo: Decodable, Hashable {
     var login: LoginBrand?
     /// 服务器有没有开「登录滑动验证」（安全验证那一块显不显示由它决定）
     var sliderLogin: Bool?
+    /// 通话走谁的通道：服务器 data/call.json 的 mode（"trtc" 腾讯云 / "self" 我们自己的 WebRTC）
+    var callMode: String?
 }
 
 struct LoginBrand: Decodable, Hashable {

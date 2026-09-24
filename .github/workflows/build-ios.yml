@@ -9,6 +9,11 @@ name: build-ios
 
 on:
   push:
+    # 只有 iOS 端源码变了才打包：服务端/文档的提交不该浪费 macOS 构建时间
+    # （私有仓库的 macOS 分钟是计费的，公开仓库才免费）
+    paths:
+      - 'Sources/**'
+      - 'Info.plist'
   workflow_dispatch:
 
 jobs:

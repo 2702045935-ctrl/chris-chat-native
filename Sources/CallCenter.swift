@@ -521,6 +521,7 @@ final class CallCenter: NSObject, ObservableObject {
     }
 
     private func beginMedia() async {
+        CallAudioPipe.shared.resetHandOver()      // 新的一通：允许本通道重新用麦克风
         let mic = await Permission.ask(.audio)
         if !mic { errorText = "没有麦克风权限，去「设置 → CHRIS聊天」里打开"; finish(tip: "没有麦克风权限"); return }
         if isVideo {
@@ -707,8 +708,8 @@ final class CallCenter: NSObject, ObservableObject {
     /// 所以基本同时切，不会出现一边 WebRTC、一边转发互相听不见的局面。
     private func startSelfFallbackWatch() {
         selfFallbackTimer?.invalidate()
-        selfFallbackTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
-            Task { @MainActor in
+        selfFallbackTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { _ in
+            Task { @MainActor [weak self] in
                 guard let self = self, self.phase != .idle, !self.callId.isEmpty else { return }
                 if self.pc?.connectionState == .connected { return }
                 self.note("WebRTC 6 秒没连上 → 语音切服务器转发兜底")
@@ -1128,8 +1129,9 @@ extension CallCenter: RTCPeerConnectionDelegate {
         note(isVideo ? "对端也在腾讯云房间里 → 媒体切到 TRTC ✓"
                      : "对端也在腾讯云房间里 → 语音切到 TRTC ✓")
         /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
-        CallAudioPipe.shared.onFrame = nil
-        CallAudioPipe.shared.stop()
+        /* 语音：不是「停一下」而是「交出去」—— 连抢麦重试都禁止，
+           否则这边还在抢麦克风，TRTC 开了麦却采不到音（两边都没声音）。 */
+        CallAudioPipe.shared.handOverToTRTC()
         serverAudioOn = false
         audioTrack?.isEnabled = false
         localVideoTrack?.isEnabled = false
@@ -1142,6 +1144,13 @@ extension CallCenter: RTCPeerConnectionDelegate {
             if waitNs > 0 { try? await Task.sleep(nanoseconds: waitNs) }
             guard let self = self, self.usingTRTC,
                   self.phase != .idle, !self.callId.isEmpty else { return }
+            /* 语音：等我们自己的采集**真的**停下来再让 TRTC 开麦（系统释放麦克风是异步的） */
+            if !self.isVideo {
+                let t0 = Date()
+                while CallAudioPipe.shared.isRunning, Date().timeIntervalSince(t0) < 2.0 {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
             TRTCBridge.shared.activate()
             TRTCBridge.shared.setMuted(self.muted)
             TRTCBridge.shared.setSpeaker(self.speakerOn)

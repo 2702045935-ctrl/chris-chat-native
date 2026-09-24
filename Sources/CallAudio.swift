@@ -33,6 +33,10 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private var started = false
     /// 抢麦克风的重试任务（上一通刚结束、TRTC/铃声还占着的时候要靠它抢回来）
     private var startTask: Task<Void, Never>?
+    /// 已经交给 TRTC 了：本通道彻底闭嘴 —— 连「重试抢麦」都不许再跑。
+    /// 少了这个标志，切给腾讯之后这边还在抢麦克风，腾讯开了麦却采不到音，
+    /// 表现就是「切到 TRTC 了、两边反而都没声音」（线上真出过）。
+    private var handedOver = false
     /// 采集有没有真的跑起来（起不来时页面/日志能看到原因）
     var isRunning: Bool { started && capture.isRunning }
     /// 起不来时的原因（上报日志用）
@@ -51,6 +55,7 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     }
 
     func start() {
+        if handedOver { return }        // 麦克风已经交给 TRTC，别再去抢
         if started { return }
         startTask?.cancel()
         started = false
@@ -63,7 +68,7 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         startTask = Task.detached { [weak self] in
             guard let self = self else { return }
             for attempt in 0..<6 {
-                if Task.isCancelled || self.started { return }
+                if Task.isCancelled || self.started || self.handedOver { return }
                 self.configureSession()
                 self.startPlayback()
                 if self.startCaptureBlocking() {
@@ -92,6 +97,16 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         playerReady = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
+
+    /// 把麦克风交给 TRTC：先停采集，并禁止后续任何重试抢麦
+    func handOverToTRTC() {
+        handedOver = true
+        onFrame = nil
+        stop()
+    }
+
+    /// 新的一通电话：复位「已交出」状态，让本通道可以再用
+    func resetHandOver() { handedOver = false }
 
     /* ---------------------------------------------------------- 播放：只挂播放器的引擎 */
 

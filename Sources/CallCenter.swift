@@ -179,8 +179,11 @@ final class CallCenter: NSObject, ObservableObject {
         startRingTimeout()
         Ringtone.shared.startRingback()        // 等对方接的时候放回铃音（嘟——）
         Task { await beginMedia() }
-        /* 视频才交给腾讯云；语音不进 TRTC（进了就把我们自己的采集挤掉，见 startTRTCIfPossible） */
-        if video { Task { await startTRTCIfPossible() } }
+        /* 视频交给腾讯云；语音也**先进 TRTC 房间**（进房不采集，等对端也在同一个房里
+           才切过去，切之前一直用服务器转发通道兜着 —— 见 startTRTCIfPossible /
+           switchMediaToTRTC）。结果：两台新包走腾讯，对端是旧版或网页版就自动留在
+           自建转发，不会因为改了这条而打不通。 */
+        Task { await startTRTCIfPossible() }
     }
 
     /// 接听（来电界面点绿键）
@@ -191,7 +194,7 @@ final class CallCenter: NSObject, ObservableObject {
         phase = .connecting
         tip = "正在接通…"
         Task { await beginMedia() }
-        if isVideo { Task { await startTRTCIfPossible() } }   // 语音不进 TRTC（同上）
+        Task { await startTRTCIfPossible() }   // 语音也进 TRTC 房间（进房不采集，等对端也在房里才切）
         startConnectWatch()
         /* 注意：这里**不能**直接开始采集。
            麦克风权限是在 beginMedia() 里现申请的（第一次会弹窗），
@@ -933,14 +936,15 @@ extension CallCenter: RTCPeerConnectionDelegate {
            WebRTC（视频）+ 服务器转发语音，通话照样通，不会变哑巴。 */
 
     private func startTRTCIfPossible() async {
-        /* 语音通话**不进** TRTC。
-           原因：TRTC 用 role=anchor 进房时，它自己就会开本地音频采集（这也是下面
-           standByForLocalMedia 存在的原因）。可它那种「抢麦」会让我们的
-           AVCaptureSession 变成一个空壳 —— isRunning=true、采集=ok，却一个
-           音频 buffer 都不回调。线上表现就是：两边界面都写着通话中，
-           服务器却一帧音频都收不到，一个字都听不见（语音一直不通就是这个）。
-           语音只有「服务器转发」这一条路，把麦克风完整留给它；视频照旧交给 TRTC。 */
-        guard isVideo else { return }
+        /* 语音现在也进 TRTC 房间，但**进房不采集**（TRTCBridge.start 只 enterRoom）。
+           以前栽过的坑：TRTC 用 role=anchor 一进房就自己开麦采集，把我们的
+           AVCaptureSession 挤成空壳（isRunning=true、采集=ok，却一个 buffer 都不回调），
+           服务器一帧都收不到 —— 所以这里的顺序必须是：
+             ① 先只进房（不采集），自建转发继续跑着兜底；
+             ② 确认**对端也在同一个房间里**之后，才 switchMediaToTRTC()：
+                先停掉自建那两路，再 activate() 让 TRTC 开麦。
+           麦克风始终只有一个主人，不会出现两个引擎抢麦。
+           对端是旧版本 / 网页版（不会进这个房间）→ 一直走自建转发。 */
         guard !trtcJoined, !usingTRTC, !callId.isEmpty else { return }
         let bridge = TRTCBridge.shared
         bridge.onJoined = { [weak self] ok in
@@ -1010,7 +1014,8 @@ extension CallCenter: RTCPeerConnectionDelegate {
     private func switchMediaToTRTC() {
         guard !usingTRTC, phase != .idle, !callId.isEmpty else { return }
         usingTRTC = true
-        note("对端也在腾讯云房间里 → 媒体切到 TRTC ✓")
+        note(isVideo ? "对端也在腾讯云房间里 → 媒体切到 TRTC ✓"
+                     : "对端也在腾讯云房间里 → 语音切到 TRTC ✓")
         /* 关掉我们自己那两路，避免叠音 + 抢摄像头 */
         CallAudioPipe.shared.onFrame = nil
         CallAudioPipe.shared.stop()
@@ -1018,10 +1023,18 @@ extension CallCenter: RTCPeerConnectionDelegate {
         audioTrack?.isEnabled = false
         localVideoTrack?.isEnabled = false
         capturer?.stopCapture()
-        /* 我们自己不采集了，才让 TRTC 开始采集（避免两个引擎抢麦克风/摄像头） */
-        TRTCBridge.shared.activate()
-        TRTCBridge.shared.setMuted(muted)
-        TRTCBridge.shared.setSpeaker(speakerOn)
+        /* 我们自己不采集了，才让 TRTC 开始采集（避免两个引擎抢麦克风/摄像头）。
+           语音要多等一拍：我们刚把 AVCaptureSession 停下来，系统释放麦克风是异步的，
+           紧接着 activate 有概率抢不到（表现就是「切过去之后对面反而听不见了」）。 */
+        let waitNs: UInt64 = isVideo ? 0 : 300_000_000
+        Task { @MainActor [weak self] in
+            if waitNs > 0 { try? await Task.sleep(nanoseconds: waitNs) }
+            guard let self = self, self.usingTRTC,
+                  self.phase != .idle, !self.callId.isEmpty else { return }
+            TRTCBridge.shared.activate()
+            TRTCBridge.shared.setMuted(self.muted)
+            TRTCBridge.shared.setSpeaker(self.speakerOn)
+        }
         if phase != .active {
             Ringtone.shared.stop()
             phase = .active

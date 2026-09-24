@@ -5569,7 +5569,10 @@ function readTrtcCfg() {
     enabled: raw.enabled === true,
     sdkAppId: Number(raw.sdkAppId) || 0,
     secretKey: String(raw.secretKey || ''),
-    expireSeconds: Number(raw.expireSeconds) > 0 ? Number(raw.expireSeconds) : TRTC_DEFAULT.expireSeconds
+    expireSeconds: Number(raw.expireSeconds) > 0 ? Number(raw.expireSeconds) : TRTC_DEFAULT.expireSeconds,
+    /* 语音走不走 TRTC 的总开关（默认走）。设成 false 就一键退回自建转发：
+       客户端对语音取签名会拿到失败，自己继续用服务器转发通道，不用重装 App。 */
+    voiceEnabled: raw.voiceEnabled !== false
   };
 }
 
@@ -8356,6 +8359,12 @@ async function handleApi(req, res, pathname, query) {
     if (!me) return fail(res, 401, '请先登录');
     const cfg = readTrtcCfg();
     if (!cfg.sdkAppId || !cfg.secretKey) return fail(res, 500, 'TRTC 还没配置（data/trtc.json 里填 sdkAppId 和 secretKey）');
+    /* 语音这条的总开关：data/trtc.json 里写 "voiceEnabled": false，
+       语音的签名请求直接失败，客户端自动退回自建转发通道（视频不受影响）。 */
+    const wantMedia = String(query.get('media') || '').toLowerCase();
+    if (wantMedia === 'audio' && cfg.voiceEnabled === false) {
+      return fail(res, 503, '语音暂不走 TRTC（服务端 data/trtc.json 的 voiceEnabled 关掉了）');
+    }
     const expire = Number(query.get('expire')) > 0 ? Number(query.get('expire')) : cfg.expireSeconds;
     const seed = String(query.get('room') || query.get('chat') || '').trim().slice(0, 80)
       || ('u' + me.id);

@@ -1263,8 +1263,11 @@ final class API {
     }
 
     /// 取一张 TRTC 进房票。room 用「这次通话的 callId」，两边算出来的房间号一致。
-    func trtcSig(room: String) async throws -> TRTCSig {
-        try await get("/api/trtc/sig?room=" + (room.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? room),
+    /// media 只是给服务端看的开关：服务端把 data/trtc.json 的 voiceEnabled 设成 false，
+    /// 语音这条就会拿到失败、自动继续用自建转发通道（不用重装 App 就能一键退回）。
+    func trtcSig(room: String, media: String = "video") async throws -> TRTCSig {
+        try await get("/api/trtc/sig?room=" + (room.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? room)
+                      + "&media=" + media,
                       as: TRTCSig.self)
     }
 

@@ -35,9 +35,22 @@ Environment=PORT=5180
 
 | 通道 | 走什么 |
 |---|---|
-| 语音通话 | **自建服务器转发**：App 采集 16kHz 单声道 PCM（40ms 一帧）→ base64 → WebSocket `action:"audio"` → 服务端原样转给对端 |
+| 语音通话 | **优先腾讯云 TRTC**，自建转发兜底（见下） |
 | 视频通话 | **腾讯云 TRTC**（`/api/trtc/sig` 签发；密钥只在服务端 `data/trtc.json`） |
 | 直播 | 自建 WebRTC（用同一份 `iceServers`） |
+
+**语音的双通道逻辑**（B499 起）：两端都**先进 TRTC 房间但不采集**，同时自建转发通道照常跑着；
+等确认「对端也在同一个房间里」，客户端才 `switchMediaToTRTC()`——先停掉自建采集/播放，
+再让 TRTC 开麦。所以：
+
+* 两台新版 App → 语音走腾讯云（音质/抖动/回声消除都由 TRTC 负责，不吃服务器带宽）
+* 对端是旧版 App 或网页版（不会进 TRTC 房间）→ 自动留在自建转发，不会打不通
+* `data/trtc.json` 里把 `voiceEnabled` 设成 `false` → 服务端对语音的签名请求直接返回失败，
+  客户端自动退回自建转发（**一键回退，不用重装 App**）
+* ⚠️ `data/trtc.json` 里记着「体验版 2026-09-30 到期」——到期后腾讯这条会失效，
+  语音/视频会自动退回可用通道（语音退自建转发），但视频没有自建退路，得先续费或另想办法
+
+自建转发通道本身：App 采集 16kHz 单声道 PCM（40ms 一帧）→ base64 → WebSocket `action:"audio"` → 服务端原样转给对端
 
 **TURN/STUN**：用系统 coturn（`/etc/turnserver.conf`，`external-ip=206.187.208.79/10.0.246.2`）。
 

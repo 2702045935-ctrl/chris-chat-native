@@ -60,7 +60,7 @@ final class TRTCBridge: NSObject, ObservableObject {
 
         let cfg: API.TRTCSig
         do {
-            cfg = try await API.shared.trtcSig(room: roomSeed)
+            cfg = try await API.shared.trtcSig(room: roomSeed, media: video ? "video" : "audio")
         } catch {
             lastError = (error as? APIError)?.errorDescription ?? "TRTC 取不到签名"
             return false

@@ -334,10 +334,16 @@ struct ChatDetailView: View {
 
             /* 按住说话时中间那个浮层：麦克风 + 音量条 + 提示 */
             if recorder.recording {
-                VoiceHUD(seconds: recorder.seconds, level: recorder.level, willCancel: recorder.willCancel)
+                VoiceHUD(seconds: recorder.seconds, level: recorder.level,
+                         willCancel: recorder.willCancel, willTranscribe: recorder.willTranscribe,
+                         maxSeconds: recorder.maxSeconds)
                     .zIndex(50)
             }
 
+        }
+        /* 按住说话到 60 秒自动发出（微信就是这样），免得录个没完 */
+        .onChange(of: recorder.seconds) { s in
+            if recorder.recording, s >= recorder.maxSeconds { finishVoice() }
         }
         /* 顶栏：超薄毛玻璃（浅色模式下就是 iOS 那种浅浅的磨砂），背景图/消息从底下透过去 */
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -634,6 +640,8 @@ struct ChatDetailView: View {
                 } else {
                     SystemLine(message: message)
                         .padding(.bottom, gapAfter(message))
+                        /* 老记录（没有「谁打的」信息）：点一下按这个会话的对方回拨 */
+                        .onTapGesture { startRealCall(video: message.isVideoCall) }
                 }
             } else if message.isRecalled {
                 recallLine(message)
@@ -738,6 +746,22 @@ struct ChatDetailView: View {
         }
         .padding(.bottom, gapAfter(message))
         .onLongPressGesture { openActions(message) }
+        /* 微信那样：点一下这条通话记录 = 直接回拨（视频记录就回拨视频） */
+        .onTapGesture { redial(from: message) }
+    }
+
+    /// 点通话记录回拨：对方 = 这条记录的双方里「不是我」的那个。
+    /// 严格校验（空的、等于我自己都不拨），免得又出现「不能给自己打电话」那种误拨。
+    private func redial(from message: Message) {
+        let peer = (message.callFrom == myId) ? (message.call?.to ?? "") : message.callFrom
+        guard !peer.isEmpty, peer != myId else { app.show(Tr("这条记录里找不到对方账号")); return }
+        if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
+        CallCenter.shared.resetIfStale()
+        if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
+        let name = app.contact(for: peer)?.name ?? chat.name
+        CallCenter.shared.start(peerId: peer, name: name,
+                                avatar: app.contact(for: peer)?.avatarPath ?? (chat.avatar ?? ""),
+                                video: message.isVideoCall)
     }
 
     private func indexOf(_ message: Message) -> Int? {
@@ -885,7 +909,21 @@ struct ChatDetailView: View {
                                 .onEnded { _ in
                                     pressStart = nil
                                     voiceStarting = false
-                                    if recorder.recording { finishVoice() }
+                                    guard recorder.recording else { return }
+                                    /* 松手时按当前滑到的档位处理（照微信那张图）：
+                                       取消区 → 丢弃；转文字区 → 本地识别成文字进输入框；其余 → 发语音 */
+                                    if recorder.willCancel { recorder.cancel(); return }
+                                    if recorder.willTranscribe {
+                                        guard let got = recorder.end() else { return }
+                                        FileSpeech.requestAuth()
+                                        Task {
+                                            let text = await FileSpeech.recognize(url: got.url)
+                                            if text.isEmpty { app.show(Tr("没听清，再说一次或者直接发语音")) }
+                                            else { input = text }
+                                        }
+                                        return
+                                    }
+                                    finishVoice()
                                 }
                         )
                     } else if recorder.recording {
@@ -902,11 +940,27 @@ struct ChatDetailView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .center)
                     } else {
-                        TextField("", text: $input)
-                            .focused($focused)
-                            .font(pf(17))
-                            .foregroundColor(C.label)
-                            .onTapGesture { panel = .none }
+                        HStack(spacing: 4) {
+                            TextField("", text: $input)
+                                .focused($focused)
+                                .font(pf(17))
+                                .foregroundColor(C.label)
+                                .onTapGesture { panel = .none }
+                            /* 「听声出字」：只在**点进输入框、键盘起来**的时候才出现（微信就是这个时机），
+                               点一下开始听，说的字直接落进输入框，可以改完再发 */
+                            if focused {
+                                Button {
+                                    let base = input
+                                    dictation.toggle { s in input = base.isEmpty ? s : (base + s) }
+                                } label: {
+                                    Image(systemName: dictation.listening ? "mic.fill" : "mic")
+                                        .font(.system(size: 17))
+                                        .foregroundColor(dictation.listening ? C.green : C.chatBarIcon)
+                                        .frame(width: 30, height: 30)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 8)

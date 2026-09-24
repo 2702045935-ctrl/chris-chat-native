@@ -1,15 +1,37 @@
 import SwiftUI
 
-/// 按住说话时屏幕中间那个提示浮层（麦克风 + 音量条 + "松开发送，上滑取消"）
+/// 按住说话时屏幕中间那个提示浮层。
+/// 版式照微信那张参考图：**上面一行是「滑到这里 转文字」，中间是麦克风 + 音量波形，
+/// 下面一行是主提示「松手 发语音」**；手指滑进哪个区域，哪一块就亮起来。
 struct VoiceHUD: View {
     let seconds: Int
     let level: CGFloat
     let willCancel: Bool
+    var willTranscribe: Bool = false
+    var maxSeconds: Int = 60
 
     private var bars: Int { 9 }
 
+    /// 主提示：过期/取消/转文字/正常 四种口气
+    private var mainHint: String {
+        if willCancel { return "松开手指，取消发送" }
+        if willTranscribe { return "松手 转文字" }
+        return "\(seconds)″　松手 发语音"
+    }
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
+            /* ① 上：转文字区（滑到这里高亮） */
+            Text("滑到这里 转文字")
+                .font(pf(13))
+                .foregroundColor(willTranscribe ? .white : .white.opacity(0.55))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(willTranscribe ? C.green.opacity(0.95) : Color.white.opacity(0.12))
+                )
+
+            /* ② 中：麦克风 + 音量波形 */
             HStack(spacing: 14) {
                 Image(systemName: willCancel ? "xmark" : "mic.fill")
                     .font(.system(size: 24, weight: .semibold))
@@ -28,9 +50,16 @@ struct VoiceHUD: View {
                 .frame(height: 32)
             }
 
-            Text(willCancel ? "松开手指，取消发送" : "\(seconds)″ 松开发送，上滑取消")
+            /* ③ 下：主提示 + 最后 10 秒的倒计时 */
+            Text(mainHint)
                 .font(pf(13))
                 .foregroundColor(.white.opacity(0.92))
+
+            if !willCancel && seconds >= maxSeconds - 10 {
+                Text("还可以说 \(max(0, maxSeconds - seconds)) 秒")
+                    .font(pf(11.5))
+                    .foregroundColor(C.green)
+            }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 18)

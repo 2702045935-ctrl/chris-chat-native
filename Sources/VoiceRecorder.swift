@@ -19,6 +19,10 @@ final class VoiceRecorder: NSObject, ObservableObject {
     @Published private(set) var seconds = 0
     @Published private(set) var level: CGFloat = 0        // 0…1，界面画音量
     @Published private(set) var willCancel = false
+    /// 上滑到「滑到这里 转文字」那一档（松手后把这段语音转成文字，微信就是这个手势）
+    @Published private(set) var willTranscribe = false
+    /// 微信的按住说话最长 60 秒，到点自动发出
+    let maxSeconds = 60
 
     private var rec: AVAudioRecorder?
     private var ticker: Timer?
@@ -73,7 +77,11 @@ final class VoiceRecorder: NSObject, ObservableObject {
     }
 
     /// 手指上滑就准备取消
-    func drag(_ dy: CGFloat) { willCancel = dy < -60 }
+    /// 上滑分两档（照微信那张图）：先进入「转文字」，再往上滑才取消
+    func drag(_ dy: CGFloat) {
+        willTranscribe = dy < -60 && dy > -140
+        willCancel = dy <= -140
+    }
 
     /// 松手：返回要发的文件；取消 / 时间太短返回 nil
     func end() -> (url: URL, seconds: Int)? {

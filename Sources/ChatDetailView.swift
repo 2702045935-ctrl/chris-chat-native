@@ -224,6 +224,7 @@ struct ChatDetailView: View {
     @State private var loadingOlder = false
     @State private var holdScroll = false        // 上翻加载时不要自动跳到底部
     @State private var atBottom = true           // 列表是不是已经到底（没到底就别跟着新消息硬滚）
+    @State private var voiceMode = false         // 输入区是不是「按住说话」模式（微信：左边那个语音/键盘切换）
 
     private var myId: String { app.me?.id ?? "" }
     private var isGroup: Bool { chat.type == "group" }
@@ -834,51 +835,60 @@ struct ChatDetailView: View {
             }
             HStack(spacing: 6) {
                 Button {
-                    /* 点一下 = 语音转文字（说的字直接进输入框）；
-                       按住不动 = 录音发语音（松开发送，上滑取消）。都是这一个话筒图标。 */
+                    /* 微信的规矩：这个按钮是「语音 / 键盘」切换 ——
+                       切到语音，整条输入框变成「按住 说话」（打字内容存成草稿，切回来还在）。 */
+                    if recorder.recording { return }
+                    voiceMode.toggle()
+                    if voiceMode { focused = false; panel = .none }
                 } label: {
-                    SVGIcon(markup: I.voice, size: L.composerIcon,
-                            color: (recorder.recording || dictation.listening) ? C.green : C.chatBarIcon)
+                    Image(systemName: voiceMode ? "keyboard" : "mic")
+                        .font(.system(size: 21, weight: .regular))
+                        .foregroundColor(recorder.recording ? C.green : C.chatBarIcon)
                         .frame(width: L.composerIconBox, height: L.composerIconBox)
                 }
                 .buttonStyle(.plain)
-                /* 同一个话筒：轻点 = 语音转文字；按住 = 录音发语音 */
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { v in
-                            if pressStart == nil { pressStart = Date() }
-                            if recorder.recording {
-                                recorder.drag(v.translation.height)
-                            } else if !voiceStarting,
-                                      Date().timeIntervalSince(pressStart ?? Date()) > 0.22 {
-                                /* 按住 0.22 秒以上才当「按住说话」，避免和轻点撞车 */
-                                voiceStarting = true
-                                if dictation.listening { dictation.stop() }
-                                focused = false
-                                panel = .none
-                                Task {
-                                    _ = await recorder.begin()
-                                    voiceStarting = false
-                                }
-                            }
-                        }
-                        .onEnded { _ in
-                            let held = Date().timeIntervalSince(pressStart ?? Date())
-                            pressStart = nil
-                            voiceStarting = false
-                            if recorder.recording { finishVoice(); return }
-                            /* 没按住（很快松手）= 语音转文字 */
-                            if held < 0.22 {
-                                focused = false
-                                panel = .none
-                                let base = input
-                                dictation.toggle { s in input = base.isEmpty ? s : (base + s) }
-                            }
-                        }
-                )
 
                 HStack(spacing: 0) {
-                    if recorder.recording {
+                    if voiceMode {
+                        /* 微信那种「按住 说话」：按住开始录、上滑取消、松手发送。
+                           打字内容存成草稿，切回键盘时原样回来。 */
+                        HStack(spacing: 7) {
+                            if recorder.recording {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(recorder.willCancel ? C.red : C.green)
+                            }
+                            Text(recorder.recording
+                                 ? (recorder.willCancel ? Tr("松开手指，取消发送") : Tr("松开 发送"))
+                                 : Tr("按住 说话"))
+                                .font(pf(15.5))
+                                .foregroundColor(recorder.willCancel ? C.red : C.label)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { v in
+                                    if pressStart == nil { pressStart = Date() }
+                                    if recorder.recording {
+                                        recorder.drag(v.translation.height)
+                                    } else if !voiceStarting {
+                                        voiceStarting = true
+                                        focused = false
+                                        panel = .none
+                                        Task {
+                                            _ = await recorder.begin()
+                                            voiceStarting = false
+                                        }
+                                    }
+                                }
+                                .onEnded { _ in
+                                    pressStart = nil
+                                    voiceStarting = false
+                                    if recorder.recording { finishVoice() }
+                                }
+                        )
+                    } else if recorder.recording {
                         /* 录音时把输入框整条收起来（微信就是这样）：
                            不然刚打的字一直露在框里，还和录音按钮混在一起。
                            松手立刻恢复，原来打的字还在（草稿）。 */

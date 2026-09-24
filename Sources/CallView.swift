@@ -20,8 +20,17 @@ struct CallOverlay: View {
 
     var body: some View {
         if call.phase != .idle {
-            CallView()
-                .zIndex(999)
+            if call.minimized {
+                /* 挂起（左上那个画中画按钮）：**回到上一页**，只在页面上飘一个小浮窗
+                   —— 微信就是这样：聊天、看朋友圈都照用，通话本身一直在跑。
+                   以前这里是「整屏还是通话页的模糊背景 + 里面有个小窗」，
+                   等于没回到上一页，用户点它跟没点一样。 */
+                CallMiniWindow()
+                    .zIndex(999)
+            } else {
+                CallView()
+                    .zIndex(999)
+            }
         }
     }
 }
@@ -91,10 +100,6 @@ struct CallView: View {
     @ObservedObject private var trtc = TRTCBridge.shared
     @EnvironmentObject var app: AppState
     @State private var showInvite = false
-    /// 最小化小窗的位置（nil = 默认贴右上角；拖过之后记住位置，松手会吸附到左右边）
-    @State private var miniX: CGFloat? = nil
-    @State private var miniY: CGFloat? = nil
-    @State private var dragging: CGSize = .zero
     /* 通话页里「自己那个小画面」（画中画）：默认贴右下角，可以拖着走，松手吸附到左右边 */
     @State private var pipX: CGFloat? = nil
     @State private var pipY: CGFloat? = nil
@@ -117,20 +122,16 @@ struct CallView: View {
         ZStack {
             backdrop
 
-            if call.minimized {
-                miniWindow
+            if call.isVideo && call.phase == .active {
+                videoLayer
             } else {
-                if call.isVideo && call.phase == .active {
-                    videoLayer
-                } else {
-                    avatarLayer
-                }
+                avatarLayer
+            }
 
-                VStack(spacing: 0) {
-                    topBar
-                    Spacer(minLength: 0)
-                    bottomBar
-                }
+            VStack(spacing: 0) {
+                topBar
+                Spacer(minLength: 0)
+                bottomBar
             }
         }
         .sheet(isPresented: $showInvite) {
@@ -539,91 +540,6 @@ struct CallView: View {
         .padding(.top, 19)
     }
 
-    /// 最小化后的样子：**右上角一个小浮窗**（和微信一样）——
-    /// 视频通话显示远端画面，语音通话显示头像+名字+计时；点一下回到通话界面，
-    /// 右上角那个小 ✕ 可以直接挂断。通话本身一直在继续，不受影响。
-    /// 可以拖着走，松手吸附到左右边（微信就是这样）。
-    private var miniWindow: some View {
-        GeometryReader { geo in
-            let w: CGFloat = call.isVideo ? 108 : 146
-            let h: CGFloat = call.isVideo ? 144 : 48
-            let maxX = max(8, geo.size.width - w - 8)
-            let maxY = max(6, geo.size.height - h - 90)
-            let homeX = geo.size.width - w - 10
-            let x = min(max((miniX ?? homeX) + dragging.width, 8), maxX)
-            let y = min(max((miniY ?? 6) + dragging.height, 6), maxY)
-            windowBody(w: w, h: h)
-                .position(x: x + w / 2, y: y + h / 2)
-                .gesture(
-                    DragGesture(minimumDistance: 4)
-                        .onChanged { v in dragging = v.translation }
-                        .onEnded { v in
-                            let nx = (miniX ?? homeX) + v.translation.width
-                            let ny = (miniY ?? 6) + v.translation.height
-                            // 松手吸附：靠近哪边就贴哪边（微信那种手感）
-                            miniX = nx + w / 2 < geo.size.width / 2 ? 8 : maxX
-                            miniY = min(max(ny, 6), maxY)
-                            dragging = .zero
-                        }
-                )
-        }
-    }
-
-    private func windowBody(w: CGFloat, h: CGFloat) -> some View {
-        ZStack(alignment: .topTrailing) {
-                    Group {
-                        if call.isVideo {
-                            ZStack {
-                                if call.usingTRTC {
-                                    TRTCVideoView(view: trtc.remoteView)
-                                } else {
-                                    VideoSurface(track: call.remoteVideo)
-                                }
-                                if call.usingTRTC ? (trtc.remoteView == nil) : (call.remoteVideo == nil) {
-                                    Avatar(path: call.peerAvatar, size: 44, radius: 8)
-                                }
-                            }
-                        } else {
-                            HStack(spacing: 9) {
-                                Avatar(path: call.peerAvatar, size: 28, radius: 14)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(call.peerName)
-                                        .font(pfExact(13, .medium))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                    Text(call.phase == .active ? timeText : (call.tip.isEmpty ? "通话中" : call.tip))
-                                        .font(pfExact(11))
-                                        .foregroundColor(.white.opacity(0.72))
-                                        .lineLimit(1)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 10)
-                            .background(Color(hex: 0x07C160))
-                        }
-                    }
-                    .frame(width: w, height: h)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.black.opacity(0.18), lineWidth: 0.5))
-                    .contentShape(Rectangle())
-                    .onTapGesture { call.restore() }
-
-                    Button {
-                        call.hangup()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 20, height: 20)
-                            .background(Circle().fill(Color.black.opacity(0.55)))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(5)
-        }
-        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
-    }
-
     /// （旧版：一条横条。留着备用，不再使用）
     private var miniBarOld: some View {
         HStack(spacing: 8) {
@@ -688,6 +604,116 @@ struct CallView: View {
             .navigationTitle(Tr("添加通话"))
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+/// 挂起（微信左上那个画中画按钮）之后，飘在页面最上面的小浮窗：
+///   · 视频通话：显示对方画面（没画面就退回头像）；语音通话：绿色一条（头像 + 名字 + 计时）
+///   · 点一下 → 回通话页；右上角小 ✕ → 直接挂断
+///   · 可以拖着走，松手吸附到左右边（微信就是这么做的）
+/// 关键：它是**透明容器**，只画这一个窗，所以底下的页面照常显示、照常能点 ——
+/// 这就是「回到上一页，但通话还在」。
+struct CallMiniWindow: View {
+    @ObservedObject private var call = CallCenter.shared
+    @ObservedObject private var trtc = TRTCBridge.shared
+
+    /// 小窗位置（nil = 默认贴右上角；拖过之后记住，松手吸附到左右边）
+    @State private var miniX: CGFloat? = nil
+    @State private var miniY: CGFloat? = nil
+    @State private var dragging: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let w: CGFloat = call.isVideo ? 108 : 146
+            let h: CGFloat = call.isVideo ? 144 : 48
+            /* 顶部留出状态栏/刘海：以前写死 6，会钻进灵动岛里 */
+            let topSafe = max(geo.safeAreaInsets.top, 24)
+            let minY = topSafe - 6
+            let maxX = max(8, geo.size.width - w - 8)
+            let maxY = max(minY, geo.size.height - h - 90)      // 90 = 底栏那一条
+            let homeX = geo.size.width - w - 10
+            let homeY = topSafe + 4
+            let x = min(max((miniX ?? homeX) + dragging.width, 8), maxX)
+            let y = min(max((miniY ?? homeY) + dragging.height, minY), maxY)
+            windowBody(w: w, h: h)
+                .position(x: x + w / 2, y: y + h / 2)
+                .gesture(
+                    DragGesture(minimumDistance: 4)
+                        .onChanged { v in dragging = v.translation }
+                        .onEnded { v in
+                            let nx = (miniX ?? homeX) + v.translation.width
+                            let ny = (miniY ?? homeY) + v.translation.height
+                            // 松手吸附：靠近哪边就贴哪边（微信那种手感）
+                            miniX = nx + w / 2 < geo.size.width / 2 ? 8 : maxX
+                            miniY = min(max(ny, minY), maxY)
+                            dragging = .zero
+                        }
+                )
+        }
+    }
+
+    private func windowBody(w: CGFloat, h: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if call.isVideo {
+                    ZStack {
+                        if call.usingTRTC {
+                            TRTCVideoView(view: trtc.remoteView)
+                        } else {
+                            VideoSurface(track: call.remoteVideo)
+                        }
+                        if call.usingTRTC ? (trtc.remoteView == nil) : (call.remoteVideo == nil) {
+                            Avatar(path: call.peerAvatar, size: 44, radius: 8)
+                        }
+                    }
+                } else {
+                    HStack(spacing: 9) {
+                        Avatar(path: call.peerAvatar, size: 28, radius: 14)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(call.peerName)
+                                .font(pfExact(13, .medium))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            Text(call.phase == .active ? miniTimeText : (call.tip.isEmpty ? "通话中" : call.tip))
+                                .font(pfExact(11))
+                                .foregroundColor(.white.opacity(0.72))
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10)
+                    .background(Color(hex: 0x07C160))
+                }
+            }
+            .frame(width: w, height: h)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.black.opacity(0.18), lineWidth: 0.5))
+            .contentShape(Rectangle())
+            .onTapGesture { call.restore() }
+
+            Button {
+                call.hangup()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(Color.black.opacity(0.55)))
+            }
+            .buttonStyle(.plain)
+            .padding(5)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
+    }
+
+    /// 小浮窗上的计时（mm:ss；超过一小时给 h:mm:ss）
+    private var miniTimeText: String {
+        let s = call.seconds
+        let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, sec)
+            : String(format: "%02d:%02d", m, sec)
     }
 }
 

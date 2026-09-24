@@ -163,6 +163,7 @@ final class CallCenter: NSObject, ObservableObject {
         guard phase == .idle else { errorText = "正在通话中"; return }
         guard !peerId.isEmpty else { errorText = "找不到对方账号"; return }
         dismissDialog()                 // 上一通留下的对话框别压在新通话上面
+        minimized = false               // 上一通要是挂起过（小浮窗），新的一通必须整页打开
         self.peerId = peerId
         peerName = name
         peerAvatar = avatar
@@ -744,6 +745,7 @@ final class CallCenter: NSObject, ObservableObject {
         seconds = 0
         muted = false
         cameraOff = false
+        minimized = false               // 挂起了也要收掉小浮窗，不然下一通一进来就是小窗
         if !wasIdle {
             phase = .idle
             /* 按最新要求：挂断以后不再弹「通话已结束」那种小卡片了。

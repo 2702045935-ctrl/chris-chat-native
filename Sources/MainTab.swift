@@ -9,6 +9,8 @@ struct MainTabView: View {
     @State private var shownCrash = false
     /* 读一下语言状态：切语言时这一层会重画（不重建整棵树，避免闪退） */
     @ObservedObject private var lang = LangStore.shared
+    /* 未实名动钱时的全局提示（和微信一样：聊天不受影响，只有钱的功能要求实名） */
+    @ObservedObject private var realNameGate = RealNameGate.shared
 
     private var unreadTotal: Int {
         app.chats.reduce(0) { $0 + ($1.unread ?? 0) }
@@ -84,6 +86,16 @@ struct MainTabView: View {
         .sheet(item: $app.payScan) { info in
             PayConfirmPage(target: info, scanText: app.payScanText)
                 .environmentObject(app)
+        }
+        /* 未实名却动了钱：弹微信那种对话框，点「去实名认证」直接进实名页 */
+        .alert("根据国家规定", isPresented: $realNameGate.alert) {
+            Button("去实名认证") { realNameGate.openPage = true }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("请先完成实名认证，之后才能使用转账、红包、收付款、零钱等功能。聊天不受影响。")
+        }
+        .sheet(isPresented: $realNameGate.openPage) {
+            RealNameView().environmentObject(app)
         }
         /* 全局打开聊天：扫码进群 / 建完群 / 点推送都走这里（整页打开，不受当前在哪个 tab 影响） */
         .fullScreenCover(item: $app.openChat) { c in

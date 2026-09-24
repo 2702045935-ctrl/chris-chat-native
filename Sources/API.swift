@@ -1001,11 +1001,14 @@ enum APIError: LocalizedError {
     case message(String)
     /// 服务端判定这次登录有风险，要求补一次滑动验证（微信那种「需要时才弹」）
     case needSlider
+    /// 没实名却动了钱（转账/红包/收付款/零钱）—— 服务端要求先实名（和微信一样）
+    case needRealName
 
     var errorDescription: String? {
         switch self {
         case .message(let m): return m
         case .needSlider: return "请完成安全验证"
+        case .needRealName: return "根据国家规定，请先完成实名认证"
         }
     }
 }
@@ -1171,6 +1174,11 @@ final class API {
                单独抛一个类型出来，让登录页能把滑块「弹出来」而不是弹个错误。 */
             if let det = dict["details"] as? [String: Any], (det["needSlider"] as? Bool) == true {
                 throw APIError.needSlider
+            }
+            /* 未实名动了钱：和微信一样弹个对话框，带「去实名认证」入口（聊天不受影响） */
+            if let det = dict["details"] as? [String: Any], (det["needRealName"] as? Bool) == true {
+                RealNameGate.shared.prompt()
+                throw APIError.needRealName
             }
             throw APIError.message(msg)
         }

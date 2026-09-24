@@ -7103,6 +7103,18 @@ function isValidIdCard(raw) {
 }
 const maskIdCard = (id) => id.slice(0, 6) + '********' + id.slice(14);
 const idCardHash = (id) => crypto.createHash('sha256').update('chris-idcard:' + id).digest('hex');
+
+/* 未实名的账号能不能碰钱？—— 和微信一样：**聊天不受影响**，但转账/红包/收付款/零钱
+   这些「钱」的动作必须先实名。返回 true 表示已经拦下（调用方直接 return 即可）。
+   文案照着微信的口气：「根据国家规定，请先完成实名认证」。 */
+function blockedByRealName(res, user) {
+  try {
+    if (!user) return false;
+    if (user.realName && user.idCardHash) return false;      // 已经实名
+    fail(res, 403, '根据国家规定，请先完成实名认证后再使用（我 → 设置 → 实名认证）', { needRealName: true });
+    return true;
+  } catch (e) { return false; }
+}
 const unbanHits = new Map();
 function unbanRateAllow(ip) {
   const t = Date.now();
@@ -10085,6 +10097,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 提现到零钱（也可以用「全部提现」） */
   if (parts[0] === 'biz' && parts[1] === 'withdraw' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     const acc = bizOf(user.id, true);
     const all = body.all === true;
@@ -10386,6 +10399,7 @@ async function handleApi(req, res, pathname, query) {
      同时往两个人的会话里落一条转账记录（账单、经营账户查账都看得到）。 */
 
   if (parts[0] === 'pay' && parts[1] === 'code' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const code = newPayCode(user.id);
     const rec = payCodes.get(code) || { exp: Date.now() + PAY_CODE_TTL_MS };
     const url = payBaseUrl(req) + '/pay.html?c=' + code;
@@ -10405,6 +10419,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 收款码：不带金额 = 「我的收款码」；带 amount = 微信那种「设置金额」 */
   if (parts[0] === 'pay' && parts[1] === 'receive-code' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     const amt = rpRound2(Number(body.amount) || 0);
     if (amt < 0 || amt > 200000) return fail(res, 422, '金额填得不对');
@@ -10437,6 +10452,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 扫码付款：付款码（对方扫我）/ 收款码（我扫对方）都走这里 */
   if (parts[0] === 'pay' && parts[1] === 'collect' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     if (!payRateAllow(user.id)) return fail(res, 429, '付得太快了，歇一会儿再试');
     const found = resolvePayText(str(body.text || body.code, 400));
@@ -10511,6 +10527,7 @@ async function handleApi(req, res, pathname, query) {
   }
 
   if (parts[0] === 'pay' && parts[1] === 'transfer' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     const amount = Math.round((Number(body.amount) || 0) * 100) / 100;
     const useBalance = body.method !== 'card';
@@ -10604,6 +10621,7 @@ async function handleApi(req, res, pathname, query) {
   /* 发红包（微信那一套）：单聊 1 个；群聊可以设个数，拼手气 / 普通。
      发的时候先把总额从余额里扣掉，抢一个扣一个，24 小时没抢完的把剩下的退回。 */
   if (parts[0] === 'pay' && parts[1] === 'redpacket' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     const face = !!body.face;
     const pwd = String(body.password || '').trim();
@@ -10871,6 +10889,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 充值：银行卡 → 零钱 */
   if (parts[0] === 'wallet' && parts[1] === 'recharge' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const rules = readWalletRules();
     if (!rules.allowRecharge || !secCfg().allowRecharge) {
       return fail(res, 403, '充值暂未开放，请让管理员在后台打开「允许用户自助充值」');
@@ -10898,6 +10917,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 提现：零钱 → 银行卡（微信：每笔 0.1%，最低 0.1 元，2 小时内到账） */
   if (parts[0] === 'wallet' && parts[1] === 'withdraw' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const rules = readWalletRules();
     const body = await readBody(req);
     const amount = Math.round((Number(body.amount) || 0) * 100) / 100;

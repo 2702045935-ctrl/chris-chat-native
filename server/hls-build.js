@@ -23,6 +23,15 @@ function seal(file, name) {
   const c = crypto.createCipheriv('aes-256-ctr', key(name), iv);
   fs.writeFileSync(file, Buffer.concat([MAGIC, iv, c.update(plain), c.final()]));
 }
+/* 原片的视频码率（bps）。读不出来返回 0，当「不确定」处理。 */
+function srcBitrate(file) {
+  try {
+    const out = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0',
+      '-show_entries', 'stream=bit_rate', '-of', 'default=nw=1:nk=1', file]).toString().trim();
+    const n = parseInt(out, 10);
+    return isFinite(n) && n > 0 ? n : 0;
+  } catch (e) { return 0; }
+}
 const TMP = '/tmp/hlsbuild/';
 fs.mkdirSync(TMP, { recursive: true });
 fs.mkdirSync(HLS, { recursive: true });
@@ -59,16 +68,24 @@ for (const name of jobs) {
   try { fs.writeFileSync(src, openName(name)); } catch (e) { log('解密失败', name); fail += 1; continue; }
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
+  /* 原片码率太高就先压再切：抖音/视频号下载来的原片动不动 3~4Mbps，
+     直接 copy 切段虽然快，但手机 4G 或别人家 Wi-Fi 照样卡（一秒要 3Mbits）。
+     压到 800k 之后同样时长只有原来约 1/4 的流量；已经够轻的原片才直接 copy。 */
+  const br = srcBitrate(src);
+  const heavy = br > 1200000;
+  if (heavy) log('原片 ' + Math.round(br / 1000) + 'kbps 偏高 → 压到 800k 再切：' + name);
   /* 2 秒一段：首段更小 = 更快出画面（弱网下尤其明显） */
   const copyArgs = ['-y', '-loglevel', 'error', '-i', src, '-c', 'copy', '-bsf:a', 'aac_adtstoasc',
     '-hls_time', '2', '-hls_playlist_type', 'vod', '-hls_segment_type', 'mpegts',
     '-hls_flags', 'independent_segments', '-hls_segment_filename', dir + 'seg_%05d.ts', play];
-  let runOk = true;
-  try { execFileSync('nice', ['-n', '15', 'ffmpeg'].concat(copyArgs), { stdio: ['ignore', 'ignore', 'ignore'] }); }
-  catch (e) { runOk = false; }
+  let runOk = !heavy;
+  if (!heavy) {
+    try { execFileSync('nice', ['-n', '15', 'ffmpeg'].concat(copyArgs), { stdio: ['ignore', 'ignore', 'ignore'] }); }
+    catch (e) { runOk = false; }
+  }
   if (!runOk || !fs.existsSync(play)) {
     /* 切不动（不是 H.264 / 时间戳异常）→ 重编码一遍再切 */
-    log('直接切段不行，改重编码：' + name);
+    if (!heavy) log('直接切段不行，改重编码：' + name);
     const encArgs = ['-y', '-loglevel', 'error', '-i', src,
       '-vf', "scale='if(gt(iw,ih),min(1024,iw),-2)':'if(gt(iw,ih),-2,min(1024,ih))'",
       '-c:v', 'libx264', '-preset', 'veryfast', '-threads', '1', '-b:v', '800k', '-maxrate', '1000k', '-bufsize', '1600k',

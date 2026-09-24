@@ -9048,6 +9048,10 @@ async function handleApi(req, res, pathname, query) {
     f.posts.unshift(post);
     if (f.posts.length > 200) f.posts = f.posts.slice(0, 200);
     writeJson(file, f);
+    /* 新视频进 feed 了：几秒后自动补一遍 HLS 分片（异步，不挡这次请求）。
+       少了这一步，视频号就会退化成「整包下 mp4」——线上真出过：
+       两条视频没有 hls 字段，客户端只能下 5.2MB / 3.6Mbps 的原片，看视频一直卡。 */
+    scheduleHlsBuild();
     ok(res, { id: post.id, video: video });
     return;
   }
@@ -13027,6 +13031,27 @@ function uploadAccessLog(ip, status, name, url, extra) {
    没生成过分片的视频回 404，客户端会自动退回整包 MP4，不会播不出来。
    ============================================================ */
 const HLS_DIR = path.join(DATA_DIR, 'hls');
+
+/* 新视频进 feed 后自动补 HLS 分片（防退化的那一步）。
+   合并成一个 4 秒的防抖：连发几条视频只跑一次；detached + unref 所以
+   不占请求、也不会拦着服务退出。 */
+let hlsBuildTimer = null;
+function scheduleHlsBuild() {
+  try {
+    if (hlsBuildTimer) clearTimeout(hlsBuildTimer);
+    hlsBuildTimer = setTimeout(() => {
+      hlsBuildTimer = null;
+      try {
+        const child = spawn(process.execPath, ['hls-build.js'], {
+          cwd: __dirname, detached: true, stdio: 'ignore'
+        });
+        child.on('error', () => { });
+        child.unref();
+        callTrace('视频号：新视频已排队做 HLS 分片（自动）');
+      } catch (e) { callTrace('视频号：HLS 自动分片起不来 ' + String(e && e.message || e)); }
+    }, 4000);
+  } catch (e) { }
+}
 
 function serveHls(req, res, rel) {
   const parts = String(rel).split('/').filter(Boolean);      // ['hls', id, 文件名]

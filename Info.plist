@@ -19,7 +19,7 @@
   <array><string>remote-notification</string><string>audio</string></array>
   <key>UILaunchScreen</key>
   <dict>
-    <key>UIColorName</key><string></string>
+    <key>UIColorName</key><string>LaunchBg</string>
   </dict>
   <key>UISupportedInterfaceOrientations</key>
   <array><string>UIInterfaceOrientationPortrait</string></array>

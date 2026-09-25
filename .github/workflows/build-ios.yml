@@ -99,6 +99,33 @@ jobs:
           # 启动图用 JPEG：同一张 1290×2796 的图，PNG 5.4MB、JPEG 0.37MB
           # （UIImage(named: "splash") 不挑扩展名，jpg 一样能取到）
           cp splash.jpg "$APP/"
+          # 启动屏底色：系统那张「启动屏」默认是白的，冷启动会先闪一下白。
+          # 这里编一个只含纯黑颜色的 Assets.car，Info.plist 的 UILaunchScreen
+          # 用 UIColorName=LaunchBg 指过来 —— 冷启动从第一帧就是黑的，和启动页同色。
+          # 万一 actool 不认（老工具链），只是退回系统默认底色，不影响打包。
+          mkdir -p Assets.xcassets/LaunchBg.colorset
+          cat > Assets.xcassets/Contents.json <<'JSON'
+          { "info": { "version": 1, "author": "xcode" } }
+          JSON
+          cat > Assets.xcassets/LaunchBg.colorset/Contents.json <<'JSON'
+          {
+            "colors": [
+              {
+                "idiom": "universal",
+                "color": {
+                  "color-space": "srgb",
+                  "components": { "red": "0.000", "green": "0.000", "blue": "0.000", "alpha": "1.000" }
+                }
+              }
+            ],
+            "info": { "version": 1, "author": "xcode" }
+          }
+          JSON
+          xcrun actool Assets.xcassets --compile "$APP" --platform iphoneos \
+            --target-device iphone --minimum-deployment-target 16.0 \
+            --output-format human-readable-text > /dev/null 2>&1 \
+            || echo "actool 跳过：启动屏用系统默认底色"
+          ls -la "$APP" | head -20
           # 把 WebRTC 打进 App 里（动态库，运行时从 @executable_path/Frameworks 加载）
           mkdir -p "$APP/Frameworks"
           cp -R WebRTCKit/WebRTC.xcframework/ios-arm64/WebRTC.framework "$APP/Frameworks/WebRTC.framework"

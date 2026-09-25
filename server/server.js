@@ -9519,6 +9519,9 @@ async function handleApi(req, res, pathname, query) {
     defs.forEach((d) => { builtin[d.key] = d.svg || ''; });
     const svgOf = (icon, own) => own || overrides[icon] || builtin[icon] || '';
     const me = currentUser(req);
+    /* 用钱包必须实名（和微信一样：没实名进不了零钱）。
+       App 收到 needRealName 会自动弹实名认证页，不用出新包。 */
+    if (blockedByRealName(res, me)) return;
     const cfg = db.wallet || normalizeWallet(null);
     /* 后台把「点一下能看」也关了的话，连数值都不下发（只给 ¥****），前端想看也没有 */
     const hardMask = !!(cfg.style && cfg.style.maskAmount !== false && cfg.style.maskReveal === false);
@@ -9556,6 +9559,7 @@ async function handleApi(req, res, pathname, query) {
      带上对方是谁（名字/头像）、进出方向、状态、时间，再给一份汇总和月份列表。 */
   if (parts[0] === 'bills' && method === 'GET') {
     const me = currentUser(req);
+    if (blockedByRealName(res, me)) return;      // 账单属于钱包，同样要实名
     const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 100));
     const month = str(query.get('month'), 7);          // 形如 2026-09，不传就是全部
     let all = (db.transfers || [])
@@ -9674,6 +9678,7 @@ async function handleApi(req, res, pathname, query) {
      余额是这个人的真实零钱（冻结金额目前恒为 0，等有冻结逻辑再接）。 */
   if (parts[0] === 'balance-page' && method === 'GET') {
     const me = currentUser(req);
+    if (blockedByRealName(res, me)) return;      // 零钱页要实名
     const cfg = db.balancePage || normalizeBalancePage(null);
     ok(res, Object.assign({}, cfg, {
       balance: Number(me && me.balance) || 0,
@@ -11112,11 +11117,13 @@ async function handleApi(req, res, pathname, query) {
      · 充值 / 提现 / 提现手续费 都会进账单
      ============================================================ */
   if (parts[0] === 'wallet' && parts[1] === 'banks' && method === 'GET') {
+    if (blockedByRealName(res, user)) return;
     ok(res, { banks: userBanks(user) });
     return;
   }
 
   if (parts[0] === 'wallet' && parts[1] === 'banks' && method === 'POST') {
+    if (blockedByRealName(res, user)) return;
     const body = await readBody(req);
     const cardNo = String(body.cardNo || '').replace(/\D/g, '');
     if (cardNo.length < 12 || cardNo.length > 19) return fail(res, 422, '卡号不对（12~19 位数字）');
@@ -11228,6 +11235,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 提现记录 */
   if (parts[0] === 'wallet' && parts[1] === 'withdraws' && method === 'GET') {
+    if (blockedByRealName(res, user)) return;
     const mine = readWalletOps().ops.filter((o) => o.userId === user.id).slice(0, 100);
     const rules = readWalletRules();
     ok(res, { ops: mine, rules: { feeRate: rules.feeRate, feeMin: rules.feeMin, withdrawMin: rules.withdrawMin, withdrawMax: rules.withdrawMax, allowRecharge: !!rules.allowRecharge, rechargeMax: rules.rechargeMax, note: rules.note } });

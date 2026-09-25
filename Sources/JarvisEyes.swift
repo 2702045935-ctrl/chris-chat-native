@@ -5,6 +5,8 @@ import SwiftUI
    放在会话页顶栏最左边，点一下进 AI 助手的对话。 */
 struct JarvisEyesAvatar: View {
     var size: CGFloat = 28
+    /* 深色模式下眼睛要用白色，不然黑底上看不见 */
+    @Environment(\.colorScheme) private var scheme
 
     /// 0 = 睁着，1 = 闭上
     @State private var blink: CGFloat = 0
@@ -24,13 +26,7 @@ struct JarvisEyesAvatar: View {
 
     var body: some View {
         ZStack {
-            /* 白白的小脸（带一点上亮下暗，别太平） */
-            Circle()
-                .fill(LinearGradient(colors: [Color.white, Color(hexString: "#EDF1F7")],
-                                     startPoint: .top, endPoint: .bottom))
-                .overlay(Circle().stroke(Color(hexString: "#DCE2EC"), lineWidth: 0.7))
-                .shadow(color: Color.black.opacity(0.12), radius: 1.5, y: 0.5)
-
+            /* 外面的「小脸」圆去掉了（用户要求）：现在只有两只眼睛，背景透明 */
             HStack(spacing: size * 0.185) {
                 eye
                 eye
@@ -45,14 +41,16 @@ struct JarvisEyesAvatar: View {
 
     private var eye: some View {
         Capsule()
-            .fill(Color(hexString: "#1B1D22"))
+            /* 浅色模式：深色眼珠；深色模式：白色眼睛 */
+            .fill(scheme == .dark ? Color.white : Color(hexString: "#1B1D22"))
             .frame(width: eyeW, height: max(size * 0.035, eyeH * (1 - blink * 0.94)))
             /* 眼珠跟着左右瞟、偶尔抬一下眼皮 */
             .offset(x: lookX * size * 0.055, y: -lookY * size * 0.028)
             /* 眼睛里那点高光，看着更像活的 */
             .overlay(alignment: .top) {
                 Circle()
-                    .fill(Color.white.opacity(0.55))
+                    /* 高光：眼珠是深色时用白点，眼珠是白色时用暗点（颠倒一下才看得见） */
+                    .fill(scheme == .dark ? Color.black.opacity(0.35) : Color.white.opacity(0.55))
                     .frame(width: eyeW * 0.36, height: eyeW * 0.36)
                     .offset(x: -eyeW * 0.14, y: eyeH * 0.10)
                     .opacity(blink > 0.6 ? 0 : 1)

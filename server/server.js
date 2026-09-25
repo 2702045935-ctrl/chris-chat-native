@@ -4416,6 +4416,24 @@ function friendIds(userId) {
     .map((f) => (f.fromId === userId ? f.toId : f.fromId));
 }
 
+/* 意见反馈：一行一条 JSONL（data/feedback.jsonl）。
+   微信那套字段：分类 / 描述 / 截图（最多 4 张）/ 联系方式 / 状态 / 官方回复。 */
+const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.jsonl');
+function readFeedbackRows() {
+  try {
+    return fs.readFileSync(FEEDBACK_FILE, 'utf8').split('\n')
+      .map((s) => s.trim()).filter(Boolean)
+      .map((line) => { try { return JSON.parse(line); } catch (err) { return null; } })
+      .filter(Boolean);
+  } catch (err) { return []; }
+}
+function writeFeedbackRows(rows) {
+  try {
+    fs.writeFileSync(FEEDBACK_FILE, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''), 'utf8');
+    return true;
+  } catch (err) { return false; }
+}
+
 /* 建一个一对一会话（机器人 / 代发消息 / 欢迎语都用它） */
 function createDirectChat(aId, bId) {
   const chat = {
@@ -5497,7 +5515,18 @@ function handleClientMessage(user, socket, raw) {
       const target = findUser(str(msg.toUserId, 40));
       if (!target) return ws.sendText(socket, JSON.stringify({ type: 'call-error', callId, error: '用户不存在' }));
       if (target.id === user.id) return ws.sendText(socket, JSON.stringify({ type: 'call-error', callId, error: '不能给自己打电话' }));
-      if (!friendIds(user.id).includes(target.id)) return ws.sendText(socket, JSON.stringify({ type: 'call-error', callId, error: '先加为好友才能通话' }));
+      if (!friendIds(user.id).includes(target.id)) {
+        /* 排障用：把「谁想打给谁、两边的好友关系到底什么样」写进 call-trace，
+           免得只看到用户说"明明是好友"。 */
+        try {
+          const rel = db.friendships.filter((f) => (f.fromId === user.id && f.toId === target.id)
+            || (f.fromId === target.id && f.toId === user.id));
+          callTrace('invite-rejected ' + user.id + '(' + (user.username || '') + ') -> '
+            + target.id + '(' + (target.username || '') + ') 好友记录='
+            + (rel.length ? rel.map((x) => x.fromId + '->' + x.toId + ':' + x.status).join(',') : '无'));
+        } catch (err) { }
+        return ws.sendText(socket, JSON.stringify({ type: 'call-error', callId, error: '先加为好友才能通话' }));
+      }
       callTrace('invite ' + user.id + ' -> ' + target.id + ' media=' + (msg.media === 'video' ? 'video' : 'audio')
         + ' 对方在线=' + connections.has(target.id)
         + ' 主叫版本=' + (socket.__appBuild || '?')
@@ -11755,13 +11784,34 @@ async function handleApi(req, res, pathname, query) {
     if (!content) return fail(res, 422, '先写点要反馈的内容');
     const row = {
       id: uid('fb'), userId: user.id, username: user.username, nickname: user.nickname,
+      /* 微信那套：先选分类（功能异常 / 产品建议 / 界面样式 / 其他），再写描述，可以贴截图 */
+      category: str(body.category, 20) || '功能异常',
+      images: (Array.isArray(body.images) ? body.images : [])
+        .map((s) => str(s, 300)).filter(Boolean).slice(0, 4),
       contact: str(body.contact, 60), platform: str(body.platform, 20),
-      content: content, createdAt: now()
+      content: content, createdAt: now(),
+      status: 'pending', reply: '', repliedAt: '', repliedBy: ''
     };
     try {
-      fs.appendFileSync(path.join(DATA_DIR, 'feedback.jsonl'), JSON.stringify(row) + '\n', 'utf8');
+      fs.appendFileSync(FEEDBACK_FILE, JSON.stringify(row) + '\n', 'utf8');
     } catch (err) { return fail(res, 500, '提交失败，稍后再试'); }
     ok(res, { sent: true, id: row.id });
+    return;
+  }
+
+  /* 我的反馈：微信「意见反馈」下面能看到自己提交过的和官方回复 */
+  if (parts[0] === 'feedback' && parts[1] === 'mine' && method === 'GET') {
+    const rows = readFeedbackRows()
+      .filter((r) => r && r.userId === user.id)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 50)
+      .map((r) => ({
+        id: r.id, category: r.category || '功能异常', content: r.content || '',
+        images: Array.isArray(r.images) ? r.images : [],
+        createdAt: r.createdAt || '', status: r.status || 'pending',
+        reply: r.reply || '', repliedAt: r.repliedAt || ''
+      }));
+    ok(res, { rows: rows, total: rows.length });
     return;
   }
 
@@ -16246,6 +16296,32 @@ async function handleOps(req, res, parts, query) {
     } catch (err) { /* 还没人反馈过 */ }
     const limit = Math.min(500, Math.max(1, Number(query.get('limit')) || 200));
     ok(res, { items: rows.slice(-limit).reverse(), total: rows.length });
+    return;
+  }
+
+  /* 后台回复一条反馈：写进那行（状态变已回复）+ 给用户推一条实时事件，
+     用户在「我的反馈」里就能看到官方回复（和微信一样）。 */
+  if (sub === 'feedback' && parts[2] === 'reply' && method === 'POST') {
+    if (!can(admin, 'users') && !can(admin, 'support')) return fail(res, 403, '你的角色没有回复反馈的权限');
+    const body = await readBody(req);
+    const id = str(body.id, 40);
+    const reply = String(body.reply || '').slice(0, 1000);
+    if (!id || !reply) return fail(res, 422, '要回的内容不能为空');
+    const rows = readFeedbackRows();
+    const hit = rows.find((r) => r && r.id === id);
+    if (!hit) return fail(res, 404, '这条反馈不存在');
+    hit.reply = reply;
+    hit.status = 'replied';
+    hit.repliedAt = now();
+    hit.repliedBy = admin.username || '';
+    if (!writeFeedbackRows(rows)) return fail(res, 500, '写入失败');
+    try {
+      sendTo(hit.userId, {
+        type: 'feedback', id: hit.id, reply: reply, at: hit.repliedAt
+      });
+    } catch (err) { }
+    audit(req, admin, '回复意见反馈', hit.username || hit.userId, reply.slice(0, 60));
+    ok(res, { replied: true, id: id });
     return;
   }
 

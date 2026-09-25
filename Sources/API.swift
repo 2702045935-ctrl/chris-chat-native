@@ -2769,13 +2769,33 @@ final class API {
     /* ---------------- 意见反馈 / 密码找回 ---------------- */
 
     @discardableResult
-    func sendFeedback(content: String, contact: String) async -> String? {
+    func sendFeedback(content: String, contact: String,
+                      category: String = "功能异常", images: [String] = []) async -> String? {
         do {
             let _: SendPayload = try await post("/api/feedback",
-                                                ["content": content, "contact": contact, "platform": "iOS"],
+                                                ["content": content, "contact": contact,
+                                                 "category": category, "images": images,
+                                                 "platform": "iOS"],
                                                 as: SendPayload.self)
             return nil
         } catch { return (error as? APIError)?.errorDescription ?? "提交失败" }
+    }
+
+    /// 我的反馈（微信「意见反馈」下面能看到自己提过的 + 官方回复）
+    struct MyFeedback: Decodable, Identifiable, Hashable {
+        var id: String
+        var category: String?
+        var content: String?
+        var images: [String]?
+        var createdAt: String?
+        var status: String?
+        var reply: String?
+        var repliedAt: String?
+    }
+    private struct MyFeedbackPayload: Decodable { var rows: [MyFeedback]? }
+    func myFeedback() async -> [MyFeedback] {
+        guard let p: MyFeedbackPayload = try? await get("/api/feedback/mine", as: MyFeedbackPayload.self) else { return [] }
+        return p.rows ?? []
     }
 
     /// 密码找回：手机号 + 验证码 + 新密码。

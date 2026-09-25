@@ -16348,6 +16348,45 @@ async function handleOps(req, res, parts, query) {
     return;
   }
 
+  /* 一次性修复：早期版本会把 video / livephoto 这类消息降级成 text，
+     气泡里就把那段 JSON 原样显示出来（用户说的"视频乱码"）。
+     这里按很严格的条件把它们改回正确的 kind —— 只改 kind，不动内容。
+     识别规则（和 App 发送时的 JSON 一一对应）：
+       video     ：{"url": "….mp4", "seconds": n, "cover": "…"}
+       livephoto ：{"image": "…", "video": "….mov"} */
+  if (sub === 'fix-media-kinds' && method === 'POST') {
+    if (admin.role !== 'super') return fail(res, 403, '只有超级管理员能跑这个修复');
+    let scanned = 0, fixedVideo = 0, fixedLive = 0;
+    db.chats.forEach((c) => {
+      const list = loadMessages(c.id);
+      let changed = false;
+      list.forEach((m) => {
+        scanned += 1;
+        if (!m || m.recalled) return;
+        if (String(m.kind || '') !== 'text') return;
+        const t = String(m.content || '').trim();
+        if (!t.startsWith('{') || t.length > 2000) return;
+        let o = null;
+        try { o = JSON.parse(t); } catch (err) { return; }
+        if (!o || typeof o !== 'object') return;
+        const v1 = String(o.url || '');
+        const v2 = String(o.video || '');
+        const isVideoFile = (s) => /\.(mp4|mov|m4v|avi|mkv|webm|3gp|flv|wmv)(\?|$)/i.test(s);
+        if (o.image && v2 && isVideoFile(v2)) {
+          m.kind = 'livephoto'; changed = true; fixedLive += 1;
+        } else if (v1 && isVideoFile(v1)) {
+          m.kind = 'video'; changed = true; fixedVideo += 1;
+        }
+      });
+      if (changed) {
+        try { saveMessagesFile(c.id, list); } catch (err) { }
+      }
+    });
+    audit(req, admin, '修复媒体消息类型', '-', '扫 ' + scanned + ' 条，video ' + fixedVideo + ' / 实况 ' + fixedLive);
+    ok(res, { scanned: scanned, video: fixedVideo, livephoto: fixedLive });
+    return;
+  }
+
   /* ---------------- 好友关系 ---------------- */
   if (sub === 'friendships' && method === 'GET') {
     if (!can(admin, 'friends')) return fail(res, 403, '你的角色没有查看这一项的权限');

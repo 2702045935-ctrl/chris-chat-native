@@ -29,6 +29,25 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private let player = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private var playerReady = false
+    /// 引擎的节点只 attach/connect 一次（重复 attach 会抛异常）
+    private var wired = false
+    /// 播放相关的操作都在这条串行队列上做（自愈重启可能 sleep 一下，不能堵主线程）
+    private let playQueue = DispatchQueue(label: "chris.call.play")
+    /// 播放端看门狗：引擎被系统/别的 App 掐停之后 2 秒内拉回来
+    private var watchdog: DispatchSourceTimer?
+
+    /* 播放端统计（诊断用）：「两边都在发帧、却听不到声音」这种问题，
+       以前日志里只有「采集=ok」，根本看不出是哪一头不响。 */
+    private(set) var framesIn = 0            // 服务器转过来的帧
+    private(set) var framesScheduled = 0     // 真的排进播放器的帧
+    private(set) var framesDropped = 0       // 播放器没起来时丢掉的帧
+
+    /// 通话结束时上报给服务器，写进 call-trace.log
+    var playDiag: String {
+        "播放端 收到=\(framesIn) 排播=\(framesScheduled) 丢=\(framesDropped)"
+            + " 引擎=\(player.isRunning ? "跑" : "停")"
+            + " 播放器=\(playerReady ? (playerNode.isPlaying ? "跑" : "停") : "没起")"
+    }
 
     private var started = false
     /// 抢麦克风的重试任务（上一通刚结束、TRTC/铃声还占着的时候要靠它抢回来）
@@ -61,6 +80,10 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         started = false
         lastError = ""
         pending.removeAll()
+        framesIn = 0
+        framesScheduled = 0
+        framesDropped = 0
+        startWatchdog()
 
         /* 麦克风经常被「上一通电话 / TRTC 进房 / 铃声引擎」占着，一次抢不到就报错的话，
            整通电话对面就听不到你说话（假通）。这里改成最多抢 6 次、每次间隔 0.7 秒，
@@ -74,6 +97,11 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
                 if self.startCaptureBlocking() {
                     self.started = true
                     self.lastError = ""
+                    /* 抢麦中间可能把音频会话关过（setActive(false)）——
+                       系统会顺手把播放引擎掐停，而以前播放端只建一次，
+                       引擎一死整通电话就一个字都听不见（服务器那边看帧数还正常）。
+                       这里每次抢到麦克风后再确认一次播放端是活的。 */
+                    self.startPlayback()
                     DispatchQueue.main.async { self.onStateChange?(true) }
                     return
                 }
@@ -91,10 +119,14 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         started = false
         startTask?.cancel()
         startTask = nil
+        watchdog?.cancel()
+        watchdog = nil
         captureQueue.async { [capture] in if capture.isRunning { capture.stopRunning() } }
-        playerNode.stop()
-        player.stop()
-        playerReady = false
+        playQueue.sync {
+            playerNode.stop()
+            player.stop()
+            playerReady = false
+        }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
@@ -110,23 +142,53 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
 
     /* ---------------------------------------------------------- 播放：只挂播放器的引擎 */
 
+    /// 看门狗：通话期间每 2 秒看一眼播放引擎，停了就拉起来
+    private func startWatchdog() {
+        guard watchdog == nil else { return }
+        let t = DispatchSource.makeTimerSource(queue: playQueue)
+        t.schedule(deadline: .now() + 1.5, repeating: 2.0)
+        t.setEventHandler { [weak self] in
+            guard let self = self, self.started, !self.handedOver else { return }
+            self.startPlaybackOnQueue()
+        }
+        watchdog = t
+        t.resume()
+    }
+
+    /// 从任意线程调用：把播放引擎搭好 / 拉起来（幂等）
     private func startPlayback() {
-        guard !playerReady, let fmt = playFormat else { return }
-        player.attach(playerNode)
-        player.connect(playerNode, to: player.mainMixerNode, format: fmt)
+        playQueue.sync { startPlaybackOnQueue() }
+    }
+
+    private func startPlaybackOnQueue() {
+        guard let fmt = playFormat else { return }
+        if !wired {
+            player.attach(playerNode)
+            player.connect(playerNode, to: player.mainMixerNode, format: fmt)
+            wired = true
+        }
+        /* 已经在跑就别折腾（这个函数会被看门狗、每帧播放反复调到） */
+        if playerReady, player.isRunning, playerNode.isPlaying { return }
+        _ = try? AVAudioSession.sharedInstance().setActive(true, options: [])
         player.prepare()
         for attempt in 0..<4 {
+            if playerReady, player.isRunning, playerNode.isPlaying { return }
             do {
-                try player.start()
+                if !player.isRunning { try player.start() }
+                playerNode.play()
                 if player.isRunning {
-                    playerNode.play()
                     playerReady = true
                     return
                 }
             } catch {
                 lastError = (lastError.isEmpty ? "" : lastError + " / ") + "播放引擎: \(error.localizedDescription)"
             }
-            if attempt < 3 { Thread.sleep(forTimeInterval: 0.25); try? AVAudioSession.sharedInstance().setActive(true, options: []) }
+            if attempt < 3 { Thread.sleep(forTimeInterval: 0.25) }
+        }
+        /* 4 次都没起来：明说「播放端没起来」，别让日志继续只报「采集=ok」 */
+        playerReady = false
+        if !lastError.contains("播放引擎没起来") {
+            lastError = (lastError.isEmpty ? "" : lastError + " / ") + "播放引擎没起来"
         }
     }
 
@@ -223,17 +285,37 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
 
     /// 播放对方传来的一帧（16kHz 单声道 Int16）
     func play(_ data: Data) {
-        guard playerReady, let fmt = playFormat else { return }
+        guard !data.isEmpty else { return }
+        framesIn += 1
+        playQueue.async { [weak self] in self?.playOnQueue(data) }
+    }
+
+    private func playOnQueue(_ data: Data) {
+        /* 引擎要是被掐停了（来电、别的 App 抢会话、我们自己抢麦时关过会话），
+           这里先把它拉起来再排帧 —— 以前 playerReady 只要还是 true 就直接
+           往一个已经停掉的引擎里 schedule，帧全被吞掉，表现就是「通话中但没声音」。 */
+        if !(playerReady && player.isRunning && playerNode.isPlaying) { startPlaybackOnQueue() }
+        guard playerReady, player.isRunning, let fmt = playFormat else {
+            framesDropped += 1
+            return
+        }
         let frames = data.count / 2
         guard frames > 0,
-              let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames)) else { return }
+              let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames)) else {
+            framesDropped += 1
+            return
+        }
         buf.frameLength = AVAudioFrameCount(frames)
-        guard let ch = buf.int16ChannelData else { return }
+        guard let ch = buf.int16ChannelData else {
+            framesDropped += 1
+            return
+        }
         data.withUnsafeBytes { raw in
             if let base = raw.baseAddress {
                 memcpy(ch[0], base, frames * 2)
             }
         }
         playerNode.scheduleBuffer(buf, completionHandler: nil)
+        framesScheduled += 1
     }
 }

@@ -4421,6 +4421,8 @@ function previewTextOf(m) {
       return /\.(mp4|mov|m4v|avi|mkv|webm|3gp|flv|wmv)(\?|$)/i.test(name) ? '[视频]' : '[文件]';
     }
     case 'audio': return '[语音]';
+    case 'video': return '[视频]';
+    case 'livephoto': return '[实况]';
     case 'link': {
       try { const o = JSON.parse(String(m.content || '{}')); return '[' + String(o.title || '链接') + ']'; } catch (err) { return '[链接]'; }
     }

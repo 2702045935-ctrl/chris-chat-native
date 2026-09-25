@@ -224,6 +224,10 @@ struct ChatDetailView: View {
     @State private var loadingOlder = false
     @State private var holdScroll = false        // 上翻加载时不要自动跳到底部
     @State private var atBottom = true           // 列表是不是已经到底（没到底就别跟着新消息硬滚）
+    /// 刚选好的照片/视频/实况：先出预览页（原图、实况开关），点发送才真发
+    @State private var pendingMedia: MediaSendSheet.Payload?
+    /// 点视频气泡 / 长按实况 → 全屏播放这个视频
+    @State private var videoToPlay: URL?
     @State private var voiceMode = false         // 输入区是不是「按住说话」模式（微信：左边那个语音/键盘切换）
 
     private var myId: String { app.me?.id ?? "" }
@@ -460,7 +464,16 @@ struct ChatDetailView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showPhoto) {
-            PhotoPicker { image in sendImage(image) }
+            /* 照片入口：图片 / 视频 / 实况都支持（老的 PhotoPicker 只认图片，选视频/实况没反应）。
+               选完先出「发送预览页」（原图 / 实况 两个开关），点发送才真发 —— 和微信一致。 */
+            MediaPicker(onImage: { image in pendingMedia = .image(image) },
+                        onVideo: { url in
+                            Task {
+                                let cover = await MediaTool.firstFrame(url).flatMap { dataURLToImage($0) }
+                                pendingMedia = .video(url, cover)
+                            }
+                        },
+                        onLive: { image, url in pendingMedia = .live(image, url) })
         }
         .sheet(isPresented: $showCamera) {
             CameraPicker { image in sendImage(image) }
@@ -535,6 +548,22 @@ struct ChatDetailView: View {
             if let info = billInfo {
                 BillDetailView(chat: chat, info: info)
             }
+        }
+        /* 选完照片/视频/实况 → 发送预览页（原图 / 实况 开关），点发送才真发 */
+        .sheet(isPresented: Binding(get: { pendingMedia != nil },
+                                    set: { if !$0 { pendingMedia = nil } })) {
+            if let p = pendingMedia {
+                MediaSendSheet(payload: p) { live, original in
+                    let payload = p
+                    pendingMedia = nil
+                    sendMedia(payload, live: live, original: original)
+                }
+            }
+        }
+        /* 点视频气泡 / 长按实况 → 全屏播放 */
+        .sheet(isPresented: Binding(get: { videoToPlay != nil },
+                                    set: { if !$0 { videoToPlay = nil } })) {
+            if let u = videoToPlay { VideoPlayerSheet(url: u) }
         }
         .fileImporter(isPresented: $showFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { sendFile(url) }
@@ -1229,6 +1258,73 @@ struct ChatDetailView: View {
         }
     }
 
+    /* ---------------------------------------------------------- 发视频 / 实况（和微信一致） */
+
+    /// dataURL → UIImage（视频封面预览用）
+    private func dataURLToImage(_ s: String) -> UIImage? {
+        guard let comma = s.firstIndex(of: ","),
+              let data = Data(base64Encoded: String(s[s.index(after: comma)...])) else { return nil }
+        return UIImage(data: data)
+    }
+
+    /// 预览页点「发送」：按「实况」「原图」两个开关决定怎么发
+    private func sendMedia(_ p: MediaSendSheet.Payload, live: Bool, original: Bool) {
+        switch p {
+        case .image(let img):
+            uploading = true
+            Task {
+                do {
+                    let url = original ? try await API.shared.uploadOriginal(image: img)
+                                       : try await API.shared.upload(image: img)
+                    if let m = try await API.shared.send(chatId: chat.id, kind: "image", content: url) {
+                        messages.append(m)
+                    }
+                } catch { app.show((error as? APIError)?.errorDescription ?? "图片发送失败") }
+                uploading = false
+                await app.loadChats()
+            }
+
+        case .video(let url, _):
+            uploading = true
+            Task {
+                let file = original ? url : (await MediaTool.compress(url) ?? url)
+                guard let up = await MediaTool.upload(file) else {
+                    uploading = false
+                    app.show(Tr("视频上传失败"))
+                    return
+                }
+                var body: [String: Any] = ["url": up, "seconds": await MediaTool.seconds(file)]
+                if let c = await MediaTool.firstFrame(file) { body["cover"] = c }
+                let json = (try? JSONSerialization.data(withJSONObject: body)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+                if let m = try? await API.shared.send(chatId: chat.id, kind: "video", content: json) {
+                    messages.append(m)
+                }
+                uploading = false
+                await app.loadChats()
+            }
+
+        case .live(let img, let url):
+            /* 微信：实况开关没打开 → 就按普通图片发 */
+            if !live { sendImage(img); return }
+            uploading = true
+            Task {
+                do {
+                    let iurl = original ? try await API.shared.uploadOriginal(image: img)
+                                        : try await API.shared.upload(image: img)
+                    let file = original ? url : (await MediaTool.compress(url) ?? url)
+                    guard let vurl = await MediaTool.upload(file) else { throw APIError.message("实况上传失败") }
+                    let body: [String: Any] = ["image": iurl, "video": vurl]
+                    let json = (try? JSONSerialization.data(withJSONObject: body)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+                    if let m = try await API.shared.send(chatId: chat.id, kind: "livephoto", content: json) {
+                        messages.append(m)
+                    }
+                } catch { app.show((error as? APIError)?.errorDescription ?? "实况发送失败") }
+                uploading = false
+                await app.loadChats()
+            }
+        }
+    }
+
     private func sendImage(_ image: UIImage) {
         uploading = true
         Task {
@@ -1607,6 +1703,12 @@ struct MessageRow: View {
 
         case "audio":
             audioBubble
+
+        case "video":
+            VideoBubble(message: message, mine: mine) { url, _ in videoToPlay = url }
+
+        case "livephoto":
+            LivePhotoBubble(message: message) { url in videoToPlay = url }
 
         default:
             Group {

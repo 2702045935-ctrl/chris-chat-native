@@ -283,10 +283,11 @@ struct MeView: View {
                不然两个渐变叠在一起会显得很脏（微信也是这么处理的） */
             .background(
                 Capsule().fill(hasColor
-                    ? AnyShapeStyle(moodOn ? Color.white.opacity(0.24)
-                                           : LinearGradient(colors: [Color(hexString: c1),
-                                                                     Color(hexString: c2.isEmpty ? c1 : c2)],
-                                                            startPoint: .leading, endPoint: .trailing))
+                    ? (moodOn
+                        ? AnyShapeStyle(Color.white.opacity(0.24))
+                        : AnyShapeStyle(LinearGradient(colors: [Color(hexString: c1),
+                                                                Color(hexString: c2.isEmpty ? c1 : c2)],
+                                                       startPoint: .leading, endPoint: .trailing)))
                     : AnyShapeStyle(Color.clear))
             )
             .overlay(

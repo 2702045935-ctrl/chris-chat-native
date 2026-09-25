@@ -112,16 +112,14 @@ enum MediaTool {
         return max(1, Int(d.rounded()))
     }
 
-    /// 取第一帧当封面（返回 dataURL，服务端会把图存下来）
-    static func firstFrame(_ url: URL) async -> String? {
+    /// 取第一帧当封面（返回图片本身；调用方把它上传掉，拿服务器路径写进消息里）
+    static func firstFrame(_ url: URL) async -> UIImage? {
         let asset = AVURLAsset(url: url)
         let gen = AVAssetImageGenerator(asset: asset)
         gen.appliesPreferredTrackTransform = true
         gen.maximumSize = CGSize(width: 720, height: 1280)
         guard let cg = try? await gen.image(at: CMTime(seconds: 0.2, preferredTimescale: 600)).image else { return nil }
-        let img = UIImage(cgImage: cg)
-        guard let data = img.jpegData(compressionQuality: 0.82) else { return nil }
-        return "data:image/jpeg;base64," + data.base64EncodedString()
+        return UIImage(cgImage: cg)
     }
 
     /// 压缩视频（微信默认就会压）：720p，压完再发；「原图」开关打开就跳过这一步

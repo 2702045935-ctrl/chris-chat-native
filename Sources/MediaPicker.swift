@@ -96,6 +96,101 @@ struct MediaPicker: UIViewControllerRepresentable {
     }
 }
 
+/* ============================================================
+   朋友圈的相册入口（微信那个 ＋ / 「从相册选择」）：
+   · 照片一次可以挑多张（最多 9 张，顺序就是选图顺序）
+   · 挑到视频就按「一条视频」发（微信也是：视频和照片不混着发）
+   · 实况照片按静态图算（朋友圈暂时按图片发）
+   ============================================================ */
+
+enum MomentPickResult {
+    case images([UIImage])
+    case video(URL)
+}
+
+struct MomentPicker: UIViewControllerRepresentable {
+    /// 最多几张（微信 9 张）
+    var limit: Int = 9
+    var onResult: (MomentPickResult) -> Void
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var cfg = PHPickerConfiguration(photoLibrary: .shared())
+        cfg.filter = .any(of: [.images, .videos])       // 关键：照片和视频都能选
+        cfg.selectionLimit = max(1, limit)
+        cfg.preferredAssetRepresentationMode = .current
+        let vc = PHPickerViewController(configuration: cfg)
+        vc.delegate = context.coordinator
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) { }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        private let parent: MomentPicker
+        init(_ p: MomentPicker) { parent = p }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            picker.dismiss(animated: true)
+            guard !results.isEmpty else { return }
+            /* 挑到视频（实况不算，实况按照片发）→ 按一条视频走 */
+            let movie = results.first { r in
+                let p = r.itemProvider
+                return p.hasItemConformingToTypeIdentifier(UTType.movie.identifier)
+                    && !p.hasItemConformingToTypeIdentifier(UTType.livePhoto.identifier)
+            }
+            if let mv = movie {
+                loadMovie(mv.itemProvider) { url in
+                    guard let url = url else { return }
+                    DispatchQueue.main.async { self.parent.onResult(.video(url)) }
+                }
+                return
+            }
+            loadImages(results) { imgs in
+                guard !imgs.isEmpty else { return }
+                DispatchQueue.main.async { self.parent.onResult(.images(imgs)) }
+            }
+        }
+
+        private func loadImage(_ p: NSItemProvider, _ done: @escaping (UIImage?) -> Void) {
+            if p.canLoadObject(ofClass: UIImage.self) {
+                p.loadObject(ofClass: UIImage.self) { obj, _ in done(obj as? UIImage) }
+                return
+            }
+            p.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                done(data.flatMap { UIImage(data: $0) })
+            }
+        }
+
+        /// 一次挑多张：全部取完一次性回调（顺序保持选择顺序）
+        private func loadImages(_ results: [PHPickerResult], _ done: @escaping ([UIImage]) -> Void) {
+            var out = [UIImage?](repeating: nil, count: results.count)
+            let group = DispatchGroup()
+            for (i, r) in results.enumerated() {
+                group.enter()
+                loadImage(r.itemProvider) { img in
+                    out[i] = img
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) { done(out.compactMap { $0 }) }
+        }
+
+        private func loadMovie(_ p: NSItemProvider, _ done: @escaping (URL?) -> Void) {
+            p.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, _ in
+                guard let url = url else { done(nil); return }
+                let dst = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("chris-moment-\(UUID().uuidString).mov")
+                do {
+                    try? FileManager.default.removeItem(at: dst)
+                    try FileManager.default.copyItem(at: url, to: dst)
+                    done(dst)
+                } catch { done(nil) }
+            }
+        }
+    }
+}
+
 /* ---------------------------------------------------------- 视频工具 */
 
 enum MediaTool {

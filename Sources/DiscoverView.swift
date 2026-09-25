@@ -259,6 +259,10 @@ struct MomentsView: View {
     /* 朋友圈发视频（微信：一条动态要么九张图、要么一条视频） */
     @State private var composerVideoPick = false
     @State private var pickMediaMenu = false
+    /// 发表页的「＋」：相册（照片能多选，视频一条）
+    @State private var showMomentAlbum = false
+    /// 长按相机 →「从相册选择」：同上，选完直接进发表页
+    @State private var showAlbumFromCamera = false
     @State private var pickedVideo: URL?
     @State private var videoCover: UIImage?
     @State private var videoSeconds = 0
@@ -455,7 +459,8 @@ struct MomentsView: View {
         }
         .confirmationDialog(Tr("发表"), isPresented: $cameraMenu, titleVisibility: .visible) {
             Button(Tr("拍摄")) { showCamera = true }
-            Button(Tr("从相册选择")) { showPhoto = true }
+            /* 微信这条：从相册选择 → 照片和视频都在一个相册里挑 */
+            Button(Tr("从相册选择")) { showAlbumFromCamera = true }
             Button(Tr("取消"), role: .cancel) { }
         }
         /* 点封面图 → 微信那个「更换相册封面」 */
@@ -478,10 +483,21 @@ struct MomentsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showPhoto) {
-            PhotosPicker(limit: 9) { images in
-                picked = Array(images.prefix(9))          // 最多 9 张，顺序就是选图顺序
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { posting = true }
+        /* 长按相机 → 发表 →「从相册选择」：照片和视频都能挑（微信的逻辑）
+           —— 以前这里写死 PhotosPicker，只认图片，所以"朋友圈只能选图片"。 */
+        .sheet(isPresented: $showAlbumFromCamera, onDismiss: { showAlbumFromCamera = false }) {
+            MomentPicker(limit: 9) { r in
+                switch r {
+                case .images(let imgs):
+                    picked = Array(imgs.prefix(9))        // 最多 9 张，顺序就是选图顺序
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { posting = true }
+                case .video(let url):
+                    Task {
+                        await prepareVideo(url)
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        posting = true
+                    }
+                }
             }
         }
         .sheet(isPresented: $showCamera) {
@@ -790,34 +806,18 @@ struct MomentsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .swipeBack { posting = false }
         .hidesTabBar()
-            .sheet(isPresented: $composerPick) {
-                PhotosPicker(limit: max(1, 9 - picked.count)) { images in
-                    let room = 9 - picked.count
-                    if images.count > room {
-                        app.show("最多 9 张图，还能再加 \(room) 张")
-                        picked.append(contentsOf: images.prefix(room))
-                    } else {
-                        picked.append(contentsOf: images)
+            /* ＋ 号：微信是直接打开相册（照片能多选，视频就一条），不再弹「照片/视频」二选一 */
+            .sheet(isPresented: $showMomentAlbum, onDismiss: { showMomentAlbum = false }) {
+                MomentPicker(limit: max(1, 9 - picked.count)) { r in
+                    switch r {
+                    case .images(let imgs):
+                        let room = 9 - picked.count
+                        if imgs.count > room { app.show("最多 9 张图，还能再加 \(room) 张") }
+                        picked.append(contentsOf: imgs.prefix(max(0, room)))
+                    case .video(let url):
+                        Task { await prepareVideo(url) }
                     }
                 }
-            }
-            /* ＋ 号：微信是从相册里挑照片或视频，我们这里给一个「照片 / 视频」二选一 */
-            .confirmationDialog(Tr("添加照片或视频"), isPresented: $pickMediaMenu, titleVisibility: .visible) {
-                /* ⚠ 这个 dialog 还没收完就弹 sheet，SwiftUI 会**直接丢掉**那次弹层
-                   （用户看到的就是「点了视频没反应」）。所以等一下再弹。 */
-                Button(Tr("照片")) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { composerPick = true }
-                }
-                Button(Tr("视频")) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { composerVideoPick = true }
-                }
-                Button(Tr("取消"), role: .cancel) { }
-            }
-            .sheet(isPresented: $composerVideoPick, onDismiss: { composerVideoPick = false }) {
-                MediaPicker(onImage: { _ in },
-                            onVideo: { url in Task { await prepareVideo(url) } },
-                            onLive: { _, _ in },
-                            videosOnly: true)
             }
             .confirmationDialog(Tr("谁可以看"), isPresented: $showVisibility, titleVisibility: .visible) {
                 Button(Tr("公开（所有好友可见）")) { visibility = "public" }
@@ -933,7 +933,7 @@ struct MomentsView: View {
                 }
             }
             if picked.count < 9 && pickedVideo == nil {
-                Button { pickMediaMenu = true } label: {
+                Button { showMomentAlbum = true } label: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(C.searchBg)

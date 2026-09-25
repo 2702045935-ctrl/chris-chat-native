@@ -422,6 +422,8 @@ struct BrandInfo: Decodable, Hashable {
     var login: LoginBrand?
     /// 服务器有没有开「登录滑动验证」（安全验证那一块显不显示由它决定）
     var sliderLogin: Bool?
+    /// 后台配的启动页图片（没有就用 App 包里那张 splash.png 兜底）
+    var splash: String?
 }
 
 struct LoginBrand: Decodable, Hashable {

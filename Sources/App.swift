@@ -49,6 +49,8 @@ final class AppState: ObservableObject {
     @Published var splashDone = false
     /// 服务器上配的默认聊天背景（自己没设时用它，和网页版一致）
     @Published var defaultChatBackground = ""
+    /// 后台配的启动页图片（空 = 用 App 包里那张）
+    @Published var splashImage = ""
     @Published var toast: String?
     /// 扫到收付款码之后要弹的确认付款页（扫一扫在哪个页面都能弹出来）
     @Published var payScan: PayScanInfo?
@@ -207,6 +209,7 @@ final class AppState: ObservableObject {
         // 服务器上配的默认聊天背景（自己没设时用）
         if let b = await API.shared.branding() {
             defaultChatBackground = b.chatBackground ?? ""
+            splashImage = b.splash ?? ""
         }
     }
 
@@ -475,7 +478,7 @@ struct CHRISApp: App {
                     .environmentObject(app)
                     .preferredColorScheme(app.preferredScheme)   // 跟随系统 / 强制浅色 / 强制深色
                 if !app.splashDone {
-                    SplashView()
+                    SplashView(remote: app.splashImage)
                         .transition(.opacity)
                         .zIndex(9)
                 }

@@ -4,6 +4,9 @@ import SwiftUI
    图片打包在 App 里（CI 会把 iosfull/splash.png 拷进 bundle），不走网络，
    所以断网、冷启动都能立刻显示。 */
 struct SplashView: View {
+    /// 后台配的启动页图片（后台「界面配置」里换）；空着就用包里那张
+    var remote: String = ""
+
     var body: some View {
         /* 用 GeometryReader 拿"整块窗口"的真实尺寸（含状态栏/刘海那一条），
            再用 ignoresSafeArea 铺出去 —— 之前用 UIScreen 尺寸在安全区里布局，
@@ -11,7 +14,13 @@ struct SplashView: View {
         GeometryReader { geo in
             ZStack {
                 Color.black
-                if let img = UIImage(named: "splash") {
+                /* 优先用后台配的那张（远端图，带缓存）：换图不用重装 App。
+                   没配、或者还没下载完 → 下面用包里那张兜底，保证冷启动/断网都不白屏。 */
+                if !remote.isEmpty {
+                    RemoteImage(path: remote)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                } else if let img = UIImage(named: "splash") {
                     Image(uiImage: img)
                         .resizable()
                         .scaledToFill()

@@ -2062,6 +2062,7 @@ const DEFAULT_BRANDING = {
   appName: 'CHRIS Chat',
   logo: '',
   chatBackground: '',
+  splash: '',                 // 启动页图片（后台可换；空 = 用 App 包里那张）
   fontFamily: '',
   fontName: '',
   fontUrl: '',
@@ -8035,6 +8036,8 @@ async function handleAdmin(req, res, parts, query) {
     if (body.appName !== undefined) next.appName = str(body.appName, 30) || DEFAULT_BRANDING.appName;
     if (body.logo !== undefined) next.logo = str(body.logo, 300000);
     if (body.chatBackground !== undefined) next.chatBackground = str(body.chatBackground, 300000);
+    /* 启动页图片（后台可换，不用重新出包） */
+    if (body.splash !== undefined) next.splash = str(body.splash, 300000);
     if (body.fontFamily !== undefined) next.fontFamily = str(body.fontFamily, 400);
     if (body.fontName !== undefined) next.fontName = str(body.fontName, 120);
     if (body.fontUrl !== undefined) next.fontUrl = str(body.fontUrl, 500000);

@@ -1,8 +1,9 @@
 import SwiftUI
 
 /* 我们自己的启动页：铺满整屏显示 splash.png，进来盖 1 秒后淡出。
-   图片打包在 App 里（CI 会把 iosfull/splash.png 拷进 bundle），不走网络，
-   所以断网、冷启动都能立刻显示。 */
+   图片打包在 App 里（CI 会把 splash.png 拷进 bundle），不走网络，
+   所以断网、冷启动都能立刻显示。
+   2026-09-25：改成「铺满（cover）」——和微信一样整屏顶满，不再上下留色带。 */
 struct SplashView: View {
     /// 后台配的启动页图片（后台「界面配置」里换）；空着就用包里那张
     var remote: String = ""
@@ -17,18 +18,18 @@ struct SplashView: View {
                 /* 优先用后台配的那张（远端图，带缓存）：换图不用重装 App。
                    没配、或者还没下载完 → 下面用包里那张兜底，保证冷启动/断网都不白屏。 */
                 if !remote.isEmpty {
-                    /* ① 底：同一张图放大填满 + 模糊 —— 把「比例不合留出来的边」填掉，
-                          所以**不会出现黑边**（这一层会被裁掉一部分，但它是模糊背景，看不出来）。 */
+                    /* 底下垫一层放大+模糊的同图：极窄/极宽的屏幕（iPad、老 16:9）上
+                       cover 也裁不出东西时，兜住边角，不会露黑边。 */
                     RemoteImage(path: remote, mode: .fill, maxSide: 1600)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .blur(radius: 26)
                         .clipped()
-                    /* ② 面：整张图**完整显示**（fit，一点不裁、也不变形）；
-                          maxSide 2560 是解码上限，别把高清图压糊（默认只有 1600）。 */
-                    RemoteImage(path: remote, mode: .fit, maxSide: 2560)
+                    /* 主图：铺满（cover）。图本身按手机比例（1290×2796）出的，
+                       所以只会裁掉极边缘一点，主体（星球）居中不受影响。 */
+                    RemoteImage(path: remote, mode: .fill, maxSide: 2560)
                         .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
                 } else if let img = UIImage(named: "splash") {
-                    /* 包里那张也按同样办法：底图填满模糊（不留黑边）＋ 上面整图完整显示 */
                     Image(uiImage: img)
                         .resizable()
                         .scaledToFill()
@@ -37,8 +38,9 @@ struct SplashView: View {
                         .clipped()
                     Image(uiImage: img)
                         .resizable()
-                        .scaledToFit()          // 完整显示，不裁剪
+                        .scaledToFill()
                         .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "message.fill")

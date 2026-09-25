@@ -32,9 +32,6 @@ struct BalancePageView: View {
     private var st: BalanceStyle { cfg?.style ?? BalanceStyle() }
 
     var body: some View {
-        if needReal {
-            NeedRealNameView { dismiss() }
-        } else {
         VStack(spacing: 0) {
             // 顶部导航：左边返回箭头 + 中间「零钱明细」（和参考代码一致）
             NavBar(title: cfg?.navTitle ?? "零钱明细", back: { dismiss() })
@@ -81,6 +78,14 @@ struct BalancePageView: View {
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "balance" || ev.type == "transfer" || ev.type == "ui" { Task { await load() } }
+        }
+        /* 强制实名：没实名时整页盖一层「请先实名」（服务端 403 拦下来的）。
+           这样不会因为拿不到配置而退回默认样式（默认金额字号 64，就是"字变大"那个坑）。 */
+        .overlay {
+            if needReal {
+                NeedRealNameView { dismiss() }
+                    .environmentObject(app)
+            }
         }
     }
 
@@ -209,5 +214,4 @@ struct BalancePageView: View {
             if case .needRealName = e { needReal = true; return }
         } catch { }
     }
-        }
 }

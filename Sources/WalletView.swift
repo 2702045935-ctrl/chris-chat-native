@@ -118,13 +118,13 @@ struct WalletView: View {
         .sheet(isPresented: $showIdentity) { IdentityView().environmentObject(app) }
         .sheet(isPresented: $showPaySettings) { PaySettingsView().environmentObject(app) }
         .sheet(isPresented: $showPayScore) { PayScoreView().environmentObject(app) }
-        }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
         .task { await load() }
         .onChange(of: realtime.event) { ev in
             if ev.type == "transfer" || ev.type == "balance" || ev.type == "ui" { Task { await load() } }
+        }
         }
     }
 

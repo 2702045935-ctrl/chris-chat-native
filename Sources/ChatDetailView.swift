@@ -1386,7 +1386,8 @@ struct ChatDetailView: View {
             Task {
                 /* ① 封面：预览页那张现成的先用（本来就有），没有再抽第一帧 ——
                       这样"发送中"的气泡立刻就有画面，不用等处理完（微信也是马上出封面）。 */
-                let cover = preview ?? (await MediaTool.firstFrame(url))
+                let cover: UIImage?
+                if let p = preview { cover = p } else { cover = await MediaTool.firstFrame(url) }
                 if cover != nil { sendingPreview = cover }
                 /* 封面很小，和视频上传**并行**传掉，省掉最后那一下等待 */
                 let coverTask = Task { () -> String? in

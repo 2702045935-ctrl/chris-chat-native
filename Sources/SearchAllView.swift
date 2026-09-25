@@ -259,7 +259,8 @@ struct SearchAllView: View {
         .padding(.horizontal, 16).frame(height: 32).background(C.pageBg)
     }
 
-    private func row<C: View>(tap: @escaping () -> Void, @ViewBuilder content: () -> C) -> some View {
+    /* 注意：泛型别叫 C —— 会把颜色调色板 C 遮蔽掉（C.cardBg 就取不到了，编译直接报错） */
+    private func row<Content: View>(tap: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
         Button(action: tap) {
             HStack(spacing: 12) {
                 content()

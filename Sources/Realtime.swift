@@ -47,6 +47,9 @@ struct PushEvent: Equatable {
     var liveSDP = ""
     var liveCandidate = ""
     var tick = 0
+    /// ready 里带回来：服务器上我这边还有没有一通"进行中"的电话
+    /// （重连时用它校对本地通话页，避免"对方早挂了、我还显示着"）
+    var callActive: Bool? = nil
 }
 
 /// 和服务器保持一条长连接（WebSocket）：别人一发消息，这边立刻就能收到，
@@ -231,6 +234,7 @@ final class Realtime: ObservableObject {
             ev.user = decoded
         }
         ev.announce = (obj["text"] as? String) ?? ""
+        if let ca = obj["callActive"] as? Bool { ev.callActive = ca }
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
         if let n = obj["friendRequests"] as? Int { ev.friendRequests = n }
         // 转账状态变化（对方收款 / 24 小时退回）

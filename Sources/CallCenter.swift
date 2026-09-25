@@ -147,7 +147,8 @@ final class CallCenter: NSObject, ObservableObject {
         sub = Realtime.shared.$event
             .receive(on: RunLoop.main)
             .sink { [weak self] ev in
-                guard ev.type == "call" || ev.type == "call-error" else { return }
+                /* ready 也要放进来：重连时靠它校对"我还该不该显示通话页" */
+                guard ev.type == "call" || ev.type == "call-error" || ev.type == "ready" else { return }
                 self?.handle(ev)
             }
         Task { await loadIce() }
@@ -339,6 +340,13 @@ final class CallCenter: NSObject, ObservableObject {
     }
 
     private func handle(_ ev: PushEvent) {
+        /* 重连（从后台回来 / 切网）时校对一次：服务器上已经没有我这一通电话了，
+           就把本地的通话页收掉 —— 不然会出现「对方早挂断了、我这边还显示通话中」，
+           而且这通也不会留下通话时长记录。 */
+        if ev.type == "ready" {
+            if phase != .idle, ev.callActive == false { finish(tip: "通话已结束") }
+            return
+        }
         if ev.type == "call-error" {
             if !ev.callError.isEmpty { errorText = ev.callError }
             /* 打不通（对方不在线 / 忙线 / 不能打）：先留在通话页上把原因显示几秒，

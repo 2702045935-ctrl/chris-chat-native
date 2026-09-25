@@ -5345,6 +5345,20 @@ function callTrace(line) {
   } catch (err) { /* 记不上就算了，不能因为日志把通话弄挂 */ }
 }
 
+/* 兜底清理：客户端崩溃 / 被强杀时不会发"挂断"，服务器上这通电话就一直挂着
+   （表现就是：对方永远显示"正在通话中"，而且这通也不会留下通话时长记录）。
+   · 响铃中超 5 分钟 → 结束（正常 65 秒就该超时了，这是二次兜底）
+   · 通话中超 8 小时 → 结束（比任何真实通话都长，不会误伤） */
+setInterval(() => {
+  const now = Date.now();
+  Array.from(calls.values()).forEach((c) => {
+    if (!c || c.state === 'ended') return;
+    const since = now - (c.answeredAt || c.startedAt || now);
+    if (c.state === 'ringing' && since > 5 * 60 * 1000) callEnd(c, 'timeout');
+    else if (since > 8 * 60 * 60 * 1000) callEnd(c, 'timeout');
+  });
+}, 60 * 1000).unref();
+
 function callEnd(call, reason, extra) {
   if (call.timer) clearTimeout(call.timer);
   /* 宽限期定时器要清掉：不然通话都结束了它还会再结束一次（日志里会出现重复的 end） */
@@ -5765,8 +5779,12 @@ function handleSocket(user, socket) {
     statuses: friendStatusMap(user.id),
     momentUnread: momentUnread(user.id),
     /* 重连时顺手把「待处理好友申请」也带上：手机在后台没收到推送，
-       一回来就能把通讯录红点点亮，不用等用户去点通讯录 */
-    friendRequests: pendingFriendRequests(user.id)
+      一回来就能把通讯录红点点亮，不用等用户去点通讯录 */
+    friendRequests: pendingFriendRequests(user.id),
+    /* 我这边服务器上到底还有没有一通"进行中"的电话：
+       客户端重连（从后台回来/切网）时用它校对 —— 没有了就把本地的通话页收掉，
+       不然会出现「对方早挂了、我这边还显示着」。 */
+    callActive: Array.from(calls.values()).some((c) => c.state !== 'ended' && (c.from === user.id || c.to === user.id))
   }));
 
   ws.attach(socket, {
@@ -5829,7 +5847,12 @@ function deliverMessage(user, chatId, kind, content, clientId) {
     if (!isOwner && (chat.muteMembers || []).includes(user.id)) return { error: '你被群主禁言了' };
   }
 
-  const allowed = ['text', 'image', 'file', 'audio', 'gift', 'transfer', 'location', 'redpacket', 'link'];
+  /* 客户端会发的类型都必须在名单里！不在名单里的会被降级成 text，
+     于是气泡里就把那段 JSON 原样显示出来 —— 用户看到的"视频乱码"就是这么来的。
+     2026-09-25 补：video / livephoto（视频与实况）、dice / wheel / fortune / rps（小游戏）、
+     balance / company（转账卡、经营账户）。system / call 这类只由服务端自己写，不放开。 */
+  const allowed = ['text', 'image', 'file', 'audio', 'gift', 'transfer', 'location', 'redpacket', 'link',
+    'video', 'livephoto', 'dice', 'wheel', 'fortune', 'rps', 'balance', 'company'];
   const type = allowed.includes(kind) ? kind : 'text';
   /* IM 模块的开关：管理员关了哪一类就发不出去 */
   const imBlock = imKindBlocked(type);

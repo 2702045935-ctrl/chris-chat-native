@@ -178,7 +178,8 @@ final class Realtime: ObservableObject {
                            全堵在 socket 里；等它回来时几十帧一起灌进来，声音就一顿一顿。
                            语音帧的实时性比"事件顺序"重要得多。 */
                         if let self = self {
-                            Task { @MainActor in self.handle(text) }
+                            let t = text          // 拷一份常量再进并发闭包（不然编译器不让）
+                            Task { @MainActor in self.handle(t) }
                         }
                     } else {
                         clock.touch()

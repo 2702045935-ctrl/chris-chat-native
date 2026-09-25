@@ -16,6 +16,7 @@ struct DiscoverView: View {
     private var latestThumb: String {
         for m in app.moments {
             if let img = m.images?.first, !img.isEmpty { return img }
+            if let c = m.videoCover, !c.isEmpty { return c }      // 视频动态用封面
         }
         return ""
     }
@@ -1306,7 +1307,9 @@ struct MomentRow: View {
                     .padding(.top, 6)
                 }
 
-                if !images.isEmpty {
+                /* 视频动态没有 images（一条动态要么九张图、要么一条视频）——
+                   以前这里只看 images，视频那条整块都不画，发出去看着就是"空的"。 */
+                if !images.isEmpty || !(moment.video ?? "").isEmpty {
                     grid
                         .padding(.top, 13)
                 }

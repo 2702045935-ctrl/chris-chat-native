@@ -931,6 +931,10 @@ struct ContactCardView: View {
                 for src in (m.images ?? []) where images.count < 5 {
                     images.append(src)
                 }
+                /* 视频动态没有 images：用封面顶上（朋友圈/名片上那几格缩略图） */
+                if let c = m.videoCover, !c.isEmpty, images.count < 5 {
+                    images.append(c)
+                }
             }
             thumbs = images
             hasMoments = !list.isEmpty

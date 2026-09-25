@@ -637,7 +637,11 @@ struct ChatDetailView: View {
     /* ---------------------------------------------------------- 消息列表 */
 
     private var messageList: some View {
-        ScrollViewReader { proxy in
+        /* 「提前一屏开始拉」：最早的这十几条随便哪条一露面，就说明用户快到顶了 ——
+           这时候就去拉上一页，等他真滑到顶，内容已经在手里了（这才是微信那种无感）。
+           以前是等最顶上那条出现才拉，等于到了顶还要等一个网络来回。 */
+        let nearTopIds = Set(messages.prefix(12).map { $0.id })
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
                     /* 上面还有更早的记录：**顶部什么都不显示**（要的就是"无感上滑"）——
@@ -654,7 +658,7 @@ struct ChatDetailView: View {
                             /* 最早的那条露出来了 = 用户已经把列表滑到顶：
                                自动把更早的一页续上（和微信一样，往上滑就是无限的历史） */
                             .onAppear {
-                                if message.id == messages.first?.id { autoLoadOlder() }
+                                if nearTopIds.contains(message.id) { autoLoadOlder() }
                             }
                     }
                     /* 底部哨兵：它在屏幕上就说明「已经到底了」。
@@ -704,7 +708,7 @@ struct ChatDetailView: View {
     /// 滑到顶了：自动加载更早的记录（微信也是滑到顶就自动续，不用点）
     private func autoLoadOlder() {
         guard hasOlder, !loadingOlder, !loading else { return }
-        guard Date().timeIntervalSince(lastOlderLoad) > 0.4 else { return }
+        guard Date().timeIntervalSince(lastOlderLoad) > 0.25 else { return }
         lastOlderLoad = Date()
         Task { await loadOlder() }
     }
@@ -1634,7 +1638,8 @@ struct ChatDetailView: View {
         lastOlderLoad = Date()
         defer { loadingOlder = false }
         do {
-            let r = try await API.shared.messages(chatId: chat.id, limit: 40, before: seq)
+            /* 一次 60 条（服务端最多 100）：翻历史时来回次数少一半，手感更顺 */
+            let r = try await API.shared.messages(chatId: chat.id, limit: 60, before: seq)
             hasOlder = r.hasMore
             /* 一页都没有 = 上面确实没有更早的了：把入口收掉，别让用户一直滑一直等 */
             guard !r.messages.isEmpty else { hasOlder = false; return }

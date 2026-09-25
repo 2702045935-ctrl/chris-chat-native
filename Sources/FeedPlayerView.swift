@@ -80,7 +80,7 @@ struct FeedPlayerView: View {
     }
 
     private func like(_ item: FeedItem) {
-        Task { _ = try? await API.shared.feedLike(itemId: item.id) }
+        Task { _ = try? await API.shared.feedLike(item.id) }
     }
 
     /// 底部进度条：每 0.25 秒读一次当前页的播放进度

@@ -644,20 +644,13 @@ struct ChatDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    /* 上面还有更早的记录时，顶部给一行提示；**滑到顶会自动加载**（微信就是这样，
-                       不用手点），点它也能加载 —— 网络慢的时候手点更踏实。 */
+                    /* 上面还有更早的记录：**顶部什么都不显示**（要的就是"无感上滑"）——
+                       滑到顶，更早的记录自己就续上来，不出现任何「查看更早/加载中」的字，
+                       也没有转圈。这个 1pt 的透明哨兵就是触发器（它一进可视区就加载下一页）。 */
                     if hasOlder {
-                        HStack(spacing: 6) {
-                            if loadingOlder { ProgressView().scaleEffect(0.7) }
-                            Text(loadingOlder ? Tr("正在加载…") : Tr("查看更早的消息"))
-                                .font(pf(13))
-                                .foregroundColor(C.subLabel)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .contentShape(Rectangle())
-                        .onTapGesture { Task { await loadOlder() } }
-                        .onAppear { autoLoadOlder() }
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear { autoLoadOlder() }
                     }
                     ForEach(messages) { message in
                         messageBlock(message)
@@ -1656,6 +1649,8 @@ struct ChatDetailView: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { holdScroll = false }
         } catch {
+            /* 这次没拉到（网络抖了）：把节流复位，用户再往上滑一下就能立刻重试 */
+            lastOlderLoad = Date.distantPast
             app.show(Tr("聊天记录加载失败"))
         }
     }

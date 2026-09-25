@@ -46,6 +46,9 @@ struct PushEvent: Equatable {
     var liveSigKind = ""
     var liveSDP = ""
     var liveCandidate = ""
+    /// 拍一拍：谁拍的（patFrom）、拍的谁（patTo）
+    var patFrom = ""
+    var patTo = ""
     var tick = 0
     /// ready 里带回来：服务器上我这边还有没有一通"进行中"的电话
     /// （重连时用它校对本地通话页，避免"对方早挂了、我还显示着"）
@@ -278,6 +281,9 @@ final class Realtime: ObservableObject {
             ev.user = decoded
         }
         ev.announce = (obj["text"] as? String) ?? ""
+        /* 拍一拍：谁拍的、拍的谁（服务器单独推的一条轻量事件，给接收方一个"被拍了"的反馈） */
+        ev.patFrom = (obj["userId"] as? String) ?? ""
+        ev.patTo = (obj["targetId"] as? String) ?? ""
         if let ca = obj["callActive"] as? Bool { ev.callActive = ca }
         if let n = obj["momentUnread"] as? Int { ev.momentUnread = n }
         if let n = obj["friendRequests"] as? Int { ev.friendRequests = n }

@@ -4519,6 +4519,8 @@ function previewTextOf(m) {
     /* 通话记录（系统消息）：微信在会话列表里直接写「通话时长 00:12」/「已取消」/「对方无应答」，
        以前这里没这一支，最后一条是通话记录时列表里显示的是「[system]」——用户说看不到通话记录就是这个 */
     case 'system': return callRecordTextOf(String(m.content || '')).slice(0, 40);
+    /* 拍一拍：会话列表里微信显示的就是「拍了拍」（和消息里那条灰字对应） */
+    case 'pat': return '拍了拍';
     case 'transfer': return '[转账]';
     case 'gift': return '[礼物]' + (giftNameOf(m.content) ? ' ' + giftNameOf(m.content) : '');
     case 'location': return '[位置]';
@@ -5445,6 +5447,43 @@ function handleClientMessage(user, socket, raw) {
     sendToChat(chat, {
       type: 'typing', chatId: chat.id, userId: user.id, nickname: user.nickname, at: Date.now()
     }, user.id);
+    return;
+  }
+
+  /* 拍一拍（双击头像）：往会话里写一条居中的灰字，微信就是「张三 拍了拍 李四」。
+     存的是"客观"信息（谁拍谁 + 双方当时的显示名），客户端按"我是谁"选说法：
+       我拍的 → 我拍了拍"对方" / 拍的我 → "对方"拍了拍我 / 别人的 → "张三"拍了拍"李四" */
+  if (msg.type === 'pat') {
+    const chat = db.chats.find((c) => c.id === msg.chatId);
+    if (!chat || !chat.memberIds.includes(user.id)) return;
+    const target = findUser(str(msg.targetId, 40));
+    if (!target || !chat.memberIds.includes(target.id)) return;
+    /* 拍得太快就挡掉（微信也会提示"拍了拍太频繁"） */
+    const t0 = Date.now();
+    if (t0 - Number(user.lastPatAt || 0) < 1500) {
+      sendTo(user.id, { type: 'toast', text: '拍一拍太频繁了，歇一下' });
+      return;
+    }
+    user.lastPatAt = t0;
+    saveUsers();
+    chat.seq = (chat.seq || 0) + 1;
+    const message = {
+      id: uid('m'), chatId: chat.id, seq: chat.seq, senderId: user.id,
+      kind: 'pat',
+      content: JSON.stringify({
+        from: user.id, to: target.id,
+        fn: displayNameFor(user.id, user) || user.nickname || user.username,
+        tn: displayNameFor(user.id, target) || target.nickname || target.username
+      }),
+      createdAt: now(), recalled: false
+    };
+    appendMessage(chat.id, message);
+    saveChats();
+    chat.memberIds.forEach((id) => {
+      sendTo(id, { type: 'message', message, chat: chatSummary(chat, id), clientId: null });
+    });
+    /* 再单独推一条轻量事件：接收方可以立刻震一下（不用等消息拉回来） */
+    sendToChat(chat, { type: 'pat', chatId: chat.id, userId: user.id, targetId: target.id }, user.id);
     return;
   }
 

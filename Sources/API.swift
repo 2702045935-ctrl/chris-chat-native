@@ -120,6 +120,27 @@ struct Message: Decodable, Identifiable, Hashable {
     var body: String { content ?? "" }
     var isRecalled: Bool { recalled ?? false }
 
+    /* ---------------- 拍一拍（双击头像）---------------- */
+    /// 服务端写的那条「拍一拍」消息里带的客观信息：谁拍了谁、双方当时的显示名
+    private var patInfo: [String: Any]? {
+        guard kindName == "pat",
+              let d = body.data(using: .utf8),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }
+        return o
+    }
+    var patFrom: String { (patInfo?["from"] as? String) ?? "" }
+    var patTo: String { (patInfo?["to"] as? String) ?? "" }
+    var patFromName: String { (patInfo?["fn"] as? String) ?? "" }
+    var patToName: String { (patInfo?["tn"] as? String) ?? "" }
+    /// 这条「拍了拍」在**我这台手机**上该怎么念（微信的三种说法）
+    func patText(myId: String) -> String {
+        let fn = patFromName, tn = patToName
+        if !patFrom.isEmpty, patFrom == myId, !tn.isEmpty { return "我拍了拍“" + tn + "”" }
+        if !patTo.isEmpty, patTo == myId, !fn.isEmpty { return "“" + fn + "”拍了拍我" }
+        if !fn.isEmpty, !tn.isEmpty { return "“" + fn + "”拍了拍“" + tn + "”" }
+        return "拍了拍"
+    }
+
     /// 这行系统消息是不是一条通话记录
     var isCallRecord: Bool {
         if call != nil { return true }

@@ -624,6 +624,10 @@ struct ChatDetailView: View {
                 typingClear?.cancel()
                 peerTyping = ""
             }
+            /* 有人拍一拍（我被拍的时候震得重一点）：比"等消息拉回来"更即时 */
+            if ev.type == "pat", ev.chatId == chat.id {
+                UIImpactFeedbackGenerator(style: ev.patTo == myId ? .medium : .light).impactOccurred()
+            }
             // 一下子来很多条时合并成一次刷新，别把手机刷爆
             pushTask?.cancel()
             pushTask = Task {
@@ -737,7 +741,16 @@ struct ChatDetailView: View {
     private func messageBlock(_ message: Message) -> some View {
         VStack(spacing: 0) {
             if showTime(for: message) { timeLine(message) }
-            if message.kindName == "system" {
+            if message.kindName == "pat" {
+                /* 拍一拍：微信就是居中一行灰字，说法按「我」在这件事里的位置变 */
+                Text(message.patText(myId: myId))
+                    .font(pf(12.5))
+                    .foregroundColor(C.msgTime)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, gapAfter(message))
+            } else if message.kindName == "system" {
                 /* 微信的通话记录是一条气泡，摆在哪边看「谁打的」：
                    自己打出去的 → 右边（绿），对方打过来的 → 左边（白）。
                    老记录里没有「谁打的」这个信息，就还是居中一行灰字。 */
@@ -801,6 +814,7 @@ struct ChatDetailView: View {
                    onOpenWeb: { url in web = WebURL(url: url) },
                    onOpenLocation: { p in openLocation = p },
                    onOpenVideo: { u in videoToPlay = u },
+                   onPat: { uid in pat(uid) },
                    onTapRedPacket: { info in tapRedPacket(info) })
             .padding(.bottom, gapAfter(message))
             /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
@@ -859,6 +873,14 @@ struct ChatDetailView: View {
         .onLongPressGesture { openActions(message) }
     }
 
+    /// 双击头像 = 拍一拍（微信的手势）：这里只把「拍了谁」告诉服务器，
+    /// 由服务器往会话里写一条灰字（这样双方、群里的第三条人都能看到同一条记录）。
+    private func pat(_ userId: String) {
+        guard !userId.isEmpty else { return }
+        Realtime.shared.sendJSON(["type": "pat", "chatId": chat.id, "targetId": userId])
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     /// 点通话记录回拨：对方 = 这条记录的双方里「不是我」的那个。
     /// 严格校验（空的、等于我自己都不拨），免得又出现「不能给自己打电话」那种误拨。
     private func redial(from message: Message) {
@@ -889,7 +911,7 @@ struct ChatDetailView: View {
     private func isRunStart(_ message: Message) -> Bool {
         guard let i = indexOf(message), i > 0 else { return true }
         let prev = messages[i - 1]
-        if prev.kindName == "system" || prev.isRecalled { return true }
+        if prev.kindName == "system" || prev.kindName == "pat" || prev.isRecalled { return true }
         if (prev.senderId ?? "") != (message.senderId ?? "") { return true }
         return TimeFmt.minutesBetween(prev.createdAt, message.createdAt) >= 5
     }
@@ -906,8 +928,8 @@ struct ChatDetailView: View {
         guard i + 1 < messages.count else { return 4 }
         let next = messages[i + 1]
         if showTime(for: next) { return 0 }        // 时间线自己带上下间距
-        if next.kindName == "system" || next.isRecalled { return 12 }
-        if message.kindName == "system" || message.isRecalled { return 12 }
+        if next.kindName == "system" || next.kindName == "pat" || next.isRecalled { return 12 }
+        if message.kindName == "system" || message.kindName == "pat" || message.isRecalled { return 12 }
         let same = (next.senderId ?? "") == (message.senderId ?? "")
         return same ? 4 : 15
     }
@@ -1760,6 +1782,8 @@ struct MessageRow: View {
     var onOpenLocation: ((LocationPoint) -> Void)? = nil
     /// 点视频气泡 / 长按实况 → 交给聊天页去全屏播放
     var onOpenVideo: ((URL) -> Void)? = nil
+    /// 双击头像 = 拍一拍（微信的手势）
+    var onPat: ((String) -> Void)? = nil
     /// 点红包卡片 → 拆红包 / 看详情
     var onTapRedPacket: ((RedPacketInfo) -> Void)? = nil
 
@@ -1798,6 +1822,9 @@ struct MessageRow: View {
     private var avatarView: some View {
         Avatar(path: avatarPath, size: L.chatAvatar, radius: 4)
             .contentShape(Rectangle())
+            /* 双击头像 = 拍一拍（微信就是这个手势）；单击还是看名片。
+               两个手势叠在一起时，单击会等双击判定失败再触发，不会打架。 */
+            .onTapGesture(count: 2) { onPat?(message.senderId ?? "") }
             .onTapGesture { onOpenAvatar?(message.senderId ?? "") }
     }
 

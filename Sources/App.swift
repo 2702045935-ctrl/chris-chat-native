@@ -263,6 +263,9 @@ final class AppState: ObservableObject {
             coalesce { [weak self] in await self?.loadMoments() }
         case "friend", "presence", "profile":
             coalesce { [weak self] in await self?.loadContacts() }
+        case "toast":
+            /* 服务器一句轻提示（比如"拍一拍太频繁了"） */
+            if !ev.announce.isEmpty { show(ev.announce) }
         default:
             break
         }

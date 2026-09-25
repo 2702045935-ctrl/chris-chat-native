@@ -465,7 +465,7 @@ struct FeedbackView: View {
                         HStack(spacing: 10) {
                             Text(Tr("联系方式")).font(pf(16)).foregroundColor(C.label)
                             Spacer(minLength: 8)
-                            TextField("手机号 / 微信号（可不填）", text: $contact)
+                            TextField("手机号 / 账号（可不填）", text: $contact)
                                 .font(pf(15))
                                 .multilineTextAlignment(.trailing)
                         }

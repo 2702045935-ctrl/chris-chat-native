@@ -29,7 +29,7 @@ struct VideoShareSheet: View {
 
             /* 圆形图标那一排（抖音就是这种：图标 + 下面的字） */
             HStack(alignment: .top, spacing: 0) {
-                iconButton("转发给朋友", "paperplane.fill", Color(hex: 0x07C160)) {
+                iconButton("转发给朋友", "paperplane.fill", Color(hex: 0x19A47A)) {
                     dismiss()
                     onForward?()
                 }

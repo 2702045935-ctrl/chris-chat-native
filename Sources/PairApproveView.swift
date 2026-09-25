@@ -17,7 +17,7 @@ struct PairApproveView: View {
             NavBar(title: Tr("设备确认登录"), back: { dismiss() })
             ScrollView {
                 VStack(spacing: 0) {
-                    Text(Tr("在另一台设备（网页版 / 新手机）上点「微信授权登录」，会显示一个 6 位数字，输在下面，那台设备就能进这台账号。"))
+                    Text(Tr("在另一台设备（网页版 / 新手机）上点「授权登录」，会显示一个 6 位数字，输在下面，那台设备就能进这台账号。"))
                         .font(pf(13))
                         .foregroundColor(C.subLabel)
                         .frame(maxWidth: .infinity, alignment: .leading)

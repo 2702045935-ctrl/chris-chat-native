@@ -23,7 +23,7 @@ final class Ringtone: ObservableObject {
 
     /// 可选铃声（id 存在本机，来电时用）
     static let all: [Tone] = [
-        Tone(id: "wechat", name: "微信"),
+        Tone(id: "wechat", name: "默认"),
         Tone(id: "marimba", name: "马林巴"),
         Tone(id: "chime", name: "清脆"),
         Tone(id: "bubble", name: "气泡"),
@@ -38,7 +38,7 @@ final class Ringtone: ObservableObject {
 
     /// 当前铃声的名字（设置页那行显示用）
     var currentName: String {
-        Ringtone.all.first(where: { $0.id == current })?.name ?? "微信"
+        Ringtone.all.first(where: { $0.id == current })?.name ?? "默认"
     }
 
     private let engine = AVAudioEngine()

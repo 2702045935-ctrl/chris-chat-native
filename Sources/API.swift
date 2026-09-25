@@ -965,7 +965,7 @@ struct BalanceStyle: Decodable, Hashable {
     var circleColorV: Color { colorDyn(circleColor, light: 0xFFD100, dark: 0xFFD100) }
     var yenColorV: Color { colorDyn(yenColor, light: 0xFFFFFF, dark: 0xFFFFFF) }
     var noteColorV: Color { colorDyn(noteColor, light: 0xEB9400, dark: 0xEB9400) }
-    var rechargeBgV: Color { colorDyn(rechargeBg, light: 0x07C160, dark: 0x3EB575) }
+    var rechargeBgV: Color { colorDyn(rechargeBg, light: 0x19A47A, dark: 0x1DC9BD) }
     var rechargeInkV: Color { colorDyn(rechargeInk, light: 0xFFFFFF, dark: 0xFFFFFF) }
     var withdrawBgV: Color { colorDyn(withdrawBg, light: 0xF2F2F2, dark: 0x2C2C2E) }
     var withdrawInkV: Color { colorDyn(withdrawInk, light: 0x313131, dark: 0xEDEDED) }

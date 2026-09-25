@@ -175,7 +175,7 @@ struct GamePlayView: View {
         case "wheel":
             ZStack {
                 Circle().fill(AngularGradient(colors: [
-                    Color(hex: 0xFA5151), Color(hex: 0xFFB400), Color(hex: 0x07C160),
+                    Color(hex: 0xFA5151), Color(hex: 0xFFB400), Color(hex: 0x19A47A),
                     Color(hex: 0x4C9AFF), Color(hex: 0xB06CFF), Color(hex: 0xFA5151)
                 ], center: .center))
                 .frame(width: 190, height: 190)

@@ -39,8 +39,8 @@ struct AccountSecurityView: View {
                         }
                         .buttonStyle(.plain)
                         HairLine(inset: 16)
-                        Button { app.show(Tr("微信号一年只能改一次，需要的话联系客服")) } label: {
-                            row(Tr("微信号"), usernameText, chevron: true)
+                        Button { app.show(Tr("账号一年只能改一次，需要的话联系客服")) } label: {
+                            row(Tr("账号"), usernameText, chevron: true)
                         }
                         .buttonStyle(.plain)
                         HairLine(inset: 16)

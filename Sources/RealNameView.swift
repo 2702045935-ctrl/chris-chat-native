@@ -63,7 +63,7 @@ struct RealNameView: View {
             VStack(spacing: 10) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 40))
-                    .foregroundColor(Color(hexString: "#07C160"))
+                    .foregroundColor(Color(hexString: "#19A47A"))
                 Text(Tr("已实名认证"))
                     .font(pf(17, .medium))
                     .foregroundColor(ink)

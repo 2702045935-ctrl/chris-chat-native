@@ -365,7 +365,7 @@ struct CallView: View {
             if call.phase == .incoming {
                 HStack(spacing: 51) {
                     roundKey(label: "拒绝", bg: Color(hex: 0xFA5151)) { call.reject() }
-                    roundKey(label: "接听", bg: Color(hex: 0x07C160), ink: .white,
+                    roundKey(label: "接听", bg: Color(hex: 0x19A47A), ink: .white,
                              action: { call.accept() }) {
                         Image(systemName: "phone.fill")
                             .font(.system(size: 27, weight: .medium))
@@ -544,7 +544,7 @@ struct CallView: View {
             Button {
                 call.restore()
             } label: {
-                Text(Tr("回到通话")).font(pfExact(14)).foregroundColor(Color(hex: 0x07C160))
+                Text(Tr("回到通话")).font(pfExact(14)).foregroundColor(Color(hex: 0x19A47A))
             }
             .buttonStyle(.plain)
             Button {
@@ -675,7 +675,7 @@ struct CallMiniWindow: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 10)
-                    .background(Color(hex: 0x07C160))
+                    .background(Color(hex: 0x19A47A))
                 }
             }
             .frame(width: w, height: h)

@@ -2090,6 +2090,7 @@ function loadStore() {
   const friends = readJson(path.join(DATA_DIR, 'friendships.json'), { friendships: [] });
   const chats = readJson(path.join(DATA_DIR, 'chats.json'), { chats: [] });
   const reads = readJson(path.join(DATA_DIR, 'reads.json'), { reads: {} });
+  const delivered = readJson(path.join(DATA_DIR, 'delivered.json'), { delivered: {} });
   const moments = readJson(path.join(DATA_DIR, 'moments.json'), { moments: [] });
   const momentViews = readJson(path.join(DATA_DIR, 'moment-views.json'), { views: {} });
   const announcements = readJson(path.join(DATA_DIR, 'announcements.json'), { announcements: [] });
@@ -2115,6 +2116,10 @@ function loadStore() {
   db.friendships = Array.isArray(friends.friendships) ? friends.friendships : [];
   db.chats = Array.isArray(chats.chats) ? chats.chats : [];
   db.reads = reads.reads && typeof reads.reads === 'object' ? reads.reads : {};
+  /* 投递回执：客户端收到消息就回一条 ack，这里记「这个人收到哪个会话的第几条」。
+     和 reads（已读游标）分开存：delivered=收到了没，reads=看了没。
+     后台「消息投递日志」靠这两个区分 未送达 / 已送达 / 已读（微信也是这么分的）。 */
+  db.delivered = delivered.delivered && typeof delivered.delivered === 'object' ? delivered.delivered : {};
   /* 清空聊天记录：记到哪一条为止（只影响清空的那个人，别人不受影响） */
   db.cleared = reads.cleared && typeof reads.cleared === 'object' ? reads.cleared : {};
   db.moments = Array.isArray(moments.moments) ? moments.moments : [];
@@ -2181,14 +2186,17 @@ const saveUsers = () => writeJson(path.join(DATA_DIR, 'users.json'), { users: db
 const saveFriendships = () => writeJson(path.join(DATA_DIR, 'friendships.json'), { friendships: db.friendships });
 const saveChats = () => writeJson(path.join(DATA_DIR, 'chats.json'), { chats: db.chats });
 const saveReads = () => writeJson(path.join(DATA_DIR, 'reads.json'), { reads: db.reads, cleared: db.cleared || {} });
+const saveDelivered = () => writeJson(path.join(DATA_DIR, 'delivered.json'), { delivered: db.delivered });
 /* 高频写入用这两个：先打标记，攒到定时器里再落盘（压测发现每发一条消息
    都重写 chats.json/reads.json 是最大瓶颈，1.5 秒合并一次完全够用）。 */
 let chatsDirty = false;
 let readsDirty = false;
+let deliveredDirty = false;
 setInterval(() => {
   try {
     if (chatsDirty) { chatsDirty = false; saveChats(); }
     if (readsDirty) { readsDirty = false; saveReads(); }
+    if (deliveredDirty) { deliveredDirty = false; saveDelivered(); }
   } catch (err) { /* 忽略 */ }
 }, 1500).unref();
 const saveMoments = () => writeJson(path.join(DATA_DIR, 'moments.json'), { moments: db.moments });
@@ -3434,6 +3442,11 @@ function saveMessagesFile(chatId, list) {
 
 /** 启动时把还留在磁盘上的明文消息文件改成密文（一次性、可重复跑） */
 function migrateMessagesToEncrypted() {
+  /* 一次性迁移：跑完在 data 下落个标记，之后每次启动直接跳过。
+     以前每启动一次都要把上万个消息文件从头读一遍（profiler 里 readFileUtf8 占 6%+），
+     聊天记录越多启动越慢 —— 压测副本上这一项就要 2~3 秒。 */
+  const marker = path.join(DATA_DIR, '.messages-migrated');
+  try { if (fs.existsSync(marker)) return 0; } catch (err) { /* 读不到标记就照常迁 */ }
   let files = 0, lines = 0, skipped = 0;
   let names = [];
   try { names = fs.readdirSync(MSG_DIR).filter((f) => f.endsWith('.jsonl')); } catch (err) { return 0; }
@@ -3464,6 +3477,7 @@ function migrateMessagesToEncrypted() {
     } catch (err) { /* 写不动就留着，下次再迁 */ }
   }
   if (files) console.log('[落盘加密] ' + files + ' 个会话、' + lines + ' 条消息已从明文改成密文（另有 ' + skipped + ' 个本来就是密文）');
+  try { fs.writeFileSync(marker, new Date().toISOString() + '\n', 'utf8'); } catch (err) { /* 写不了标记下次再迁一次，不影响正确性 */ }
   return files;
 }
 
@@ -4053,6 +4067,40 @@ function adminIpOk(ip) {
   /* 只允许国内 IP：后台从此不给境外访问（那个新加坡 IP 就是这么被挡掉的） */
   if (raw.adminCnOnly) return isCnIp(ip);
   return !adminLanOnlyOn();
+}
+
+/* ============================================================
+   后台访问白名单（严格模式）：名单里的 IP 才能碰后台，
+   不在名单里的一律按「这个页面/接口不存在」处理 —— 404，不给任何提示，
+   扫描器扫过去只能看到和随便乱输路径一样的 404。
+   名单存在 data/whitelist.json（后台「访问白名单」页可以改）。
+   本机 127.0.0.1 永远放行：服务器上自己的脚本、看门狗都靠它。
+   ============================================================ */
+const WHITELIST_FILE = path.join(DATA_DIR, 'whitelist.json');
+let whitelistCache = null;      // { at, ips }
+function adminWhitelist() {
+  const t = Date.now();
+  if (whitelistCache && t - whitelistCache.at < 3000) return whitelistCache.ips;
+  let raw = null;
+  try { raw = JSON.parse(fs.readFileSync(WHITELIST_FILE, 'utf8')); } catch (err) { raw = null; }
+  const ips = (raw && Array.isArray(raw.ips) ? raw.ips : [])
+    .map((x) => String(x || '').trim()).filter(Boolean);
+  whitelistCache = { at: t, ips };
+  return ips;
+}
+function saveAdminWhitelist(ips) {
+  const list = Array.from(new Set((ips || []).map((x) => String(x || '').trim()).filter(Boolean))).slice(0, 200);
+  writeJson(WHITELIST_FILE, { ips: list, updatedAt: now() });
+  whitelistCache = { at: Date.now(), ips: list };
+  return list;
+}
+/** 后台放行判定：本机永远行；名单非空就只认名单；名单为空时退回老规则（避免把自己关在门外） */
+function adminAllowed(ip) {
+  const s = String(ip || '').replace('::ffff:', '');
+  if (s === '127.0.0.1' || s === '::1' || s === '') return true;
+  const list = adminWhitelist();
+  if (list.length) return list.indexOf(s) >= 0;
+  return adminIpOk(s);
 }
 
 /* ---------- 中国 IPv4 段（APNIC 委派数据，生成在 data/cn-ips.json，二分查找） ---------- */
@@ -5338,6 +5386,20 @@ function handleClientMessage(user, socket, raw) {
     return;
   }
 
+  /* 投递回执：客户端收到消息就回一条 ack（带这个会话收到的最大 seq）。
+     有了它，后台「消息投递日志」才能区分 未送达 / 已送达 / 已读。 */
+  if (msg.type === 'ack') {
+    const chat = db.chats.find((c) => c.id === msg.chatId);
+    if (!chat || !chat.memberIds.includes(user.id)) return;
+    const seq = Math.max(0, Math.floor(Number(msg.seq) || 0));
+    if (!db.delivered[user.id]) db.delivered[user.id] = {};
+    if (seq > Number(db.delivered[user.id][chat.id] || 0)) {
+      db.delivered[user.id][chat.id] = seq;
+      deliveredDirty = true;
+    }
+    return;
+  }
+
   if (msg.type === 'typing') {
     const chat = db.chats.find((c) => c.id === msg.chatId);
     if (!chat || !chat.memberIds.includes(user.id)) return;
@@ -5933,7 +5995,24 @@ function botInChat(chat, senderId) {
   return bot;
 }
 /* 建机器人账号，并让它们成为所有人的好友 */
+/* 机器人索引：ensureBots 以前对每个用户线性扫全部好友表 + 会话表
+   （压测副本上量过：1694 用户 × (8774 好友 + 3 × 8537 会话) ≈ 8600 万次比较），
+   启动时会把一个核吃满十几秒，随数据量平方增长。先把「好友对 / 单聊对」建成 Map，
+   后面查一次 O(1)。实测副本启动从 10~20 秒降到 3 秒。 */
+function BOT_PAIR_KEY(a, b) { a = String(a); b = String(b); return a < b ? (a + '|' + b) : (b + '|' + a); }
+function buildBotIndexes() {
+  const fr = new Map();
+  db.friendships.forEach(function (f) { const k = BOT_PAIR_KEY(f.fromId, f.toId); if (!fr.has(k)) fr.set(k, f); });
+  const dc = new Map();
+  db.chats.forEach(function (c) {
+    if (c.type === 'direct' && Array.isArray(c.memberIds) && c.memberIds.length === 2) {
+      dc.set(BOT_PAIR_KEY(c.memberIds[0], c.memberIds[1]), c);
+    }
+  });
+  return { fr: fr, dc: dc };
+}
 function ensureBots() {
+  const IDX = buildBotIndexes();
   const bots = [
     { username: AI_USERNAME, nickname: 'AI 助手', avatar: '/uploads/bot-ai.png', bio: '有问题随时问我，还能帮你查最新资讯～' },
     { username: 'housekeeper', nickname: 'AI助手', avatar: '/uploads/bot-housekeeper-v2.png', bio: '您的私人助理：提醒、天气、记账、代发消息，随时为您效劳' },
@@ -5961,9 +6040,12 @@ function ensureBots() {
     }
     db.users.forEach((u) => {
       if (u.id === bot.id || u.bot) return;
-      const f = friendshipBetween(u.id, bot.id);
+      const fk = BOT_PAIR_KEY(u.id, bot.id);
+      const f = IDX.fr.get(fk);
       if (!f) {
-        db.friendships.push({ id: uid('f'), fromId: bot.id, toId: u.id, status: 'accepted', createdAt: now() });
+        const nf = { id: uid('f'), fromId: bot.id, toId: u.id, status: 'accepted', createdAt: now() };
+        db.friendships.push(nf);
+        IDX.fr.set(fk, nf);
         changed = true;
       } else if (f.status !== 'accepted') {
         f.status = 'accepted';
@@ -5977,7 +6059,7 @@ function ensureBots() {
   db.users.forEach((u) => {
     if (u.bot) return;
     db.users.filter((b) => b.bot && !b.service).forEach((b) => {
-      const chat = directChatBetween(u.id, b.id);
+      const chat = IDX.dc.get(BOT_PAIR_KEY(u.id, b.id));
       if (!chat) return;
       const set = new Set(chat.pinnedFor || []);
       if (!set.has(u.id)) { set.add(u.id); chat.pinnedFor = Array.from(set); chatChanged = true; }
@@ -8534,7 +8616,28 @@ async function handleApi(req, res, pathname, query) {
   }
 
   if (parts[0] === 'version' && method === 'GET') {
-    ok(res, { version: assetVersion(), startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString() });
+    /* 后台「App 版本管理」配的那份也一起下发：App 启动时拉这个就能做
+       「有新版本」「强制更新」提示（和微信一样），不用重新发版才能改。 */
+    const v = imAdminCfg().version || {};
+    ok(res, {
+      version: assetVersion(),
+      startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+      app: {
+        version: v.version || '',
+        notes: v.notes || '',
+        force: !!v.force,
+        url: v.url || 'https://aa.x8iu.com/Luchat.ipa',
+        downloadPage: v.downloadPage || 'https://aa.x8iu.com'
+      },
+      notice: (() => {
+        const n = imAdminCfg().notice || {};
+        return n.enabled === true ? {
+          title: n.title || '', content: n.content || '', kind: n.kind || 'popup',
+          startAt: n.startAt || '', endAt: n.endAt || '',
+          minVersion: n.minVersion || '', maxVersion: n.maxVersion || ''
+        } : null;
+      })()
+    });
     return;
   }
 
@@ -13412,12 +13515,44 @@ async function handleHttpRequest(req, res) {
       res.end(body);
       return;
     }
-    /* 后台入口：默认只允许局域网/本机（外网打进来直接 403） */
-    if (isAdminPath(parsed.pathname) && !adminIpOk(peerIp(req))) {
-      strikeIp(reqIp, '外网访问后台 ' + parsed.pathname);
-      const body = JSON.stringify({ ok: false, error: '后台只允许局域网访问', details: null });
-      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
-      res.end(body);
+    /* 自助放行：带上正确暗号 + allowme=1 访问一次，就把请求者自己的 IP 加进白名单。
+       手机流量 IP 老是变，没有这个口子每次都得手工加。暗号不对就记一笔 strike 再按 404 处理。 */
+    if (isAdminPath(parsed.pathname) && parsed.searchParams.get('allowme')) {
+      const selfIp = clientInfo(req).ip;
+      const k = String(parsed.searchParams.get('k') || '');
+      if (adminKeyOk(k)) {
+        const list = adminWhitelist();
+        if (list.indexOf(selfIp) < 0) {
+          saveAdminWhitelist(list.concat([selfIp]));
+          console.log('[后台白名单] 自助放行 ' + selfIp);
+        }
+        res.writeHead(302, {
+          Location: parsed.pathname + '?k=' + encodeURIComponent(k),
+          'Cache-Control': 'no-store'
+        });
+        res.end();
+        return;
+      }
+      strikeIp(selfIp, '自助放行暗号错 ' + parsed.pathname);
+    }
+    /* 后台入口（严格白名单）：不在名单里的一律 404 —— 和「随便乱输一个不存在的路径」
+       长得一模一样，不给任何"这里有后台"的线索。名单在后台「访问白名单」页里改。 */
+    if (isAdminPath(parsed.pathname) && !adminAllowed(peerIp(req))) {
+      /* 留痕：谁、什么时间、想开什么页面被 404 了。后台白名单排障全靠它。 */
+      try {
+        console.log('[后台白名单] 拒绝 ' + peerIp(req) + ' → ' + parsed.pathname
+          + '（不在名单里：' + adminWhitelist().join(', ') + '）');
+      } catch (err) { }
+      if (parsed.pathname.indexOf('/api/') === 0) {
+        const body = JSON.stringify({ ok: false, error: '接口不存在', details: null });
+        res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store' });
+        res.end(body);
+      } else {
+        const body = '<!doctype html><meta charset="utf-8"><title>404 Not Found</title>'
+          + '<h1>404 Not Found</h1><p>请求的页面不存在。</p>';
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store' });
+        res.end(body);
+      }
       return;
     }
     /* 后台一律走加密通道：明文 http 打开后台，密码和暗号会被同网段的人抓走。
@@ -13446,7 +13581,15 @@ async function handleHttpRequest(req, res) {
         /* 接口请求：以前为了兼容老版 App 原样放行 —— 等于把密码和令牌放在明文上过网，
            抓包就能用。现在只放行本机 / 局域网（服务器上的脚本、内网调试），
            公网来的明文接口一律让他改用 https（新版 App 本来就是 https/wss）。 */
-        if (!isLocalOrLan(peerIp(req))) {
+        /* 反向代理（nginx 在本机）回源时走的是明文口，但它已经替客户端做过 TLS 了：
+           只看 X-Forwarded-Proto 就会把「经过 nginx 的加密请求」误判成明文而拒绝。
+           所以：本机来的连接 + XFP=https 视为「已经是加密的」。 */
+        /* 注意这里要用**原始 socket 地址**判断"是不是本机代理"：
+           peerIp() 在本机连接时会优先信 X-Forwarded-For，拿它判断会把真实客户端 IP 当成对端。 */
+        const rawPeer = String((req.socket && req.socket.remoteAddress) || '').replace('::ffff:', '');
+        const proxyHttps = /^(127\.0\.0\.1|::1)$/.test(rawPeer)
+          && String(req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+        if (!isLocalOrLan(peerIp(req)) && !proxyHttps) {
           if (parsed.pathname.indexOf('/api/login') === 0 && parsed.pathname.indexOf('phone') < 0) {
             securityNotePlainLogin(req);
           }
@@ -13817,7 +13960,11 @@ function handleWsUpgrade(req, socket) {
   }
   /* 实时通道必须是加密的 wss：明文 ws:// 会把令牌和聊天内容摊在网络上。
      公网来的明文 ws 一律挡掉（本机 / 局域网还留着，方便内网调试）。 */
-  if (!req.socket.encrypted && !isLocalOrLan(clientInfo(req).ip)) {
+  /* 同上：nginx 在本机做的 TLS，回源是明文，但客户端那一侧是加密的 */
+  const rawPeerWs = String((req.socket && req.socket.remoteAddress) || '').replace('::ffff:', '');
+  const proxyHttpsWs = /^(127\.0\.0\.1|::1)$/.test(rawPeerWs)
+    && String(req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  if (!req.socket.encrypted && !proxyHttpsWs && !isLocalOrLan(clientInfo(req).ip)) {
     securityNotePlainWs(clientInfo(req).ip);
     strikeIp(clientInfo(req).ip, '明文 ws 连实时通道');
     socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
@@ -14009,12 +14156,46 @@ const OPS_ROLES = {
     'risk', 'risk.write', 'reports', 'moments', 'moments.write',
     'payments', 'payments.write', 'ops', 'ops.write', 'system',
     'audit', 'admins', 'icons', 'icons.write', 'support', 'support.write'],
-  auditor: ['dashboard', 'users', 'users.ban', 'messages', 'messages.write',
+  /* 审核运营（规范）：只能看举报 / 朋友圈 / 用户基础信息；**不能封号**，也看不到审计日志。
+     以前这里带着 users.ban —— 等于审核员能封号，和规范不符，已经去掉。 */
+  auditor: ['dashboard', 'users', 'messages', 'messages.write',
     'risk', 'risk.write', 'reports', 'moments', 'moments.write', 'support'],
-  support: ['dashboard', 'users', 'users.reset', 'messages', 'support', 'support.write'],
+  /* 客服（规范）：只能查用户、会话投递日志；不能封号，也不能重置密码。 */
+  support: ['dashboard', 'users', 'messages', 'support', 'support.write'],
+  /* 运维（规范）：看服务器监控和日志，不允许操作用户账号。 */
   ops: ['dashboard', 'system', 'ops', 'ops.write', 'audit']
 };
-const OPS_ROLE_NAMES = { super: '超级管理员', auditor: '审核员', support: '客服', ops: '运维' };
+const OPS_ROLE_NAMES = { super: '超级管理员', auditor: '内容审核运营', support: '客服', ops: '运维' };
+
+/* ---------------------------------------------------------------- IM 后台配置
+   规范里那套「运营配置 / 系统设置」（风控阈值、App 版本、告警、角色权限）
+   统一落在一个文件里，改完立即生效，不用重启服务。
+
+   说明：这套后台的数据源仍然是 data/*.json（没有引 MySQL）。
+   规范里列的 admin_user / im_group / message_delivery_log 这些「表」，
+   在这里分别对应：ops.json（后台账号）、chats.json（会话/群）、
+   messages/<chatId>.jsonl（消息）、reads.json（已读游标→投递状态）、
+   friendships.json（好友/申请）、friendmeta.json（黑名单）、
+   moments.json（朋友圈/评论）、risk.json + risk-events.jsonl（风控与处罚）。 */
+const IMADMIN_FILE = path.join(DATA_DIR, 'imadmin.json');
+let imAdminCache = null;
+function imAdminCfg() {
+  if (imAdminCache) return imAdminCache;
+  const raw = readJson(IMADMIN_FILE, null);
+  imAdminCache = (raw && typeof raw === 'object') ? raw : {};
+  return imAdminCache;
+}
+function saveImAdmin(patch) {
+  imAdminCache = Object.assign({}, imAdminCfg(), patch);
+  try { writeJson(IMADMIN_FILE, imAdminCache); } catch (err) { }
+  return imAdminCache;
+}
+/* 角色权限：默认用代码里的 OPS_ROLES，后台「角色权限配置」改过就用改过的 */
+function rolePerms() {
+  const custom = imAdminCfg().roles;
+  if (custom && typeof custom === 'object') return custom;
+  return OPS_ROLES;
+}
 
 /* 红点提醒：后台可以逐个位置设成 auto（按真实数据）/ on（一直亮）/ off（不显示） */
 const BADGE_DEFAULT = {
@@ -14498,7 +14679,7 @@ function opsMe(admin) {
   return {
     id: admin.id, username: admin.username, name: admin.name, role: admin.role,
     roleName: OPS_ROLE_NAMES[admin.role] || admin.role,
-    perms: OPS_ROLES[admin.role] || []
+    perms: rolePerms()[admin.role] || []
   };
 }
 
@@ -14665,6 +14846,679 @@ async function handleOps(req, res, parts, query) {
 
   const admin = currentOps(req);
   if (!admin) return fail(res, 401, '请先登录管理后台');
+
+  /* ==========================================================================
+     IM 后台（规范里的页面）：用户详情 / 处罚记录 / 消息投递 / 离线消息 /
+     好友申请 / 黑名单 / 群成员与群消息 / 朋友圈评论 / 风控黑名单 /
+     通话记录与统计 / 用户行为日志 / 运营配置（阈值·版本·告警）/ 角色权限
+     数据源见上面 IMADMIN_FILE 那段说明（还是 data/*.json，没有引 MySQL）。
+     ========================================================================== */
+  const nm = (id) => { const u = findUser(id); return u ? (u.nickname || u.username || '') : '已注销'; };
+  const uname = (id) => { const u = findUser(id); return u ? (u.username || '') : ''; };
+  const maskPhone = (p) => {
+    const s = String(p || '').replace(/\D/g, '');
+    if (!s) return '';
+    return s.length >= 7 ? (s.slice(0, 3) + '****' + s.slice(-4)) : s;
+  };
+  /* 处罚记录：封禁状态 + 风控临时限制 + 审计日志里的处罚动作，合成一份 */
+  const punishmentsOf = (uid) => {
+    const rows = [];
+    const u = findUser(uid);
+    if (u && u.banned) {
+      rows.push({ type: '封禁', reason: u.banReason || '', at: u.bannedAt || '', until: '长期', admin: u.bannedBy || '—', ip: u.bannedIp || '' });
+    }
+    try {
+      const rec = loadRiskStore().users[uid];
+      if (rec && Number(rec.restrictUntil) > Date.now()) {
+        rows.push({
+          type: '风控临时限制', reason: Object.keys(rec.kinds || {}).join(' / ') || '风险评分过高',
+          at: rec.updatedAt ? new Date(rec.updatedAt).toISOString() : '',
+          until: new Date(rec.restrictUntil).toISOString(), admin: '系统自动（' + (rec.score || 0) + ' 分）', ip: ''
+        });
+      }
+    } catch (err) { }
+    try {
+      const r = readAuditQuery({ limit: 400, q: '' });
+      r.rows.filter((x) => x.target === uid || (u && x.target === u.username))
+        .filter((x) => /封禁|解封|禁言|限制|警告|冻结|删除/.test(String(x.action || '')))
+        .forEach((x) => rows.push({ type: x.action, reason: x.detail || '', at: x.at, until: '', admin: x.admin, ip: x.ip }));
+    } catch (err) { }
+    return rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  };
+
+  /* ---------- 用户详情（基础信息 + 登录设备/日志 + 好友 + 群 + 处罚） ---------- */
+  if (sub === 'userdetail' && method === 'GET') {
+    if (!can(admin, 'users')) return fail(res, 403, '你的角色没有查看用户的权限');
+    const u = findUser(String(query.get('uid') || ''));
+    if (!u) return fail(res, 404, '用户不存在');
+    const logins = (db.security.logins || []).filter((l) => l.userId === u.id).slice(0, 50);
+    const events = (db.security.events || []).filter((l) => l.userId === u.id).slice(0, 30);
+    const devices = [];
+    const seen = new Set();
+    logins.forEach((l) => {
+      const k = String(l.device || '未知设备');
+      if (seen.has(k)) return;
+      seen.add(k);
+      devices.push({ device: k, lastIp: l.ip || '', lastAt: l.time });
+    });
+    ok(res, {
+      user: publicUser(u),
+      profile: {
+        id: u.id, username: u.username, nickname: u.nickname, phone: maskPhone(u.phone), phoneRaw: u.phone || '',
+        realName: u.realName || '', banned: !!u.banned, banReason: u.banReason || '', banCount: u.banCount || 0,
+        createdAt: u.createdAt, lastLoginAt: logins.length ? logins[0].time : '', lastIp: logins.length ? logins[0].ip : '',
+        lastDevice: logins.length ? logins[0].device : '', balance: Number(u.balance) || 0,
+        friendCount: friendIds(u.id).length, chatCount: chatsOf(u.id).length
+      },
+      logins: logins.map((l) => ({ at: l.time, ip: l.ip || '', device: l.device || '', kind: l.kind || 'login' })),
+      devices,
+      events: events.map((l) => ({ at: l.time, kind: l.kind || '', ip: l.ip || '', device: l.device || '' })),
+      friends: friendIds(u.id).map((id) => ({ id, nickname: nm(id), username: uname(id) })),
+      groups: db.chats.filter((c) => c.type !== 'direct' && (c.memberIds || []).includes(u.id))
+        .map((c) => ({ id: c.id, name: c.name || '', members: (c.memberIds || []).length })),
+      punishments: punishmentsOf(u.id)
+    });
+    return;
+  }
+
+  /* ---------- 账号处罚记录（全站） ---------- */
+  if (sub === 'punishments' && method === 'GET') {
+    if (!can(admin, 'users')) return fail(res, 403, '你的角色没有查看处罚记录的权限');
+    const limit = Math.min(300, Number(query.get('limit')) || 100);
+    const rows = [];
+    db.users.filter((u) => u.banned).forEach((u) => rows.push({
+      userId: u.id, username: u.username, nickname: u.nickname, type: '封禁',
+      reason: u.banReason || '', at: u.bannedAt || '', until: '长期', admin: u.bannedBy || '—', ip: u.bannedIp || ''
+    }));
+    try {
+      const st = loadRiskStore();
+      Object.keys(st.users || {}).forEach((id) => {
+        const rec = st.users[id];
+        if (!rec) return;
+        if (Number(rec.restrictUntil) > Date.now()) {
+          rows.push({
+            userId: id, username: uname(id), nickname: nm(id), type: '风控临时限制',
+            reason: Object.keys(rec.kinds || {}).join(' / ') || '风险评分过高',
+            at: rec.updatedAt ? new Date(rec.updatedAt).toISOString() : '',
+            until: new Date(rec.restrictUntil).toISOString(), admin: '系统自动（' + (rec.score || 0) + ' 分）', ip: ''
+          });
+        }
+      });
+    } catch (err) { }
+    try {
+      readAuditQuery({ limit: 400, q: '' }).rows
+        .filter((x) => /封禁|解封|禁言|限制|警告/.test(String(x.action || '')))
+        .forEach((x) => rows.push({
+          userId: '', username: x.target || '', nickname: '', type: x.action,
+          reason: x.detail || '', at: x.at, until: '', admin: x.admin, ip: x.ip
+        }));
+    } catch (err) { }
+    rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    ok(res, { rows: rows.slice(0, limit), total: rows.length });
+    return;
+  }
+
+  /* ---------- 单聊会话列表（规范：会话ID / 双方用户ID / 创建时间 / 最后一条消息时间） ---------- */
+  if (sub === 'chatlist' && method === 'GET') {
+    if (!can(admin, 'messages')) return fail(res, 403, '你的角色没有查看会话的权限');
+    const q = String(query.get('q') || '').trim();
+    const page = Math.max(1, Number(query.get('page')) || 1);
+    const pageSize = Math.min(50, Number(query.get('pageSize')) || 30);
+    /* 会话类型：direct / single 都是一对一，group 才是群（数据里三种都存在） */
+    let list = db.chats.filter((c) => c.type !== 'group');
+    if (q) {
+      const u = findUser(q);
+      if (u) list = list.filter((c) => (c.memberIds || []).indexOf(u.id) >= 0);
+    }
+    list = list.slice().sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
+    ok(res, {
+      rows: list.slice((page - 1) * pageSize, page * pageSize).map((c) => {
+        const msgs = loadMessages(c.id);
+        const last = msgs.length ? msgs[msgs.length - 1] : null;
+        return {
+          id: c.id,
+          memberIds: c.memberIds || [],
+          members: (c.memberIds || []).map((id) => ({ id, nickname: nm(id), username: uname(id) })),
+          createdAt: c.createdAt,
+          lastAt: last ? last.createdAt : '',
+          messageCount: msgs.length
+        };
+      }),
+      total: list.length, page, pageSize
+    });
+    return;
+  }
+
+  /* ---------- 消息投递日志（只给元数据，不给聊天明文） ---------- */
+  if (sub === 'delivery' && method === 'GET') {
+    if (!can(admin, 'messages')) return fail(res, 403, '你的角色没有查看消息投递的权限');
+    const q = String(query.get('q') || '').trim();
+    const limit = Math.min(200, Number(query.get('limit')) || 60);
+    let chats = [];
+    if (q) {
+      const u = findUser(q);
+      if (u) chats = chatsOf(u.id);
+      else { const c = db.chats.find((x) => x.id === q); if (c) chats = [c]; }
+    } else {
+      chats = db.chats.slice().sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 12);
+    }
+    const rows = [];
+    chats.slice(0, 20).forEach((c) => {
+      loadMessages(c.id).slice(-limit).forEach((m) => {
+        if (m.recalled) return;
+        const receivers = (c.memberIds || []).filter((id) => id !== m.senderId);
+        const readBy = receivers.filter((id) => Number((db.reads[id] || {})[c.id] || 0) >= Number(m.seq || 0));
+        const deliveredBy = receivers.filter((id) => Number((db.delivered[id] || {})[c.id] || 0) >= Number(m.seq || 0));
+        rows.push({
+          id: m.id, chatId: c.id, chatType: c.type,
+          fromId: m.senderId, from: nm(m.senderId), toIds: receivers, to: receivers.map(nm).join('、'),
+          kind: m.kind || '', at: m.createdAt, seq: m.seq || 0,
+          status: !receivers.length ? '已送达'
+            : (readBy.length === receivers.length ? '已读'
+              : (deliveredBy.length === receivers.length ? '已送达'
+                : (deliveredBy.length ? '部分送达' : '未送达'))),
+          deliveredCount: deliveredBy.length, readCount: readBy.length, receiverCount: receivers.length
+        });
+      });
+    });
+    rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    ok(res, { rows: rows.slice(0, limit), note: '只给元数据（谁发给谁、时间、类型、投递状态），不含聊天内容', total: rows.length });
+    return;
+  }
+
+  /* ---------- 离线消息查询（没读到的消息 + 堆积量） ---------- */
+  if (sub === 'offline' && method === 'GET') {
+    if (!can(admin, 'messages')) return fail(res, 403, '你的角色没有查看离线消息的权限');
+    const u = findUser(String(query.get('uid') || ''));
+    if (!u) return fail(res, 404, '用户不存在');
+    const rows = [];
+    let total = 0;
+    chatsOf(u.id).forEach((c) => {
+      const readSeq = Number((db.reads[u.id] || {})[c.id] || 0);
+      const deliveredSeq = Number((db.delivered[u.id] || {})[c.id] || 0);
+      const backlog = loadMessages(c.id).filter((m) => Number(m.seq || 0) > readSeq && m.senderId !== u.id);
+      if (!backlog.length) return;
+      total += backlog.length;
+      const offline = backlog.filter((m) => Number(m.seq || 0) > deliveredSeq).length;
+      rows.push({
+        chatId: c.id, type: c.type, title: c.name || '',
+        peer: c.type === 'direct' ? nm((c.memberIds || []).find((id) => id !== u.id) || '') : '',
+        count: backlog.length, offline,
+        oldest: backlog[0].createdAt, newest: backlog[backlog.length - 1].createdAt
+      });
+    });
+    rows.sort((a, b) => b.count - a.count);
+    ok(res, { user: { id: u.id, nickname: u.nickname, username: u.username }, online: onlineUserIds().includes(u.id), rows, total });
+    return;
+  }
+
+  /* ---------- 好友申请列表 ---------- */
+  if (sub === 'friendapply' && method === 'GET') {
+    if (!can(admin, 'friends')) return fail(res, 403, '你的角色没有查看好友申请的权限');
+    const pending = db.friendships.filter((f) => f.status === 'pending').map((f) => ({
+      id: f.id, fromId: f.fromId, from: nm(f.fromId), toId: f.toId, to: nm(f.toId),
+      at: f.createdAt, status: '待处理', note: f.message || ''
+    }));
+    const done = db.friendships.filter((f) => f.status === 'accepted')
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 80)
+      .map((f) => ({ id: f.id, fromId: f.fromId, from: nm(f.fromId), toId: f.toId, to: nm(f.toId), at: f.createdAt, status: '已同意', note: '' }));
+    ok(res, { pending, rows: pending.concat(done), total: db.friendships.length });
+    return;
+  }
+
+  /* ---------- 黑名单管理（谁拉黑了谁） ---------- */
+  if (sub === 'blocklist' && method === 'GET') {
+    if (!can(admin, 'friends')) return fail(res, 403, '你的角色没有查看黑名单的权限');
+    const rows = [];
+    const byOwner = readFriendMeta().byOwner || {};
+    Object.keys(byOwner).forEach((owner) => {
+      const m = byOwner[owner] || {};
+      Object.keys(m).forEach((otherId) => {
+        if (m[otherId] && m[otherId].block === true) {
+          rows.push({ ownerId: owner, owner: nm(owner), targetId: otherId, target: nm(otherId) });
+        }
+      });
+    });
+    ok(res, { rows: rows.slice(0, 500), total: rows.length });
+    return;
+  }
+  if (sub === 'blocklist' && parts[2] === 'release' && method === 'POST') {
+    if (!can(admin, 'friends.write')) return fail(res, 403, '你的角色没有解除拉黑的权限');
+    const body = await readBody(req);
+    const ownerId = str(body.ownerId, 40), targetId = str(body.targetId, 40);
+    if (!findUser(ownerId) || !findUser(targetId)) return fail(res, 404, '用户不存在');
+    setMeta(ownerId, targetId, { block: false });
+    audit(req, admin, '解除拉黑', ownerId + ' → ' + targetId, '');
+    ok(res, { released: true });
+    return;
+  }
+
+  /* ---------- 群成员列表 / 群消息日志 ---------- */
+  if (sub === 'groupmembers' && method === 'GET') {
+    if (!can(admin, 'users') && !can(admin, 'messages')) return fail(res, 403, '你的角色没有查看群的权限');
+    const c = db.chats.find((x) => x.id === String(query.get('gid') || ''));
+    if (!c) return fail(res, 404, '群不存在');
+    const admins = Array.isArray(c.adminIds) ? c.adminIds : [];
+    const members = (c.memberIds || []).map((id) => {
+      const u = findUser(id);
+      return {
+        id, nickname: u ? u.nickname : '已注销', username: u ? u.username : '',
+        role: id === c.ownerId ? '群主' : (admins.indexOf(id) >= 0 ? '管理员' : '普通成员'),
+        banned: !!(u && u.banned)
+      };
+    }).sort((a, b) => (a.role === '群主' ? -1 : b.role === '群主' ? 1 : (a.role === '管理员' ? -1 : b.role === '管理员' ? 1 : 0)));
+    ok(res, {
+      chat: { id: c.id, name: c.name || '', ownerId: c.ownerId || '', owner: nm(c.ownerId), members: members.length, createdAt: c.createdAt, muted: !!c.muted },
+      members
+    });
+    return;
+  }
+  if (sub === 'groupmessages' && method === 'GET') {
+    if (!can(admin, 'messages')) return fail(res, 403, '你的角色没有查看群消息的权限');
+    const c = db.chats.find((x) => x.id === String(query.get('gid') || ''));
+    if (!c) return fail(res, 404, '群不存在');
+    const limit = Math.min(200, Number(query.get('limit')) || 80);
+    const readStatusText = (readCount, total) => {
+      if (!total) return '已送达';
+      if (readCount >= total) return '全部已读';
+      if (readCount > 0) return readCount + '/' + total + ' 已读';
+      return '已送达';
+    };
+    const rows = loadMessages(c.id).slice(-limit).map((m) => {
+      const receivers = (c.memberIds || []).filter((id) => id !== m.senderId);
+      const readCount = receivers.filter((id) => Number((db.reads[id] || {})[c.id] || 0) >= Number(m.seq || 0)).length;
+      return {
+        id: m.id, fromId: m.senderId, from: nm(m.senderId), kind: m.kind || '', at: m.createdAt,
+        delivered: receivers.length, read: readCount, recalled: !!m.recalled,
+        status: readStatusText(readCount, receivers.length)
+      };
+    });
+    ok(res, { chat: { id: c.id, name: c.name || '', members: (c.memberIds || []).length }, rows: rows.reverse(), note: '只给元数据，不含聊天明文' });
+    return;
+  }
+
+  /* ---------- 朋友圈评论管理 ---------- */
+  if (sub === 'momentcomments' && method === 'GET') {
+    if (!can(admin, 'moments')) return fail(res, 403, '你的角色没有查看朋友圈的权限');
+    const rows = [];
+    (db.moments || []).forEach((m) => {
+      (m.comments || []).forEach((c) => {
+        rows.push({
+          id: c.id, momentId: m.id, momentOwner: nm(m.userId), userId: c.userId, user: nm(c.userId),
+          content: c.content || '', at: c.at, replyTo: c.replyTo || ''
+        });
+      });
+    });
+    rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    ok(res, { rows: rows.slice(0, 300), total: rows.length });
+    return;
+  }
+  if (sub === 'momentcomments' && parts[2] === 'del' && method === 'POST') {
+    if (!can(admin, 'moments.write')) return fail(res, 403, '你的角色没有删除评论的权限');
+    const body = await readBody(req);
+    const cid = str(body.commentId, 60);
+    let hit = null;
+    (db.moments || []).forEach((m) => {
+      const i = (m.comments || []).findIndex((c) => c.id === cid);
+      if (i >= 0) { hit = (m.comments || [])[i]; m.comments.splice(i, 1); }
+    });
+    if (!hit) return fail(res, 404, '评论不存在');
+    saveMoments();
+    audit(req, admin, '删除朋友圈评论', nm(hit.userId), String(hit.content || '').slice(0, 60));
+    ok(res, { deleted: true });
+    return;
+  }
+
+  /* ---------- 风控黑名单（IP + 账号） ---------- */
+  if (sub === 'blacklist' && method === 'GET') {
+    if (!can(admin, 'risk')) return fail(res, 403, '你的角色没有查看风控黑名单的权限');
+    const ips = [];
+    ipBans.forEach((until, ip) => ips.push({ ip, until: new Date(until).toISOString(), remainMin: Math.max(0, Math.round((until - Date.now()) / 60000)) }));
+    const restricted = [];
+    const banned = [];
+    db.users.filter((u) => u.banned).forEach((u) => banned.push({
+      id: u.id, username: u.username, nickname: u.nickname, reason: u.banReason || '', at: u.bannedAt || ''
+    }));
+    try {
+      const st = loadRiskStore();
+      Object.keys(st.users || {}).forEach((id) => {
+        const rec = st.users[id];
+        if (rec && Number(rec.restrictUntil) > Date.now()) restricted.push({
+          id, username: uname(id), nickname: nm(id), score: rec.score || 0,
+          until: new Date(rec.restrictUntil).toISOString(), kinds: Object.keys(rec.kinds || {})
+        });
+      });
+    } catch (err) { }
+    ok(res, { ips, restricted, banned, note: 'IP 封禁来自自动防刷（连续失败/明文探测）；账号封禁见「账号处罚记录」' });
+    return;
+  }
+  if (sub === 'blacklist' && method === 'POST') {
+    if (!can(admin, 'risk.write')) return fail(res, 403, '你的角色没有改风控黑名单的权限');
+    const body = await readBody(req);
+    const ip = String(body.ip || '').replace(/[^0-9a-fA-F:.]/g, '').slice(0, 60);
+    if (!ip) return fail(res, 400, 'IP 写错了');
+    if (body.release) {
+      ipBans.delete(ip);
+      audit(req, admin, '解除 IP 封禁', ip, '');
+      ok(res, { released: true });
+    } else {
+      const minutes = Math.min(10080, Math.max(1, Number(body.minutes) || 60));
+      ipBans.set(ip, Date.now() + minutes * 60000);
+      audit(req, admin, 'IP 封禁', ip, minutes + ' 分钟 · ' + (body.reason || ''));
+      ok(res, { banned: true, ip, minutes });
+    }
+    return;
+  }
+
+  /* ---------- 通话记录 + 统计（通话结果本来就以系统消息写在会话里） ---------- */
+  if (sub === 'calls' && method === 'GET') {
+    if (!can(admin, 'messages')) return fail(res, 403, '你的角色没有查看通话记录的权限');
+    const limit = Math.min(300, Number(query.get('limit')) || 100);
+    const days = Math.min(60, Math.max(1, Number(query.get('days')) || 7));
+    const since = Date.now() - days * 86400000;
+    const rows = [];
+    const pool = db.chats
+      .filter((c) => c.type !== 'group' && Date.parse(c.updatedAt || 0) >= since)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      .slice(0, 800);
+    pool.forEach((c) => {
+      loadMessages(c.id).slice(-40).forEach((m) => {
+        const kind = String(m.kind || '');
+        if (kind !== 'system' && kind !== 'call' && kind !== 'voicecall' && kind !== 'videocall') return;
+        const text = callRecordTextOf(String(m.content || ''));
+        if (!/通话|无应答|已取消|拒接|忙碌|时长/.test(text)) return;
+        const other = (c.memberIds || []).find((id) => id !== m.senderId) || '';
+        const mm = text.match(/通话时长\s+(\d{1,2}):(\d{2})/);
+        const connected = !!mm;
+        rows.push({
+          id: m.id, peerIds: [m.senderId, other], callerId: m.senderId, caller: nm(m.senderId),
+          calleeId: other, callee: nm(other), video: /视频/.test(text) || kind === 'videocall',
+          at: m.createdAt, durationSec: mm ? Number(mm[1]) * 60 + Number(mm[2]) : 0,
+          result: connected ? '接通' : '未接通', reason: connected ? '' : text.replace(/^[\[【][^\]】]*[\]】]/, '').trim() || text.slice(0, 30)
+        });
+      });
+    });
+    rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayRows = rows.filter((r) => Date.parse(r.at) >= todayStart.getTime());
+    const okRows = todayRows.filter((r) => r.result === '接通');
+    const failReasons = {};
+    todayRows.filter((r) => r.result !== '接通').forEach((r) => {
+      const k = r.reason || '其他';
+      failReasons[k] = (failReasons[k] || 0) + 1;
+    });
+    ok(res, {
+      rows: rows.slice(0, limit),
+      stats: {
+        rangeDays: days, total: rows.length, todayTotal: todayRows.length,
+        todayConnected: okRows.length,
+        successRate: todayRows.length ? Math.round(okRows.length / todayRows.length * 1000) / 10 : 0,
+        avgDurationSec: okRows.length ? Math.round(okRows.reduce((a, r) => a + r.durationSec, 0) / okRows.length) : 0,
+        failReasons
+      },
+      note: '通话记录来自会话里的系统消息（和微信一样：通话结束会在聊天里留一条记录）'
+    });
+    return;
+  }
+
+  /* ---------- 用户行为日志（注册 / 登录 / 改手机号 / 实名 / 支付密码错…） ---------- */
+  if (sub === 'behavior' && method === 'GET') {
+    if (!can(admin, 'users')) return fail(res, 403, '你的角色没有查看行为日志的权限');
+    const uid = String(query.get('uid') || '');
+    const limit = Math.min(300, Number(query.get('limit')) || 120);
+    let rows = (db.security.events || []).concat(db.security.logins || []);
+    if (uid) rows = rows.filter((r) => r.userId === uid);
+    rows = rows.slice().sort((a, b) => String(b.time).localeCompare(String(a.time)));
+    ok(res, {
+      rows: rows.slice(0, limit).map((r) => ({
+        userId: r.userId, username: uname(r.userId), kind: r.kind || 'login',
+        at: r.time, ip: r.ip || '', device: r.device || ''
+      })), total: rows.length,
+      kinds: Array.from(new Set(rows.map((r) => r.kind || 'login')))
+    });
+    return;
+  }
+
+  /* ---------- 运营配置：风控阈值 ---------- */
+  if (sub === 'thresholds' && method === 'GET') {
+    if (!can(admin, 'ops')) return fail(res, 403, '你的角色没有查看运营配置的权限');
+    const cfg = imAdminCfg().thresholds || {};
+    ok(res, {
+      thresholds: Object.assign({
+        registerPerIpPerDay: 5,
+        friendApplyPerDay: 30,
+        msgPerMinute: 60,
+        riskRestrictScore: 80,
+        riskWatchScore: 30
+      }, cfg),
+      current: {
+        msgPerMinute: Math.round(MSG_MAX_PER_WINDOW / (MSG_WINDOW_MS / 60000)),
+        wsPerIp: WS_MAX_PER_IP,
+        apiPerWindow: API_MAX_PER_WINDOW
+      }
+    });
+    return;
+  }
+  if (sub === 'thresholds' && method === 'POST') {
+    if (!can(admin, 'ops.write')) return fail(res, 403, '你的角色没有改运营配置的权限');
+    const body = await readBody(req);
+    const next = {
+      registerPerIpPerDay: Math.max(1, Number(body.registerPerIpPerDay) || 5),
+      friendApplyPerDay: Math.max(1, Number(body.friendApplyPerDay) || 30),
+      msgPerMinute: Math.max(1, Number(body.msgPerMinute) || 60),
+      riskRestrictScore: Math.max(1, Math.min(100, Number(body.riskRestrictScore) || 80)),
+      riskWatchScore: Math.max(1, Math.min(100, Number(body.riskWatchScore) || 30))
+    };
+    saveImAdmin({ thresholds: next });
+    audit(req, admin, '修改风控阈值', Object.keys(next).join(','), JSON.stringify(next));
+    ok(res, { thresholds: next });
+    return;
+  }
+
+  /* ---------- 运营配置：App 版本管理 ---------- */
+  if (sub === 'appversion' && method === 'GET') {
+    if (!can(admin, 'ops')) return fail(res, 403, '你的角色没有查看版本配置的权限');
+    ok(res, {
+      version: Object.assign({
+        version: '', notes: '', force: false, url: 'https://aa.x8iu.com/Luchat.ipa', downloadPage: 'https://aa.x8iu.com'
+      }, imAdminCfg().version || {})
+    });
+    return;
+  }
+  if (sub === 'appversion' && method === 'POST') {
+    if (!can(admin, 'ops.write')) return fail(res, 403, '你的角色没有改版本配置的权限');
+    const body = await readBody(req);
+    const next = {
+      version: str(body.version, 24), notes: String(body.notes || '').slice(0, 500),
+      force: !!body.force, url: str(body.url, 200) || 'https://aa.x8iu.com/Luchat.ipa',
+      downloadPage: str(body.downloadPage, 200) || 'https://aa.x8iu.com'
+    };
+    saveImAdmin({ version: next });
+    audit(req, admin, '修改 App 版本配置', next.version, '强制更新=' + (next.force ? '是' : '否'));
+    ok(res, { version: next });
+    return;
+  }
+
+  /* ---------- 运营配置：App 弹窗公告 ----------
+     和「全站公告消息」不是一回事：这里是 App 打开时弹的那个框（标题/内容/弹窗类型/
+     生效时间/版本范围），存 imadmin.json，App 端通过 /api/version 的 notice 字段拿到。 */
+  /* ---------- 全站公告消息（新后台也走这一套；老后台 /api/admin/broadcast 还在） ---------- */
+  if (sub === 'announcements' && method === 'GET') {
+    if (!can(admin, 'ops')) return fail(res, 403, '你的角色没有查看公告的权限');
+    ok(res, { announcements: db.announcements.slice(0, 50) });
+    return;
+  }
+  /* 应用名/启动页那套（branding）在老后台是 /api/admin/branding：
+     新后台也补一个只读入口，页面要展示时不用再跳老后台。写入口仍在老后台，避免两头改。 */
+  if (sub === 'branding' && method === 'GET') {
+    if (!can(admin, 'icons')) return fail(res, 403, '你的角色没有查看应用配置的权限');
+    ok(res, { branding: db.branding });
+    return;
+  }
+  if (sub === 'broadcast' && method === 'POST') {
+    if (!can(admin, 'ops.write')) return fail(res, 403, '你的角色没有发公告的权限');
+    const body = await readBody(req);
+    const content = str(body.content, 300);
+    if (!content) return fail(res, 422, '公告内容不能为空');
+    let chats = 0;
+    db.chats.forEach((chat) => {
+      chat.seq = (chat.seq || 0) + 1;
+      const message = {
+        id: uid('m'), chatId: chat.id, seq: chat.seq, senderId: 'system',
+        kind: 'system', content, createdAt: now(), recalled: false
+      };
+      appendMessage(chat.id, message);
+      (chat.memberIds || []).forEach((id) => {
+        sendTo(id, { type: 'message', message, chat: chatSummary(chat, id), clientId: null });
+      });
+      chats += 1;
+    });
+    saveChats();
+    db.announcements.unshift({ id: uid('an'), content, createdAt: now(), chats });
+    db.announcements = db.announcements.slice(0, 50);
+    saveAnnouncements();
+    audit(req, admin, '全站公告', content.slice(0, 40), '送达 ' + chats + ' 个会话');
+    ok(res, { sent: true, chats });
+    return;
+  }
+
+  if (sub === 'notice' && method === 'GET') {
+    if (!can(admin, 'ops')) return fail(res, 403, '你的角色没有查看公告配置的权限');
+    ok(res, {
+      notice: Object.assign({
+        enabled: false, title: '', content: '', kind: 'popup',
+        startAt: '', endAt: '', minVersion: '', maxVersion: ''
+      }, imAdminCfg().notice || {})
+    });
+    return;
+  }
+  if (sub === 'notice' && method === 'POST') {
+    if (!can(admin, 'ops.write')) return fail(res, 403, '你的角色没有改公告配置的权限');
+    const body = await readBody(req);
+    const next = {
+      enabled: !!body.enabled,
+      title: String(body.title || '').slice(0, 60),
+      content: String(body.content || '').slice(0, 1000),
+      kind: String(body.kind || 'popup').slice(0, 20),
+      startAt: String(body.startAt || '').slice(0, 30),
+      endAt: String(body.endAt || '').slice(0, 30),
+      minVersion: String(body.minVersion || '').slice(0, 20),
+      maxVersion: String(body.maxVersion || '').slice(0, 20)
+    };
+    saveImAdmin({ notice: next });
+    audit(req, admin, '修改弹窗公告', next.title, '启用=' + (next.enabled ? '是' : '否'));
+    ok(res, { notice: next });
+    return;
+  }
+
+  /* ---------- 系统设置：告警配置 ---------- */
+  if (sub === 'alerts' && method === 'GET') {
+    if (!can(admin, 'ops')) return fail(res, 403, '你的角色没有查看告警配置的权限');
+    const monitor = readJson(path.join(DATA_DIR, 'monitor-config.json'), {}) || {};
+    ok(res, {
+      alerts: Object.assign({
+        receivers: '', method: 'webhook', webhookUrl: monitor.webhookUrl || '',
+        apiErrRatePct: 5, cpuPct: 80, memPct: 85, msgFailRatePct: 3, offlineMin: 2
+      }, imAdminCfg().alerts || {}),
+      monitor: { intervalSec: monitor.intervalSec || 15, failThreshold: monitor.failThreshold || 3, keepHours: monitor.keepHours || 72 },
+      recent: (() => {
+        try {
+          const p = path.join(DATA_DIR, 'monitor-alerts.log');
+          return fs.readFileSync(p, 'utf8').trim().split('\n').slice(-20).reverse();
+        } catch (err) { return []; }
+      })()
+    });
+    return;
+  }
+  if (sub === 'alerts' && method === 'POST') {
+    if (!can(admin, 'ops.write')) return fail(res, 403, '你的角色没有改告警配置的权限');
+    const body = await readBody(req);
+    const next = {
+      receivers: String(body.receivers || '').slice(0, 200),
+      method: String(body.method || 'webhook').slice(0, 20),
+      webhookUrl: String(body.webhookUrl || '').slice(0, 300),
+      apiErrRatePct: Math.max(1, Number(body.apiErrRatePct) || 5),
+      cpuPct: Math.max(10, Number(body.cpuPct) || 80),
+      memPct: Math.max(10, Number(body.memPct) || 85),
+      msgFailRatePct: Math.max(1, Number(body.msgFailRatePct) || 3),
+      offlineMin: Math.max(1, Number(body.offlineMin) || 2)
+    };
+    saveImAdmin({ alerts: next });
+    /* webhook 同时写进监测配置：看门狗挂了就按这个地址告警 */
+    try {
+      const mf = path.join(DATA_DIR, 'monitor-config.json');
+      const cur = readJson(mf, {}) || {};
+      cur.webhookUrl = next.webhookUrl;
+      writeJson(mf, cur);
+    } catch (err) { }
+    audit(req, admin, '修改告警配置', next.method, next.receivers);
+    ok(res, { alerts: next });
+    return;
+  }
+
+  /* ---------- 系统设置：角色权限配置 ---------- */
+  /* ---------- 系统设置：后台访问白名单（严格模式：不在名单里一律 404，不给提示） ---------- */
+  if (sub === 'whitelist' && method === 'GET') {
+    if (!can(admin, 'admins')) return fail(res, 403, '你的角色没有查看白名单的权限');
+    ok(res, {
+      ips: adminWhitelist(),
+      myIp: clientInfo(req).ip,
+      alwaysAllowed: ['127.0.0.1'],
+      strict: adminWhitelist().length > 0,
+      note: '名单为空时退回老规则（局域网 + 只允许国内）；一旦名单里有 IP，就只有名单里的能进后台，其它一律 404'
+    });
+    return;
+  }
+  if (sub === 'whitelist' && method === 'POST') {
+    if (admin.role !== 'super') return fail(res, 403, '只有超级管理员能改访问白名单');
+    const body = await readBody(req);
+    const add = String(body.add || '').trim();
+    const remove = String(body.remove || '').trim();
+    let list = adminWhitelist();
+    if (Array.isArray(body.ips)) list = body.ips.map((x) => String(x));
+    if (add) list = list.concat([add]);
+    if (remove) list = list.filter((x) => x !== remove);
+    const next = saveAdminWhitelist(list);
+    audit(req, admin, '改后台访问白名单', add || remove || '整表替换', next.join(', ').slice(0, 200));
+    ok(res, { ips: next, myIp: clientInfo(req).ip, strict: next.length > 0 });
+    return;
+  }
+
+  if (sub === 'roles' && method === 'GET') {
+    if (!can(admin, 'admins')) return fail(res, 403, '你的角色没有查看角色权限的权限');
+    ok(res, {
+      roles: rolePerms(),
+      defaults: OPS_ROLES,
+      names: OPS_ROLE_NAMES,
+      allPerms: Array.from(new Set(Object.keys(OPS_ROLES).reduce((acc, r) => acc.concat(OPS_ROLES[r]), []))).sort(),
+      custom: !!(imAdminCfg().roles)
+    });
+    return;
+  }
+  if (sub === 'roles' && method === 'POST') {
+    if (admin.role !== 'super') return fail(res, 403, '只有超级管理员能改角色权限');
+    const body = await readBody(req);
+    if (body.reset) {
+      const next = Object.assign({}, imAdminCfg());
+      delete next.roles;
+      imAdminCache = next;
+      try { writeJson(IMADMIN_FILE, next); } catch (err) { }
+      audit(req, admin, '重置角色权限', '全部角色', '恢复默认');
+      ok(res, { roles: OPS_ROLES, defaults: OPS_ROLES });
+      return;
+    }
+    const roles = {};
+    const src = body.roles && typeof body.roles === 'object' ? body.roles : {};
+    ['super', 'auditor', 'support', 'ops'].forEach((r) => {
+      const list = Array.isArray(src[r]) ? src[r] : (OPS_ROLES[r] || []);
+      roles[r] = list.map((x) => String(x)).filter(Boolean).slice(0, 80);
+    });
+    roles.super = Array.from(new Set((OPS_ROLES.super || []).concat(roles.super)));
+    saveImAdmin({ roles });
+    audit(req, admin, '修改角色权限', '全部角色', JSON.stringify(roles).slice(0, 300));
+    ok(res, { roles });
+    return;
+  }
 
   /* 界面配置类（UI 图标 / 发现页 / 我的页 / 界面文字 / 状态面板 / 表情 / 礼物 / +面板 / 应用名 / 图标上传）
      只有「超级管理员」能看能改 —— 客服、审核员、运维这些角色连读都读不到。 */

@@ -299,7 +299,7 @@ enum C {
     static var subLabel    : Color { UIConfig.color("subLabelColor", 0x999999, 0x8F8F8F) }
     static var hairline    : Color { UIConfig.color("lineColor", 0xE5E5E5, 0x333335) }
     static var navLine     : Color { UIConfig.color("navLineColor", 0xE8E8E8, 0x2C2C2E) }
-    static var green       : Color { UIConfig.color("greenColor", 0x07C160, 0x3EB575) }
+    static var green       : Color { UIConfig.color("greenColor", 0x19A47A, 0x1DC9BD) }
     static var red         : Color { UIConfig.color("redColor", 0xFA5151, 0xFA5151) }
     static var orange      : Color { UIConfig.color("orangeColor", 0xFF9500, 0xFF9500) }
     static var tabInk      : Color { UIConfig.color("tabInkColor", 0x191919, 0xB5B5B5) }
@@ -309,7 +309,9 @@ enum C {
        想让它和通讯录不一样，就在后台「界面文字 → 颜色」里单独改这两项，不用重新打 App。 */
     static var chatsPageBg : Color { UIConfig.color("chatsPageBg", 0xEDEDED, 0x0B0B0D) }
     static var chatsRowBg  : Color { UIConfig.color("chatsRowBg", 0xFFFFFF, 0x1C1C1E) }
-    static let bubbleMine  = Color.dyn(0x95EC69, 0x3EB575)
+    /* 自己发的气泡：以前用的是微信那个标志性气泡绿（#95EC69），
+       审核/投诉都会盯着这个颜色，换成我们自己品牌的浅绿。 */
+    static let bubbleMine  = Color.dyn(0xD8F2E4, 0x1DC9BD)
     static let bubbleOther = Color.dyn(0xFFFFFF, 0x2D2D30)
     static let bubbleText  = Color.dyn(0x191919, 0xEDEDED)
     static let msgTime     = Color(hex: 0xAEAEB2)
@@ -329,7 +331,7 @@ enum C {
     /// 写「#浅色|#深色」两份，比如浅色模式想深一点就写 "#333333|#9A9A9A"
     static var chatBarIcon : Color { UIConfig.color("chatBarIcon", 0x6F6F6F, 0x9A9A9A) }
     /* 四个首页顶栏文字：后台「界面文字」里能改（tabTitle0 微信 / 1 通讯录 / 2 发现 / 3 我） */
-    static var tabTitle0: String { UIConfig.text("tabTitle0", "微信") }
+    static var tabTitle0: String { UIConfig.text("tabTitle0", "聊天") }
     static var tabTitle1: String { UIConfig.text("tabTitle1", "通讯录") }
     static var tabTitle2: String { UIConfig.text("tabTitle2", "发现") }
     static var tabTitle3: String { UIConfig.text("tabTitle3", "我") }
@@ -340,7 +342,7 @@ enum C {
     static let loginText   = Color(hex: 0xEDEDED)
     static let loginGray   = Color(hex: 0x7F7F7F)
     static let loginLink   = Color(hex: 0x7D90A9)
-    static let loginGreen  = Color(hex: 0x3EB575)
+    static let loginGreen  = Color(hex: 0x1DC9BD)
 }
 
 /* ============================================================
@@ -1038,7 +1040,7 @@ struct PhotoPager: View {
 
 /// 登录页用的颜色（后台可改，默认值就是设计稿里的那几个）
 enum LoginTheme {
-    static var accent = Color(hexString: "#07C160")
+    static var accent = Color(hexString: "#19A47A")
     static var accent2 = Color(hexString: "#007AFF")
     static var disabledAccent = Color(hexString: "#B2E4C8")
     static var disabledGray = Color(hexString: "#C7C7CC")

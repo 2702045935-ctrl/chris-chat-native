@@ -71,7 +71,7 @@ struct SecurityScoreView: View {
                     .stroke(Color.dyn(0xE9E9E9, 0x2C2C2E), lineWidth: 10)
                 Circle()
                     .trim(from: 0, to: CGFloat(max(0.02, Double(data?.percent ?? 0) / 100)))
-                    .stroke(LinearGradient(colors: [Color(hexString: "#07C160"), Color(hexString: "#3FD07F")],
+                    .stroke(LinearGradient(colors: [Color(hexString: "#19A47A"), Color(hexString: "#3FD07F")],
                                            startPoint: .leading, endPoint: .trailing),
                             style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(-90))
@@ -81,7 +81,7 @@ struct SecurityScoreView: View {
                         .foregroundColor(ink)
                     Text(Tr(data?.level ?? "算分中"))
                         .font(pf(13, .medium))
-                        .foregroundColor(Color(hexString: "#07C160"))
+                        .foregroundColor(Color(hexString: "#19A47A"))
                 }
             }
             .frame(width: 150, height: 150)
@@ -115,7 +115,7 @@ struct SecurityScoreView: View {
                             Spacer(minLength: 0)
                             Text("\(dim.score)")
                                 .font(pf(16, .medium))
-                                .foregroundColor(Color(hexString: "#07C160"))
+                                .foregroundColor(Color(hexString: "#19A47A"))
                             Text("/ \(dim.max)")
                                 .font(pf(12))
                                 .foregroundColor(gray)
@@ -135,7 +135,7 @@ struct SecurityScoreView: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(Color.dyn(0xEFEFEF, 0x2C2C2E))
                             Capsule()
-                                .fill(Color(hexString: "#07C160"))
+                                .fill(Color(hexString: "#19A47A"))
                                 .frame(width: max(4, geo.size.width * CGFloat(dim.score) / CGFloat(max(1, dim.max))))
                         }
                     }
@@ -149,7 +149,7 @@ struct SecurityScoreView: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: it.ok ? "checkmark.circle.fill" : "exclamationmark.circle")
                                         .font(.system(size: 14))
-                                        .foregroundColor(it.ok ? Color(hexString: "#07C160") : Color(hexString: "#FA9D3C"))
+                                        .foregroundColor(it.ok ? Color(hexString: "#19A47A") : Color(hexString: "#FA9D3C"))
                                     Text(Tr(it.label))
                                         .font(pf(14))
                                         .foregroundColor(ink)
@@ -183,7 +183,7 @@ struct SecurityScoreView: View {
                 .foregroundColor(ink)
             ForEach(Array(d.tips.enumerated()), id: \.offset) { _, t in
                 HStack(alignment: .top, spacing: 8) {
-                    Circle().fill(Color(hexString: "#07C160")).frame(width: 5, height: 5).padding(.top, 6)
+                    Circle().fill(Color(hexString: "#19A47A")).frame(width: 5, height: 5).padding(.top, 6)
                     Text(Tr(t))
                         .font(pf(13.5))
                         .foregroundColor(gray)

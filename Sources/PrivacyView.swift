@@ -28,7 +28,7 @@ struct PrivacyView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 22).padding(.top, 12)
                     GroupCard {
-                        row(Tr("微信号"), $p.addByWx, "addByWx")
+                        row(Tr("账号"), $p.addByWx, "addByWx")
                         HairLine(inset: 16)
                         row(Tr("手机号"), $p.addByPhone, "addByPhone")
                         HairLine(inset: 16)

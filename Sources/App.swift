@@ -1326,7 +1326,7 @@ struct AccountLoginSheet: View {
                                 .font(.system(size: 14)).foregroundColor(C.loginGreen)
                         }
                     } else {
-                        row { TextField("微信号 / 用户名", text: $username).focused($focus, equals: .user)
+                        row { TextField("账号 / 用户名", text: $username).focused($focus, equals: .user)
                             .foregroundColor(LoginTheme.ink(colorScheme))
                             .textInputAutocapitalization(.never).autocorrectionDisabled(true) }
                         HairLine(color: C.navLine)

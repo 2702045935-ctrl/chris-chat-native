@@ -153,7 +153,7 @@ struct SwipeChatRow: View {
             switch mode {
             case .none:
                 /* 第一层：标为未读 / 不显示 / 删除，各一个按钮宽 */
-                bar("标为未读", Color(hex: 0x07C160), btnW) {
+                bar("标为未读", Color(hex: 0x19A47A), btnW) {
                     onUnread()
                     close()
                 }

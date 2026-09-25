@@ -157,7 +157,7 @@ struct ShakePageView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
                         .background(RoundedRectangle(cornerRadius: 23, style: .continuous)
-                            .fill(Color(hex: 0x07C160)))
+                            .fill(Color(hex: 0x19A47A)))
                 }
                 .buttonStyle(.plain)
                 .disabled(busy)
@@ -254,7 +254,7 @@ struct ShakePageView: View {
                         .foregroundColor(.white)
                         .frame(width: 116, height: 38)
                         .background(RoundedRectangle(cornerRadius: 19, style: .continuous)
-                            .fill(Color(hex: 0x07C160)))
+                            .fill(Color(hex: 0x19A47A)))
                 }
                 .buttonStyle(.plain)
                 Button {

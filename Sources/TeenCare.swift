@@ -198,7 +198,7 @@ struct CareModeView: View {
 
                     VStack(spacing: 8) {
                         Text(Tr("效果预览")).font(pf(13)).foregroundColor(C.subLabel)
-                        Text(Tr("微信")) .font(on ? .system(size: 19) : .system(size: 16)).foregroundColor(C.label)
+                        Text(Tr("聊天")) .font(on ? .system(size: 19) : .system(size: 16)).foregroundColor(C.label)
                         Text(Tr("开启后字更大、更好看清（说明里也会跟着变大）"))
                             .font(on ? .system(size: 15) : .system(size: 13)).foregroundColor(C.subLabel)
                             .multilineTextAlignment(.center)

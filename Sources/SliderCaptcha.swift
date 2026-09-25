@@ -137,7 +137,7 @@ struct SliderCaptchaView: View {
 
             /* 拖过的部分填一层浅色，看着像"已经滑了这么多" */
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill((done ? C.green : Color.dyn(0x07C160, 0x3EB575)).opacity(0.16))
+                .fill((done ? C.green : Color.dyn(0x19A47A, 0x1DC9BD)).opacity(0.16))
                 .frame(width: dragX + pw, height: trackH)
 
             Text(done ? Tr("验证通过") : (busy ? Tr("正在核对…") : Tr("按住滑块，拖到最右边")))

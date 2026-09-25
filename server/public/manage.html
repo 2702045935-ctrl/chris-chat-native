@@ -190,6 +190,91 @@
     #content { padding: 12px !important; }
   }
 </style>
+<!-- ============================================================
+     新配色（按规范）：深灰固定侧边栏 + 白字 · 主色 #1677ff · 告警 #f5222d
+     文字 #333 / 次要 #666 · 内容区白底 + 素边框卡片，去掉多余阴影和花哨渐变。
+     放在上面那套样式后面覆盖同名选择器，功能一行没改。
+     ============================================================ -->
+<style id="im-console-look">
+  /* ---------- 左侧：深灰固定侧栏、白字、可折叠 ---------- */
+  .side { background: #2B2F36 !important; border-right: 0 !important; }
+  .side .brand { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,.08) !important; }
+  .side .brand b, .side .brand strong, .side .brand .btxt { color: #FFFFFF !important; }
+  .side .brand small { color: #9AA4B2 !important; }
+  .side .dotmark { background: #1677ff !important; color: #fff !important; }
+  .side .msearch input, #navq { background: rgba(255,255,255,.06) !important;
+    border: 1px solid rgba(255,255,255,.10) !important; color: #fff !important; }
+  #navq::placeholder { color: #8B95A3 !important; }
+  #nav { background: #2B2F36 !important; border-right: 0 !important; width: 208px !important; }
+  #nav .ngroup { color: #7E8794 !important; font-size: 11.5px !important; font-weight: 600 !important;
+    padding: 16px 16px 6px !important; letter-spacing: .6px !important; }
+  #nav button { color: #E6EAF0 !important; background: transparent !important; border: 0 !important;
+    height: 38px !important; margin: 1px 8px !important; border-radius: 6px !important; font-size: 13.5px !important; }
+  #nav button .em { opacity: .7 !important; font-size: 13px !important; }
+  #nav button:hover { background: rgba(255,255,255,.07) !important; color: #fff !important; }
+  #nav button.on, #nav button.active, #nav button[aria-current="true"] {
+    background: #1677ff !important; color: #fff !important; font-weight: 600 !important; }
+  #nav button.on .em, #nav button.active .em { opacity: 1 !important; }
+  #nav button .n { background: #f5222d !important; color: #fff !important; }
+  .side-foot { background: transparent !important; border-top: 1px solid rgba(255,255,255,.08) !important; }
+  .side-foot .meta b { color: #FFFFFF !important; }
+  .side-foot .meta em { color: #9AA4B2 !important; }
+  .side-foot .av { background: rgba(255,255,255,.10) !important; color: #fff !important; }
+  .side-foot .out { color: #9AA4B2 !important; }
+  .side-foot .out:hover { color: #fff !important; }
+
+  /* ---------- 顶部：细导航条 ---------- */
+  .top, header { background: #FFFFFF !important; border-bottom: 1px solid #EEEEEE !important; }
+  #pageTitle { color: #333 !important; font-size: 15px !important; font-weight: 600 !important; }
+  .crumb { color: #999 !important; font-size: 12px !important; }
+  .iconbtn { color: #666 !important; }
+
+  /* ---------- 内容：白底 + 素边框卡片（去掉阴影） ---------- */
+  #content { background: #FFFFFF !important; }
+  .panel { background: #FFFFFF !important; border: 1px solid #EEEEEE !important; border-radius: 4px !important;
+    box-shadow: none !important; }
+  .panel h3 { color: #333 !important; font-size: 14px !important; font-weight: 600 !important;
+    border-left: 3px solid #1677ff !important; padding-left: 9px !important; }
+  .hint { color: #666 !important; font-size: 12px !important; }
+  .kpi, .card { background: #FFFFFF !important; border: 1px solid #EEEEEE !important;
+    border-radius: 4px !important; box-shadow: none !important; }
+
+  /* ---------- 表格 / 文字 ---------- */
+  body, td, .kv b { color: #333 !important; }
+  .kv span, small, .sub { color: #666 !important; }
+  th { background: #FAFAFA !important; color: #333 !important; font-weight: 600 !important;
+    border-color: #EEEEEE !important; }
+  td { border-color: #F2F2F2 !important; }
+  tr:hover td { background: #F7FAFF !important; }
+
+  /* ---------- 主色 / 告警色 ---------- */
+  .btn.main { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; }
+  .btn.main:hover { background: #0f62d6 !important; border-color: #0f62d6 !important; }
+  .btn.red, .btn.danger { background: #f5222d !important; border-color: #f5222d !important; color: #fff !important; }
+  .btn { background: #fff !important; color: #333 !important; border-color: #DDDDDD !important; }
+  .btn:hover { border-color: #1677ff !important; color: #1677ff !important; }
+  a { color: #1677ff !important; }
+  input:focus, select:focus, textarea:focus {
+    border-color: #1677ff !important; box-shadow: 0 0 0 2px rgba(22,119,255,.12) !important; }
+  input[type="checkbox"], input[type="radio"] { accent-color: #1677ff !important; }
+  .sw input:checked + span { background: #1677ff !important; }
+  .pager .on, .pages .on, .pager a.on { background: #1677ff !important; border-color: #1677ff !important; color: #fff !important; }
+  .lg-mark, .wx-logo { background: #1677ff !important; }
+  .ok { color: #1677ff !important; }
+  .tag.g { background: #f6ffed !important; color: #389e0d !important; border-color: #d9f7be !important; }
+  .tag.r { background: #fff1f0 !important; color: #f5222d !important; border-color: #ffccc7 !important; }
+  .tag.b { background: #e6f4ff !important; color: #1677ff !important; border-color: #bae0ff !important; }
+  .tag.gy { background: #fafafa !important; color: #666 !important; border-color: #eeeeee !important; }
+  .tag.o { background: #fff7e6 !important; color: #d46b08 !important; border-color: #ffe7ba !important; }
+
+  /* ---------- 深色模式：侧栏保持深灰，主色仍是蓝 ---------- */
+  body.dark .side, body.dark #nav { background: #22262C !important; }
+  body.dark .top { background: #1C1C1E !important; border-bottom-color: #333 !important; }
+  body.dark #content { background: #1C1C1E !important; }
+  body.dark .panel, body.dark .kpi { background: #242424 !important; border-color: #333333 !important; }
+  body.dark #nav button { color: #D8DEE7 !important; }
+</style>
+
 <!-- 微信后台那套结构骨架：页面顶部自动加「面包屑 + 大标题」，
      侧栏顶部放产品名、底部放当前账号。纯注入，不改各页面自己的渲染逻辑。 -->
 <script>
@@ -352,41 +437,87 @@ let PAGE = 'dashboard';
 const STATE = {};                 // 每个页面的筛选条件
 
 const MENUS = [
-  { key: 'dashboard', icon: '📊', name: '仪表盘', perm: 'dashboard', group: '总览' },
-  { key: 'users', icon: '👤', name: '用户账号', perm: 'users', group: '用户与内容' },
-  { key: 'messages', icon: '💬', name: '消息检索', perm: 'messages', group: '用户与内容' },
-  { key: 'support', icon: '🎧', name: '客服中心', perm: 'support', group: '用户与内容' },
-  { key: 'autoreply', icon: '🤖', name: '自动回复', perm: 'support', group: '用户与内容' },
-  { key: 'im', icon: '💬', name: 'IM 模块', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'sms', icon: '📱', name: '短信通道', perm: 'ops', superOnly: true, group: '系统' },
-  { key: 'push', icon: '🔔', name: '推送通知', perm: 'ops', superOnly: true, group: '系统' },
-  { key: 'wallet', icon: '💰', name: '充值提现', perm: 'ops', superOnly: true, group: '风控与资金' },
-  { key: 'biz', icon: '🏪', name: '经营账户查账', perm: 'users', group: '风控与资金' },
-  { key: 'rpcovers', icon: '🧧', name: '红包封面', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'friends', icon: '🤝', name: '好友关系', perm: 'friends', group: '用户与内容' },
-  { key: 'risk', icon: '🛡️', name: '风控审核', perm: 'risk', group: '风控与资金' },
-  { key: 'riskengine', icon: '🧠', name: '风控引擎', perm: 'risk', group: '风控与资金' },
-  { key: 'reports', icon: '🚩', name: '举报处理', perm: 'reports', group: '风控与资金' },
-  { key: 'moments', icon: '🖼️', name: '朋友圈管理', perm: 'moments', group: '风控与资金' },
-  { key: 'feedback', icon: '📮', name: '用户反馈', perm: 'users', group: '风控与资金' },
-  { key: 'groups', icon: '👥', name: '群组管理', perm: 'users', group: '用户与内容' },
-  { key: 'payments', icon: '💰', name: '支付风控', perm: 'payments', group: '风控与资金' },
-  /* 下面这几项只给超级管理员看：其它角色（客服/审核员/运维）连菜单都不显示 */
-  { key: 'icons', icon: '🎨', name: 'UI 图标', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'discover', icon: '🧭', name: '发现页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'feed', icon: '🎬', name: '视频号', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'mepage', icon: '🙋', name: '我的页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'service', icon: '🧾', name: '服务页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'wallet', icon: '👛', name: '钱包页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'balancepage', icon: '💰', name: '零钱页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'billspage', icon: '📄', name: '账单页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'uiconfig', icon: '🔤', name: '界面文字', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'loginpage', icon: '🎨', name: '登录页', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'badges', icon: '🔴', name: '红点提醒', perm: 'icons', superOnly: true, group: '界面配置' },
-  { key: 'endpoints', icon: '🛰️', name: '线路入口', perm: 'icons', superOnly: true, group: '系统' },
-  { key: 'ops', icon: '⚙️', name: '运维 / 公告', perm: 'ops', group: '系统' },
-  { key: 'audit', icon: '📜', name: '审计日志', perm: 'audit', group: '系统' },
-  { key: 'admins', icon: '🔑', name: '后台账号', perm: 'admins', group: '系统' }
+  /* ---------------- 数据大盘 ---------------- */
+  { key: 'dashboard', icon: '📊', name: '数据大盘', perm: 'dashboard', group: '数据大盘' },
+
+  /* ---------------- 用户管理 ---------------- */
+  { key: 'users', icon: '👤', name: '用户列表', perm: 'users', group: '用户管理' },
+  { key: 'userdetail', icon: '🔎', name: '用户详情', perm: 'users', group: '用户管理' },
+  { key: 'punishments', icon: '⚖️', name: '账号处罚记录', perm: 'users', group: '用户管理' },
+  { key: 'batchops', icon: '🧰', name: '批量账号操作', perm: 'users.ban', group: '用户管理' },
+
+  /* ---------------- 会话 & 消息管理 ---------------- */
+  { key: 'chatlist', icon: '💬', name: '单聊会话列表', perm: 'messages', group: '会话 & 消息管理' },
+  { key: 'delivery', icon: '📮', name: '消息投递日志', perm: 'messages', group: '会话 & 消息管理' },
+  { key: 'offline', icon: '📥', name: '离线消息查询', perm: 'messages', group: '会话 & 消息管理' },
+  { key: 'messages', icon: '🔍', name: '消息检索', perm: 'messages', group: '会话 & 消息管理' },
+
+  /* ---------------- 好友关系管理 ---------------- */
+  { key: 'friendapply', icon: '📨', name: '好友申请列表', perm: 'friends', group: '好友关系管理' },
+  { key: 'friends', icon: '🤝', name: '好友关系查询', perm: 'friends', group: '好友关系管理' },
+  { key: 'blocklist', icon: '🚯', name: '黑名单管理', perm: 'friends', group: '好友关系管理' },
+
+  /* ---------------- 群组管理 ---------------- */
+  { key: 'groups', icon: '👥', name: '群列表', perm: 'users', group: '群组管理' },
+  { key: 'groupmembers', icon: '🧑‍🤝‍🧑', name: '群成员列表', perm: 'users', group: '群组管理' },
+  { key: 'groupmessages', icon: '📃', name: '群消息日志', perm: 'messages', group: '群组管理' },
+
+  /* ---------------- 内容管理 - 朋友圈 ---------------- */
+  { key: 'moments', icon: '🖼️', name: '朋友圈内容列表', perm: 'moments', group: '内容管理 - 朋友圈' },
+  { key: 'momentcomments', icon: '💭', name: '朋友圈评论管理', perm: 'moments', group: '内容管理 - 朋友圈' },
+  { key: 'feed', icon: '🎬', name: '视频号', perm: 'icons', superOnly: true, group: '内容管理 - 朋友圈' },
+
+  /* ---------------- 举报与风控审核 ---------------- */
+  { key: 'reports', icon: '🚩', name: '举报工单列表', perm: 'reports', group: '举报与风控审核' },
+  { key: 'sensitive', icon: '🔤', name: '敏感关键词管理', perm: 'risk', group: '举报与风控审核' },
+  { key: 'blacklist', icon: '🛡️', name: '风控黑名单（IP/账号）', perm: 'risk', group: '举报与风控审核' },
+  { key: 'risk', icon: '🧯', name: '风险评分', perm: 'risk', group: '举报与风控审核' },
+  { key: 'riskengine', icon: '🧠', name: '风控引擎', perm: 'risk', group: '举报与风控审核' },
+
+  /* ---------------- 音视频通话监控 ---------------- */
+  { key: 'calls', icon: '📞', name: '通话记录列表', perm: 'messages', group: '音视频通话监控' },
+  { key: 'callstats', icon: '📈', name: '通话统计大盘', perm: 'messages', group: '音视频通话监控' },
+
+  /* ---------------- 系统日志审计 ---------------- */
+  { key: 'behavior', icon: '🧾', name: '用户行为日志', perm: 'users', group: '系统日志审计' },
+  { key: 'audit', icon: '📜', name: '管理员操作审计', perm: 'audit', group: '系统日志审计' },
+
+  /* ---------------- 运营配置 ---------------- */
+  { key: 'announcements', icon: '📢', name: 'App 公告配置', perm: 'ops', group: '运营配置' },
+  { key: 'thresholds', icon: '🎚️', name: '风控阈值配置', perm: 'ops', group: '运营配置' },
+  { key: 'appversion', icon: '⬆️', name: 'App 版本管理', perm: 'ops', group: '运营配置' },
+  { key: 'endpoints', icon: '🛰️', name: '线路入口', perm: 'icons', superOnly: true, group: '运营配置' },
+
+  /* ---------------- 系统设置 ---------------- */
+  { key: 'admins', icon: '🔑', name: '管理员账号管理', perm: 'admins', group: '系统设置' },
+  { key: 'roles', icon: '🧩', name: '角色权限配置', perm: 'admins', group: '系统设置' },
+  { key: 'alerts', icon: '🚨', name: '告警配置', perm: 'ops', group: '系统设置' },
+  { key: 'whitelist', icon: '🧱', name: '访问白名单', perm: 'admins', group: '系统设置' },
+  { key: 'ops', icon: '⚙️', name: '运维 / 系统公告', perm: 'ops', group: '系统设置' },
+  { key: 'sms', icon: '📱', name: '短信通道', perm: 'ops', superOnly: true, group: '系统设置' },
+  { key: 'push', icon: '🔔', name: '推送通知', perm: 'ops', superOnly: true, group: '系统设置' },
+
+  /* ---------------- App 界面配置（原有，全部保留） ---------------- */
+  { key: 'icons', icon: '🎨', name: 'UI 图标', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'discover', icon: '🧭', name: '发现页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'mepage', icon: '🙋', name: '我的页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'service', icon: '🧾', name: '服务页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'walletpage', icon: '👛', name: '钱包页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'balancepage', icon: '💰', name: '零钱页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'billspage', icon: '📄', name: '账单页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'uiconfig', icon: '🔤', name: '界面文字', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'loginpage', icon: '🎨', name: '登录页', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'badges', icon: '🔴', name: '红点提醒', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'im', icon: '💬', name: 'IM 模块', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+  { key: 'rpcovers', icon: '🧧', name: '红包封面', perm: 'icons', superOnly: true, group: 'App 界面配置' },
+
+  /* ---------------- 其它（原有） ---------------- */
+  { key: 'support', icon: '🎧', name: '客服中心', perm: 'support', group: '其它' },
+  { key: 'autoreply', icon: '🤖', name: '自动回复', perm: 'support', group: '其它' },
+  { key: 'feedback', icon: '📮', name: '用户反馈', perm: 'users', group: '其它' },
+  { key: 'biz', icon: '🏪', name: '经营账户查账', perm: 'users', group: '其它' },
+  { key: 'payments', icon: '💰', name: '支付风控', perm: 'payments', group: '其它' },
+  { key: 'wallet', icon: '💳', name: '充值提现', perm: 'ops', superOnly: true, group: '其它' }
 ];
 
 function toast(msg, bad) {
@@ -630,12 +761,20 @@ function start() {
   if (!MENUS.some((m) => m.key === PAGE && can(m.perm))) {
     PAGE = (MENUS.find((m) => can(m.perm)) || { key: 'dashboard' }).key;
   }
+  /* 地址栏 #页面名 优先（别人发来的直链、或者自己收藏的某一页） */
+  try {
+    const h = String(location.hash || '').replace(/^#/, '');
+    if (h && MENUS.some((m) => m.key === h && can(m.perm))) PAGE = h;
+  } catch (e) { }
   go(PAGE);
   liveTick();
 }
 
 function go(page) {
   PAGE = page;
+  /* 地址栏带 #页面名：这样能直接给人一个链接跳到指定页（比如 #whitelist），
+     刷新也不会跳回仪表盘。 */
+  try { if (location.hash !== '#' + page) history.replaceState(null, '', location.pathname + location.search + '#' + page); } catch (e) { }
   $('nav').querySelectorAll('button').forEach((b) => {
     b.classList.toggle('on', b.getAttribute('data-page') === page);
   });
@@ -3457,7 +3596,9 @@ PAGES.service = async () => {
    底部两个蓝色链接。这里能改：标题、右上角按钮、每张卡里的每一行
    （名称 / 数值 / 小字 / 图标 / 颜色 / 点击动作 / 数值是否跟余额 / 显示 / 顺序）、
    底部链接，以及行高和所有字号（改完网页版和 App 都跟着变）。 */
-PAGES.wallet = async () => {
+/* 钱包页（App 界面）：以前这个函数也叫 PAGES.wallet，把上面的「充值提现」整个覆盖掉了
+   （点充值提现进来看到的是钱包页）—— 现在改名 PAGES.walletpage，两个页各归各位 */
+PAGES.walletpage = async () => {
   const d = await api('/wallet');
   const icons = await api('/icons');
   const iconList = (icons.defaults || []).filter((it) => /^(i|tab|plus|ui|svc)\./.test(it.key));
@@ -4366,6 +4507,652 @@ PAGES.admins = async () => {
           { method: 'POST', body: { disabled: b.getAttribute('data-off') === '1' } });
         PAGES.admins();
       } catch (e) { toast(e.message); }
+    });
+  });
+};
+
+/* ==========================================================================
+   IM 后台新增页面（按规范）
+   通用小工具：tbl() 画表、filters() 画搜索条，样式沿用页面里原有的 panel/table
+   ========================================================================== */
+
+function tbl(heads, rows) {
+  return '<table><tr>' + heads.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr>'
+    + (rows || '<tr><td colspan="' + heads.length + '" class="hint">没有数据</td></tr>') + '</table>';
+}
+function searchRow(inputHtml, btnId, btnText, hint) {
+  return '<div class="panel"><div class="body"><div class="filters">' + inputHtml
+    + '<button class="btn main" id="' + btnId + '">' + (btnText || '查询') + '</button>'
+    + (hint ? '<span class="hint">' + hint + '</span>' : '') + '</div></div></div>';
+}
+/* 指标卡（沿用仪表盘那套 kpi 样式） */
+function card(k, v, sub) {
+  return '<div class="kpi"><div class="bd"><div class="k">' + esc(k) + '</div>'
+    + '<div class="v">' + esc(String(v)) + '</div>'
+    + '<div class="sub">' + esc(sub || '') + '</div></div></div>';
+}
+const uidInput = (id, val, ph) => '<input class="wide" id="' + id + '" placeholder="'
+  + (ph || '用户ID（u_ 开头）或微信号') + '" value="' + esc(val || '') + '">';
+
+/* ---------------- 用户详情 ---------------- */
+PAGES.userdetail = async () => {
+  const st = STATE.userdetail = STATE.userdetail || { uid: '' };
+  $('content').innerHTML = searchRow(uidInput('udUid', st.uid), 'udFind', '查询',
+    '输入用户ID 或微信号。规范里的 user_info + user_login_log + 处罚记录都在这一页。')
+    + '<div id="udBox"></div>';
+  const load = async () => {
+    const v = $('udUid').value.trim();
+    STATE.userdetail = { uid: v };
+    if (!v) return;
+    try {
+      const d = await api('/userdetail?uid=' + encodeURIComponent(v));
+      const p = d.profile;
+      $('udBox').innerHTML =
+        '<div class="panel"><h3>' + esc(p.nickname) + ' <span class="hint">' + esc(p.username) + '</span></h3>'
+        + '<div class="kv"><b>用户 ID</b><span>' + esc(p.id) + '</span></div>'
+        + '<div class="kv"><b>手机号</b><span>' + esc(p.phone || '—') + '</span></div>'
+        + '<div class="kv"><b>状态</b><span>' + (p.banned ? badge('已封禁 ' + esc(p.banReason || ''), 'r')
+          : badge('正常', 'g')) + '</span></div>'
+        + '<div class="kv"><b>注册时间</b><span>' + fmtTime(p.createdAt) + '</span></div>'
+        + '<div class="kv"><b>最后登录</b><span>' + fmtTime(p.lastLoginAt) + ' · ' + esc(p.lastIp || '—')
+        + ' · ' + esc(p.lastDevice || '—') + '</span></div>'
+        + '<div class="kv"><b>好友 / 会话</b><span>' + p.friendCount + ' 个好友 · ' + p.chatCount + ' 个会话</span></div>'
+        + '<div class="kv"><b>余额</b><span>' + money(p.balance) + '</span></div>'
+        + '<div class="row" style="margin-top:14px">'
+        + (can('users.ban') ? '<button class="btn ' + (p.banned ? 'main' : 'red') + '" id="udBan">'
+          + (p.banned ? '解封账号' : '封禁账号') + '</button>' : '<span class="hint">你的角色没有封禁权限</span>')
+        + '</div></div>'
+        + '<div class="panel"><h3>登录设备历史 <span class="hint">' + d.devices.length + ' 台</span></h3>'
+        + tbl(['设备', '最近 IP', '最近时间'], d.devices.map((x) => '<tr><td>' + esc(x.device)
+          + '</td><td>' + esc(x.lastIp) + '</td><td>' + fmtTime(x.lastAt) + '</td></tr>').join('')) + '</div>'
+        + '<div class="panel"><h3>登录日志（最近 ' + d.logins.length + ' 条）</h3>'
+        + tbl(['时间', 'IP', '设备', '类型'], d.logins.map((l) => '<tr><td>' + fmtTime(l.at) + '</td><td>'
+          + esc(l.ip) + '</td><td>' + esc(l.device) + '</td><td>' + esc(l.kind) + '</td></tr>').join('')) + '</div>'
+        + '<div class="panel"><h3>好友（' + d.friends.length + '）</h3><div class="hint">'
+        + (d.friends.map((f) => esc(f.nickname)).join('、') || '暂无') + '</div></div>'
+        + '<div class="panel"><h3>所在群（' + d.groups.length + '）</h3>'
+        + tbl(['群 ID', '群名称', '人数'], d.groups.map((g) => '<tr><td>' + esc(g.id) + '</td><td>'
+          + esc(g.name) + '</td><td>' + g.members + '</td></tr>').join('')) + '</div>'
+        + '<div class="panel"><h3>处罚记录（' + d.punishments.length + '）</h3>'
+        + tbl(['类型', '原因', '时间', '解除时间', '操作人', '操作 IP'], d.punishments.map((x) =>
+          '<tr><td>' + esc(x.type) + '</td><td>' + esc(x.reason) + '</td><td>' + fmtTime(x.at)
+          + '</td><td>' + (x.until ? fmtTime(x.until) : '—') + '</td><td>' + esc(x.admin || '—')
+          + '</td><td>' + esc(x.ip || '—') + '</td></tr>').join('')) + '</div>';
+      const ban = $('udBan');
+      if (ban) ban.addEventListener('click', async () => {
+        const reason = p.banned ? '' : (prompt('封禁原因（会写进审计日志）', '违规内容') || '违规内容');
+        try {
+          await api('/users/' + p.id + '/ban', { method: 'POST', body: { banned: !p.banned, reason } });
+          toast(p.banned ? '已解封' : '已封禁');
+          load();
+        } catch (e) { toast(e.message); }
+      });
+    } catch (e) { $('udBox').innerHTML = '<div class="panel"><div class="body hint">' + esc(e.message) + '</div></div>'; }
+  };
+  $('udFind').addEventListener('click', load);
+  $('udUid').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  if (st.uid) load();
+};
+
+/* ---------------- 账号处罚记录 ---------------- */
+PAGES.punishments = async () => {
+  const d = await api('/punishments?limit=200');
+  $('content').innerHTML = '<div class="panel"><h3>账号处罚记录 <span class="hint">共 ' + d.total
+    + ' 条（封禁 / 风控临时限制 / 后台处罚动作）</span></h3>'
+    + tbl(['用户', '类型', '原因', '处罚时间', '解除时间', '操作管理员', '操作 IP'],
+      d.rows.map((r) => '<tr><td>' + esc(r.nickname || r.username || '—')
+        + (r.username ? ' <span class="hint">' + esc(r.username) + '</span>' : '') + '</td>'
+        + '<td>' + badge(esc(r.type), /封禁/.test(r.type) ? 'r' : 'gy') + '</td>'
+        + '<td>' + esc(r.reason) + '</td><td>' + fmtTime(r.at) + '</td>'
+        + '<td>' + (r.until === '长期' ? '长期' : (r.until ? fmtTime(r.until) : '—')) + '</td>'
+        + '<td>' + esc(r.admin || '—') + '</td><td>' + esc(r.ip || '—') + '</td></tr>').join('')) + '</div>';
+};
+
+/* ---------------- 批量账号操作 ---------------- */
+PAGES.batchops = async () => {
+  $('content').innerHTML =
+    '<div class="panel"><h3>批量账号操作</h3>'
+    + '<div class="hint">一行一个：用户ID 或微信号（最多 100 个）。封禁会立刻把对方所有设备踢下线，'
+    + '并按微信的逻辑在对方登录时提示原因。</div>'
+    + '<textarea id="boList" rows="8" style="width:100%;margin-top:12px;font-family:ui-monospace,Menlo,monospace"></textarea>'
+    + '<div class="row" style="margin-top:12px">'
+    + (can('users.ban') ? '<input class="wide" id="boReason" placeholder="原因（写进审计日志）" value="违规内容" style="max-width:300px">'
+      + '<button class="btn red" id="boBan">批量封禁</button><button class="btn main" id="boUnban">批量解封</button>'
+      : '<span class="hint">你的角色没有批量封禁权限（规范：内容审核运营不能批量封禁）</span>')
+    + '</div><div id="boOut" class="hint" style="margin-top:12px"></div></div>';
+  const run = async (banned) => {
+    const list = String($('boList').value || '').split(/\s*\n+\s*/).map((s) => s.trim()).filter(Boolean).slice(0, 100);
+    if (!list.length) return toast('先填用户ID');
+    const reason = ($('boReason') && $('boReason').value.trim()) || '违规内容';
+    let okN = 0, failN = 0;
+    for (const v of list) {
+      try { await api('/users/' + encodeURIComponent(v) + '/ban', { method: 'POST', body: { banned, reason } }); okN++; }
+      catch (e) { failN++; }
+    }
+    $('boOut').textContent = '完成：成功 ' + okN + ' 个，失败 ' + failN + ' 个';
+    toast('批量操作完成：成功 ' + okN + '，失败 ' + failN);
+  };
+  if ($('boBan')) $('boBan').addEventListener('click', () => run(true));
+  if ($('boUnban')) $('boUnban').addEventListener('click', () => run(false));
+};
+
+/* ---------------- 单聊会话列表 ---------------- */
+PAGES.chatlist = async () => {
+  const st = STATE.chatlist = STATE.chatlist || { page: 1 };
+  const d = await api('/chatlist?page=' + st.page + '&pageSize=30&q=' + encodeURIComponent(st.q || ''));
+  const rows = d.rows.map((c) => '<tr class="clickable" data-chat="' + esc(c.id) + '"><td>' + esc(c.id) + '</td><td>'
+    + esc(c.memberIds.join(' ↔ ')) + '</td><td>' + esc(c.members.map((m) => m.nickname).join(' ↔ '))
+    + '</td><td>' + fmtTime(c.createdAt) + '</td><td>' + (c.lastAt ? fmtTime(c.lastAt) : '—')
+    + '</td><td>' + c.messageCount + '</td></tr>').join('');
+  $('content').innerHTML = searchRow(uidInput('clQ', st.q, '双方任一用户ID（留空 = 全部）'), 'clFind', '搜索',
+    '第 ' + st.page + ' 页 / 共 ' + Math.max(1, Math.ceil(d.total / d.pageSize)) + ' 页 · 共 ' + d.total + ' 个单聊')
+    + '<div class="panel"><h3>单聊会话列表</h3>'
+    + tbl(['会话 ID', '双方用户 ID', '昵称', '创建时间', '最后一条消息', '消息数'], rows)
+    + '<div class="row" style="margin-top:12px">'
+    + '<button class="btn" id="clPrev">上一页</button><button class="btn" id="clNext">下一页</button></div></div>';
+  $('clFind').addEventListener('click', () => { STATE.chatlist = { page: 1, q: $('clQ').value.trim() }; PAGES.chatlist(); });
+  $('clPrev').addEventListener('click', () => { if (st.page > 1) { st.page--; PAGES.chatlist(); } });
+  $('clNext').addEventListener('click', () => { st.page++; PAGES.chatlist(); });
+  $('content').querySelectorAll('[data-chat]').forEach((tr) => {
+    tr.addEventListener('click', () => showGroupMessages(tr.getAttribute('data-chat')));
+  });
+};
+
+/* 复用：看某个会话的消息元数据（群里点进来也是这个） */
+async function showGroupMessages(gid) {
+  try {
+    const d = await api('/groupmessages?gid=' + encodeURIComponent(gid) + '&limit=120');
+    openModal('<h3>' + esc(d.chat.name || '单聊') + ' <span class="hint">' + esc(d.chat.id)
+      + ' · ' + d.chat.members + ' 人</span></h3>' + '<div class="hint">' + esc(d.note || '') + '</div>'
+      + tbl(['时间', '发送人', '类型', '投递状态'], d.rows.map((m) => '<tr><td>' + fmtTime(m.at) + '</td><td>'
+        + esc(m.from) + '</td><td>' + esc(m.kind) + '</td><td>' + badge(esc(m.status), /全部已读/.test(m.status) ? 'g' : 'gy')
+        + '</td></tr>').join(''))
+      + '<div class="row" style="margin-top:12px"><button class="btn" id="gmClose">关闭</button></div>');
+    $('gmClose').addEventListener('click', closeModal);
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------------- 消息投递日志 ---------------- */
+PAGES.delivery = async () => {
+  const st = STATE.delivery = STATE.delivery || { q: '' };
+  const d = await api('/delivery?q=' + encodeURIComponent(st.q) + '&limit=80');
+  const tone = (s) => s === '已读' ? 'g' : (s === '未送达' ? 'r' : 'gy');
+  $('content').innerHTML = searchRow(uidInput('dvQ', st.q, '用户ID / 微信号 / 会话ID'), 'dvFind', '查询', esc(d.note || ''))
+    + '<div class="panel"><h3>消息投递日志 <span class="hint">共 ' + d.total + ' 条</span></h3>'
+    + tbl(['消息 ID', '发送人', '接收人', '时间', '类型', '投递状态', '送达/已读'],
+      d.rows.map((r) => '<tr><td>' + esc(r.id) + '</td><td>' + esc(r.from) + ' <span class="hint">'
+        + esc(r.fromId) + '</span></td><td>' + esc(r.to) + '</td><td>' + fmtTime(r.at) + '</td><td>'
+        + esc(r.kind) + '</td><td>' + badge(esc(r.status), tone(r.status)) + '</td><td>'
+        + (r.receiverCount ? r.deliveredCount + ' / ' + r.readCount + ' / ' + r.receiverCount : '—')
+        + '</td></tr>').join('')) + '</div>';
+  $('dvFind').addEventListener('click', () => { STATE.delivery = { q: $('dvQ').value.trim() }; PAGES.delivery(); });
+  $('dvQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { STATE.delivery = { q: $('dvQ').value.trim() }; PAGES.delivery(); } });
+};
+
+/* ---------------- 离线消息查询 ---------------- */
+PAGES.offline = async () => {
+  const st = STATE.offline = STATE.offline || { uid: '' };
+  $('content').innerHTML = searchRow(uidInput('ofUid', st.uid), 'ofFind', '查询',
+    '查这个人还没读到的消息（离线堆积）——数据来自服务器上的已读游标')
+    + '<div id="ofBox"></div>';
+  const load = async () => {
+    const v = $('ofUid').value.trim();
+    STATE.offline = { uid: v };
+    if (!v) return;
+    try {
+      const d = await api('/offline?uid=' + encodeURIComponent(v));
+      $('ofBox').innerHTML = '<div class="panel"><h3>' + esc(d.user.nickname) + ' <span class="hint">'
+        + esc(d.user.username) + ' · ' + (d.online ? '当前在线' : '不在线') + '</span></h3>'
+        + '<div class="kv"><b>离线消息总数</b><span>' + d.total + ' 条</span></div>'
+        + tbl(['会话', '类型', '对方', '未读', '其中离线未送达', '最早', '最新'], d.rows.map((r) => '<tr><td>'
+          + esc(r.title || r.chatId) + '</td><td>' + (r.type === 'group' ? '群聊' : '单聊') + '</td><td>'
+          + esc(r.peer || '—') + '</td><td>' + r.count + '</td><td>'
+          + badge(String(r.offline == null ? '—' : r.offline), (r.offline > 0 ? 'r' : 'gy')) + '</td><td>' + fmtTime(r.oldest) + '</td><td>'
+          + fmtTime(r.newest) + '</td></tr>').join('')) + '</div>';
+    } catch (e) { $('ofBox').innerHTML = '<div class="panel"><div class="body hint">' + esc(e.message) + '</div></div>'; }
+  };
+  $('ofFind').addEventListener('click', load);
+  $('ofUid').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  if (st.uid) load();
+};
+
+/* ---------------- 好友申请列表 ---------------- */
+PAGES.friendapply = async () => {
+  const d = await api('/friendapply');
+  $('content').innerHTML = '<div class="panel"><h3>好友申请列表 <span class="hint">待处理 '
+    + d.pending.length + ' 条 · 历史 ' + d.rows.length + ' 条</span></h3>'
+    + tbl(['申请人', '接收人', '申请时间', '附言', '状态'], d.rows.map((r) => '<tr><td>'
+      + esc(r.from) + ' <span class="hint">' + esc(r.fromId) + '</span></td><td>' + esc(r.to)
+      + '</td><td>' + fmtTime(r.at) + '</td><td>' + esc(r.note || '—') + '</td><td>'
+      + badge(esc(r.status), r.status === '待处理' ? 'gy' : 'g') + '</td></tr>').join('')) + '</div>';
+};
+
+/* ---------------- 黑名单管理（谁拉黑了谁） ---------------- */
+PAGES.blocklist = async () => {
+  const d = await api('/blocklist');
+  $('content').innerHTML = '<div class="panel"><h3>黑名单管理 <span class="hint">共 ' + d.total
+    + ' 条。解除后双方消息立刻恢复（和微信一样：对方不会再看到「消息被拒收」）</span></h3>'
+    + tbl(['拉黑的人', '被拉黑的人', '操作'], d.rows.map((r) => '<tr><td>' + esc(r.owner)
+      + ' <span class="hint">' + esc(r.ownerId) + '</span></td><td>' + esc(r.target)
+      + ' <span class="hint">' + esc(r.targetId) + '</span></td><td>'
+      + (can('friends.write') ? '<button class="btn" data-unblock="' + esc(r.ownerId + '|' + r.targetId)
+        + '">解除拉黑</button>' : '—') + '</td></tr>').join('')) + '</div>';
+  $('content').querySelectorAll('[data-unblock]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const [ownerId, targetId] = b.getAttribute('data-unblock').split('|');
+      if (!confirm('确定解除这条拉黑关系？')) return;
+      try {
+        await api('/blocklist/release', { method: 'POST', body: { ownerId, targetId } });
+        toast('已解除');
+        PAGES.blocklist();
+      } catch (e) { toast(e.message); }
+    });
+  });
+};
+
+/* ---------------- 群成员列表 ---------------- */
+PAGES.groupmembers = async () => {
+  const st = STATE.groupmembers = STATE.groupmembers || { gid: '' };
+  $('content').innerHTML = searchRow(uidInput('gmGid', st.gid, '群 ID（c_ 开头，可在「群列表」里点进去复制）'), 'gmFind', '查询')
+    + '<div id="gmBox"></div>';
+  const load = async () => {
+    const v = $('gmGid').value.trim();
+    STATE.groupmembers = { gid: v };
+    if (!v) return;
+    try {
+      const d = await api('/groupmembers?gid=' + encodeURIComponent(v));
+      $('gmBox').innerHTML = '<div class="panel"><h3>' + esc(d.chat.name || '(无名群)')
+        + ' <span class="hint">' + d.chat.members + ' 人 · 群主 ' + esc(d.chat.owner) + ' · '
+        + fmtTime(d.chat.createdAt) + '</span></h3>'
+        + tbl(['成员', '角色', '状态'], d.members.map((m) => '<tr><td>' + esc(m.nickname)
+          + ' <span class="hint">' + esc(m.username || m.id) + '</span></td><td>'
+          + badge(esc(m.role), m.role === '群主' ? 'b' : (m.role === '管理员' ? 'g' : 'gy')) + '</td><td>'
+          + (m.banned ? badge('已封禁', 'r') : '正常') + '</td></tr>').join('')) + '</div>';
+    } catch (e) { $('gmBox').innerHTML = '<div class="panel"><div class="body hint">' + esc(e.message) + '</div></div>'; }
+  };
+  $('gmFind').addEventListener('click', load);
+  $('gmGid').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  if (st.gid) load();
+};
+
+/* ---------------- 群消息日志 ---------------- */
+PAGES.groupmessages = async () => {
+  const st = STATE.groupmessages = STATE.groupmessages || { gid: '' };
+  $('content').innerHTML = searchRow(uidInput('gmsgGid', st.gid, '群 ID'), 'gmsgFind', '查询',
+    '只给元数据（谁、什么时候、投递/已读情况），不含聊天明文')
+    + '<div id="gmsgBox"></div>';
+  const load = async () => {
+    const v = $('gmsgGid').value.trim();
+    STATE.groupmessages = { gid: v };
+    if (!v) return;
+    try {
+      const d = await api('/groupmessages?gid=' + encodeURIComponent(v) + '&limit=150');
+      $('gmsgBox').innerHTML = '<div class="panel"><h3>' + esc(d.chat.name || '单聊')
+        + ' <span class="hint">' + d.chat.members + ' 人</span></h3>'
+        + tbl(['时间', '发送人', '类型', '投递/已读'], d.rows.map((m) => '<tr><td>' + fmtTime(m.at)
+          + '</td><td>' + esc(m.from) + '</td><td>' + esc(m.kind) + '</td><td>'
+          + badge(esc(m.status), /全部已读/.test(m.status) ? 'g' : 'gy') + '</td></tr>').join('')) + '</div>';
+    } catch (e) { $('gmsgBox').innerHTML = '<div class="panel"><div class="body hint">' + esc(e.message) + '</div></div>'; }
+  };
+  $('gmsgFind').addEventListener('click', load);
+  $('gmsgGid').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  if (st.gid) load();
+};
+
+/* ---------------- 朋友圈评论管理 ---------------- */
+PAGES.momentcomments = async () => {
+  const d = await api('/momentcomments');
+  $('content').innerHTML = '<div class="panel"><h3>朋友圈评论管理 <span class="hint">共 ' + d.total
+    + ' 条（含被删前的历史）</span></h3>'
+    + tbl(['评论 ID', '评论人', '所属动态', '内容', '时间', '操作'], d.rows.map((r) => '<tr><td>'
+      + esc(r.id) + '</td><td>' + esc(r.user) + ' <span class="hint">' + esc(r.userId) + '</span></td><td>'
+      + esc(r.momentId) + ' <span class="hint">' + esc(r.momentOwner) + '</span></td><td>'
+      + esc(r.content) + '</td><td>' + fmtTime(r.at) + '</td><td>'
+      + (can('moments.write') ? '<button class="btn" data-delc="' + esc(r.id) + '">删除</button>' : '—')
+      + '</td></tr>').join('')) + '</div>';
+  $('content').querySelectorAll('[data-delc]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      if (!confirm('删除这条评论？')) return;
+      try {
+        await api('/momentcomments/del', { method: 'POST', body: { commentId: b.getAttribute('data-delc') } });
+        toast('已删除');
+        PAGES.momentcomments();
+      } catch (e) { toast(e.message); }
+    });
+  });
+};
+
+/* ---------------- 敏感关键词管理 ---------------- */
+PAGES.sensitive = async () => {
+  const d = await api('/sensitive');
+  const words = d.words || [];
+  $('content').innerHTML =
+    '<div class="panel"><h3>敏感关键词管理 <span class="hint">共 ' + words.length
+    + ' 个。命中就直接拦截消息（和微信一样：发送方看到「内容包含违规词」）</span></h3>'
+    + '<div class="row" style="margin-top:12px">'
+    + (can('risk.write') ? '<input class="wide" id="swAdd" placeholder="新增关键词" style="max-width:240px">'
+      + '<button class="btn main" id="swSave">添加</button>' : '<span class="hint">你的角色没有改敏感词的权限</span>')
+    + '</div><div style="margin-top:14px">'
+    + words.map((w) => '<span class="chip" style="margin:4px 6px 4px 0">' + esc(w)
+      + (can('risk.write') ? ' <a href="javascript:void(0)" data-delw="' + esc(w)
+        + '" style="color:#f5222d;text-decoration:none">×</a>' : '') + '</span>').join('')
+    + '</div></div>'
+    + '<div class="panel"><h3>违规告警（最近 ' + (d.violations || []).length + ' 条）</h3>'
+    + tbl(['时间', '用户', '命中词', '内容'], (d.violations || []).map((v) => '<tr><td>' + fmtTime(v.at)
+      + '</td><td>' + esc(v.nickname || v.username || v.userId || '') + '</td><td>' + esc(v.word || '')
+      + '</td><td>' + esc(String(v.text || '').slice(0, 40)) + '</td></tr>').join('')) + '</div>';
+  if ($('swSave')) $('swSave').addEventListener('click', async () => {
+    const w = $('swAdd').value.trim();
+    if (!w) return;
+    try { await api('/sensitive', { method: 'POST', body: { add: w } }); toast('已添加'); PAGES.sensitive(); }
+    catch (e) { toast(e.message); }
+  });
+  $('content').querySelectorAll('[data-delw]').forEach((a) => {
+    a.addEventListener('click', async () => {
+      try {
+        await api('/sensitive', { method: 'POST', body: { remove: a.getAttribute('data-delw') } });
+        PAGES.sensitive();
+      } catch (e) { toast(e.message); }
+    });
+  });
+};
+
+/* ---------------- 风控黑名单（IP + 账号） ---------------- */
+PAGES.blacklist = async () => {
+  const d = await api('/blacklist');
+  $('content').innerHTML =
+    '<div class="panel"><h3>风控黑名单 · IP <span class="hint">共 ' + d.ips.length + ' 条（自动防刷封的）</span></h3>'
+    + (can('risk.write') ? '<div class="row" style="margin-bottom:10px"><input class="wide" id="blIp" placeholder="要封的 IP" style="max-width:220px">'
+      + '<input class="wide" id="blMin" placeholder="分钟" value="60" style="max-width:100px">'
+      + '<input class="wide" id="blWhy" placeholder="原因" style="max-width:200px">'
+      + '<button class="btn red" id="blAdd">加入黑名单</button></div>' : '')
+    + tbl(['IP', '剩余时间', '到期时间', '操作'], d.ips.map((r) => '<tr><td>' + esc(r.ip) + '</td><td>'
+      + r.remainMin + ' 分钟</td><td>' + fmtTime(r.until) + '</td><td>'
+      + (can('risk.write') ? '<button class="btn" data-unbl="' + esc(r.ip) + '">解除</button>' : '—')
+      + '</td></tr>').join('')) + '</div>'
+    + '<div class="panel"><h3>风控黑名单 · 账号临时限制 <span class="hint">共 ' + d.restricted.length
+    + ' 条</span></h3>'
+    + tbl(['账号', '风险分', '命中行为', '解除时间'], d.restricted.map((r) => '<tr><td>' + esc(r.nickname)
+      + ' <span class="hint">' + esc(r.username || r.id) + '</span></td><td>' + badge(String(r.score), 'r')
+      + '</td><td>' + esc((r.kinds || []).join(' / ')) + '</td><td>' + fmtTime(r.until) + '</td></tr>').join('')) + '</div>'
+    + '<div class="panel"><h3>已封禁账号 <span class="hint">共 ' + d.banned.length + ' 条</span></h3>'
+    + tbl(['账号', '原因', '封禁时间'], d.banned.map((u) => '<tr><td>' + esc(u.nickname) + ' <span class="hint">'
+      + esc(u.username) + '</span></td><td>' + esc(u.reason) + '</td><td>' + fmtTime(u.at) + '</td></tr>').join('')) + '</div>'
+    + '<div class="hint" style="margin-top:10px">' + esc(d.note || '') + '</div>';
+  if ($('blAdd')) $('blAdd').addEventListener('click', async () => {
+    const ip = $('blIp').value.trim();
+    if (!ip) return;
+    try {
+      await api('/blacklist', { method: 'POST', body: { ip, minutes: Number($('blMin').value) || 60, reason: $('blWhy').value.trim() } });
+      toast('已封禁');
+      PAGES.blacklist();
+    } catch (e) { toast(e.message); }
+  });
+  $('content').querySelectorAll('[data-unbl]').forEach((b) => {
+    b.addEventListener('click', async () => {
+      try {
+        await api('/blacklist', { method: 'POST', body: { ip: b.getAttribute('data-unbl'), release: true } });
+        toast('已解除');
+        PAGES.blacklist();
+      } catch (e) { toast(e.message); }
+    });
+  });
+};
+
+/* ---------------- 通话记录列表 ---------------- */
+PAGES.calls = async () => {
+  const st = STATE.calls = STATE.calls || { days: 7 };
+  const d = await api('/calls?days=' + st.days + '&limit=150');
+  $('content').innerHTML =
+    '<div class="panel"><div class="body"><div class="filters">'
+    + '<select id="callDays" class="wide" style="max-width:160px">'
+    + [1, 3, 7, 30].map((n) => '<option value="' + n + '"' + (n === st.days ? ' selected' : '') + '>最近 ' + n + ' 天</option>').join('')
+    + '</select><span class="hint">' + esc(d.note || '') + '</span></div></div></div>'
+    + '<div class="panel"><h3>通话记录 <span class="hint">' + d.rows.length + ' 条</span></h3>'
+    + tbl(['通话 ID', '主叫', '被叫', '开始时间', '时长', '类型', '结果'],
+      d.rows.map((r) => '<tr><td>' + esc(r.id) + '</td><td>' + esc(r.caller) + ' <span class="hint">'
+        + esc(r.callerId) + '</span></td><td>' + esc(r.callee) + '</td><td>' + fmtTime(r.at) + '</td><td>'
+        + (r.durationSec ? Math.floor(r.durationSec / 60) + '分' + (r.durationSec % 60) + '秒' : '—')
+        + '</td><td>' + (r.video ? '视频' : '语音') + '</td><td>'
+        + badge(esc(r.result + (r.reason ? ' · ' + r.reason : '')), r.result === '接通' ? 'g' : 'r')
+        + '</td></tr>').join('')) + '</div>';
+  $('callDays').addEventListener('change', () => { STATE.calls = { days: Number($('callDays').value) }; PAGES.calls(); });
+};
+
+/* ---------------- 通话统计大盘 ---------------- */
+PAGES.callstats = async () => {
+  const st = STATE.callstats = STATE.callstats || { days: 7 };
+  const d = await api('/calls?days=' + st.days + '&limit=1');
+  const s = d.stats;
+  const fails = Object.keys(s.failReasons || {});
+  $('content').innerHTML =
+    '<div class="panel"><div class="body"><div class="filters">'
+    + '<select id="csDays" class="wide" style="max-width:160px">'
+    + [1, 3, 7, 30].map((n) => '<option value="' + n + '"' + (n === st.days ? ' selected' : '') + '>最近 ' + n + ' 天</option>').join('')
+    + '</select></div></div></div>'
+    + '<div class="kpis">'
+    + card('今日通话总量', s.todayTotal) + card('今日接通', s.todayConnected)
+    + card('接通成功率', s.successRate + '%') + card('平均通话时长', s.avgDurationSec + ' 秒')
+    + '</div>'
+    + '<div class="panel"><h3>失败原因分布（今日）</h3>'
+    + tbl(['原因', '次数'], fails.map((k) => '<tr><td>' + esc(k) + '</td><td>' + s.failReasons[k] + '</td></tr>').join(''))
+    + '</div>';
+  $('csDays').addEventListener('change', () => { STATE.callstats = { days: Number($('csDays').value) }; PAGES.callstats(); });
+};
+
+/* ---------------- 用户行为日志 ---------------- */
+PAGES.behavior = async () => {
+  const st = STATE.behavior = STATE.behavior || { uid: '' };
+  const d = await api('/behavior?limit=200&uid=' + encodeURIComponent(st.uid));
+  $('content').innerHTML = searchRow(uidInput('bhUid', st.uid, '用户ID（留空 = 全部）'), 'bhFind', '查询',
+    '注册 / 登录 / 换手机号 / 实名 / 支付密码错 … 共 ' + d.total + ' 条')
+    + '<div class="panel"><h3>用户行为日志</h3>'
+    + tbl(['时间', '用户', '行为', 'IP', '设备'], d.rows.map((r) => '<tr><td>' + fmtTime(r.at) + '</td><td>'
+      + esc(r.username || r.userId) + '</td><td>' + badge(esc(r.kind), 'gy') + '</td><td>' + esc(r.ip)
+      + '</td><td>' + esc(r.device) + '</td></tr>').join('')) + '</div>';
+  const go = () => { STATE.behavior = { uid: $('bhUid').value.trim() }; PAGES.behavior(); };
+  $('bhFind').addEventListener('click', go);
+  $('bhUid').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+};
+
+/* ---------------- App 公告配置（即时全站 + 弹窗公告） ---------------- */
+PAGES.announcements = async () => {
+  const hist = await api('/announcements');
+  const d = await api('/notice');
+  const n = d.notice;
+  $('content').innerHTML =
+    '<div class="panel"><h3>App 弹窗公告 <span class="hint">App 打开时弹的框（通过 /api/version 下发）</span></h3>'
+    + '<div class="kv"><b>启用</b><span><input type="checkbox" id="anEnabled"' + (n.enabled ? ' checked' : '') + '></span></div>'
+    + '<div class="kv"><b>标题</b><span><input class="wide" id="anTitle" value="' + esc(n.title) + '"></span></div>'
+    + '<div class="kv"><b>内容</b><span><textarea id="anContent" rows="3" style="width:100%">' + esc(n.content) + '</textarea></span></div>'
+    + '<div class="kv"><b>弹窗类型</b><span><select id="anKind" class="wide"><option value="popup"' + (n.kind === 'popup' ? ' selected' : '') + '>每次打开都弹</option>'
+    + '<option value="daily"' + (n.kind === 'daily' ? ' selected' : '') + '>每天第一次弹</option>'
+    + '<option value="once"' + (n.kind === 'once' ? ' selected' : '') + '>只弹一次</option></select></span></div>'
+    + '<div class="kv"><b>生效时间</b><span><input class="wide" id="anStart" placeholder="2026-10-01 00:00" value="' + esc(n.startAt) + '"> 到 '
+    + '<input class="wide" id="anEnd" placeholder="留空 = 长期" value="' + esc(n.endAt) + '"></span></div>'
+    + '<div class="kv"><b>版本范围</b><span><input class="wide" id="anMin" placeholder="最低版本，如 B528" value="' + esc(n.minVersion) + '"> ～ '
+    + '<input class="wide" id="anMax" placeholder="最高版本，留空不限" value="' + esc(n.maxVersion) + '"></span></div>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="anSave">保存公告配置</button></div></div>'
+    + '<div class="panel"><h3>全站公告消息 <span class="hint">会像微信的系统消息一样，给每个人的会话里发一条</span></h3>'
+    + '<div class="row"><input class="wide" id="bcText" placeholder="公告内容（最多 300 字）" style="max-width:520px">'
+    + '<button class="btn red" id="bcSend">立即发送</button></div>'
+    + '<div style="margin-top:14px">' + tbl(['时间', '内容', '送达会话'],
+      (hist.announcements || []).map((a) => '<tr><td>' + fmtTime(a.createdAt) + '</td><td>'
+        + esc(String(a.content || '').slice(0, 80)) + '</td><td>' + (a.chats || 0) + '</td></tr>').join('')) + '</div></div>';
+  $('anSave').addEventListener('click', async () => {
+    try {
+      await api('/notice', { method: 'POST', body: {
+        enabled: $('anEnabled').checked, title: $('anTitle').value, content: $('anContent').value,
+        kind: $('anKind').value, startAt: $('anStart').value, endAt: $('anEnd').value,
+        minVersion: $('anMin').value, maxVersion: $('anMax').value } });
+      toast('已保存');
+    } catch (e) { toast(e.message); }
+  });
+  $('bcSend').addEventListener('click', async () => {
+    const content = $('bcText').value.trim();
+    if (!content) return;
+    if (!confirm('确定给全站所有会话发这条公告？')) return;
+    try { await api('/broadcast', { method: 'POST', body: { content } }); toast('已发送'); PAGES.announcements(); }
+    catch (e) { toast(e.message); }
+  });
+};
+
+/* ---------------- 风控阈值配置 ---------------- */
+PAGES.thresholds = async () => {
+  const d = await api('/thresholds');
+  const t = d.thresholds, c = d.current;
+  const F = (label, key, hint) => '<div class="kv"><b>' + label + '</b><span><input class="wide" type="number" data-t="'
+    + key + '" value="' + esc(String(t[key])) + '"> <span class="hint">' + hint + '</span></span></div>';
+  $('content').innerHTML =
+    '<div class="panel"><h3>风控阈值配置</h3>'
+    + '<div class="hint">下面这些是后台可调的运营阈值；括号里是当前服务端实际生效的值。</div>'
+    + F('单 IP 每天最多注册', 'registerPerIpPerDay', '（服务端有同一套硬限制做兜底）')
+    + F('单人每天好友申请上限', 'friendApplyPerDay', '')
+    + F('单人每分钟消息上限', 'msgPerMinute', '当前实际：' + c.msgPerMinute + ' 条/分钟')
+    + F('风险分达到多少限制功能', 'riskRestrictScore', '默认 80（24 小时临时限制）')
+    + F('风险分达到多少重点关注', 'riskWatchScore', '默认 30')
+    + '<div class="hint" style="margin-top:8px">服务端当前：每 IP 同时 ' + c.wsPerIp + ' 条长连接 · 每 IP 10 秒 '
+    + c.apiPerWindow + ' 个接口请求</div>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="thSave">保存</button></div></div>';
+  $('thSave').addEventListener('click', async () => {
+    const body = {};
+    $('content').querySelectorAll('[data-t]').forEach((el) => { body[el.getAttribute('data-t')] = Number(el.value); });
+    try { await api('/thresholds', { method: 'POST', body }); toast('已保存（立即生效）'); PAGES.thresholds(); }
+    catch (e) { toast(e.message); }
+  });
+};
+
+/* ---------------- App 版本管理 ---------------- */
+PAGES.appversion = async () => {
+  const d = await api('/appversion');
+  const v = d.version;
+  $('content').innerHTML =
+    '<div class="panel"><h3>App 版本管理 <span class="hint">改完 App 下次启动就能拿到（/api/version 下发）</span></h3>'
+    + '<div class="kv"><b>版本号</b><span><input class="wide" id="avVer" placeholder="如 B529" value="' + esc(v.version) + '"></span></div>'
+    + '<div class="kv"><b>更新文案</b><span><textarea id="avNotes" rows="3" style="width:100%">' + esc(v.notes) + '</textarea></span></div>'
+    + '<div class="kv"><b>强制更新</b><span><input type="checkbox" id="avForce"' + (v.force ? ' checked' : '') + '>'
+    + ' <span class="hint">勾上以后，低于这个版本的 App 打开就必须更新（微信那种弹框）</span></span></div>'
+    + '<div class="kv"><b>下载地址</b><span><input class="wide" id="avUrl" value="' + esc(v.url) + '"></span></div>'
+    + '<div class="kv"><b>下载页</b><span><input class="wide" id="avPage" value="' + esc(v.downloadPage) + '"></span></div>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="avSave">保存</button></div></div>';
+  $('avSave').addEventListener('click', async () => {
+    try {
+      await api('/appversion', { method: 'POST', body: {
+        version: $('avVer').value, notes: $('avNotes').value, force: $('avForce').checked,
+        url: $('avUrl').value, downloadPage: $('avPage').value } });
+      toast('已保存');
+    } catch (e) { toast(e.message); }
+  });
+};
+
+/* ---------------- 角色权限配置 ---------------- */
+PAGES.roles = async () => {
+  const d = await api('/roles');
+  const roles = d.roles || {};
+  const names = d.names || {};
+  const perms = d.allPerms || [];
+  const roleKeys = ['super', 'auditor', 'support', 'ops'];
+  $('content').innerHTML =
+    '<div class="panel"><h3>角色权限配置 <span class="hint">规范里的四类角色：'
+    + '超级管理员 / 内容审核运营 / 客服 / 运维' + (d.custom ? '（已自定义）' : '（当前是默认）') + '</span></h3>'
+    + '<div class="hint">勾上 = 该角色能用这个功能。超级管理员永远拥有全部权限（不可取消）。</div>'
+    + '<div style="overflow:auto"><table><tr><th style="text-align:left">权限</th>'
+    + roleKeys.map((r) => '<th>' + esc(names[r] || r) + '</th>').join('') + '</tr>'
+    + perms.map((p) => '<tr><td>' + esc(p) + '</td>'
+      + roleKeys.map((r) => '<td style="text-align:center"><input type="checkbox" data-role="' + r
+        + '" data-perm="' + esc(p) + '"' + ((roles[r] || []).indexOf(p) >= 0 ? ' checked' : '')
+        + (r === 'super' ? ' disabled' : '') + '></td>').join('') + '</tr>').join('')
+    + '</table></div>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="roSave">保存</button>'
+    + '<button class="btn" id="roReset" style="margin-left:8px">恢复默认</button></div></div>';
+  $('roSave').addEventListener('click', async () => {
+    const out = { super: [], auditor: [], support: [], ops: [] };
+    $('content').querySelectorAll('[data-role]').forEach((cb) => {
+      if (cb.checked) out[cb.getAttribute('data-role')].push(cb.getAttribute('data-perm'));
+    });
+    try { await api('/roles', { method: 'POST', body: { roles: out } }); toast('已保存（管理员重新进后台生效）'); PAGES.roles(); }
+    catch (e) { toast(e.message); }
+  });
+  $('roReset').addEventListener('click', async () => {
+    if (!confirm('恢复成默认权限？')) return;
+    try { await api('/roles', { method: 'POST', body: { reset: true } }); toast('已恢复默认'); PAGES.roles(); }
+    catch (e) { toast(e.message); }
+  });
+};
+
+/* ---------------- 告警配置 ---------------- */
+PAGES.alerts = async () => {
+  const d = await api('/alerts');
+  const a = d.alerts;
+  $('content').innerHTML =
+    '<div class="panel"><h3>告警配置</h3>'
+    + '<div class="kv"><b>接收人</b><span><input class="wide" id="alTo" placeholder="手机号 / 钉钉群名，逗号分隔" value="' + esc(a.receivers) + '"></span></div>'
+    + '<div class="kv"><b>告警方式</b><span><select id="alMethod" class="wide">'
+    + ['webhook', 'sms', 'dingtalk'].map((m) => '<option value="' + m + '"' + (a.method === m ? ' selected' : '') + '>'
+      + (m === 'webhook' ? 'Webhook（企业微信/钉钉机器人/Server酱）' : m === 'sms' ? '短信' : '钉钉') + '</option>').join('')
+    + '</select></span></div>'
+    + '<div class="kv"><b>Webhook 地址</b><span><input class="wide" id="alHook" placeholder="https://…" value="' + esc(a.webhookUrl) + '"></span></div>'
+    + '<div class="kv"><b>接口错误率超过</b><span><input class="wide" type="number" id="alApi" value="' + a.apiErrRatePct + '"> % 告警</span></div>'
+    + '<div class="kv"><b>CPU 超过</b><span><input class="wide" type="number" id="alCpu" value="' + a.cpuPct + '"> % 告警</span></div>'
+    + '<div class="kv"><b>内存超过</b><span><input class="wide" type="number" id="alMem" value="' + a.memPct + '"> % 告警</span></div>'
+    + '<div class="kv"><b>消息失败率超过</b><span><input class="wide" type="number" id="alMsg" value="' + a.msgFailRatePct + '"> % 告警</span></div>'
+    + '<div class="kv"><b>掉线多久告警</b><span><input class="wide" type="number" id="alOff" value="' + a.offlineMin + '"> 分钟</span></div>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="alSave">保存</button></div></div>'
+    + '<div class="panel"><h3>最近的告警记录 <span class="hint">看门狗每 ' + d.monitor.intervalSec
+    + ' 秒探一次，连续 ' + d.monitor.failThreshold + ' 次失败算挂</span></h3>'
+    + '<div style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#666">'
+    + (d.recent.length ? d.recent.map((l) => esc(l)).join('<br>') : '（没有告警记录）') + '</div></div>';
+  $('alSave').addEventListener('click', async () => {
+    try {
+      await api('/alerts', { method: 'POST', body: {
+        receivers: $('alTo').value, method: $('alMethod').value, webhookUrl: $('alHook').value,
+        apiErrRatePct: Number($('alApi').value), cpuPct: Number($('alCpu').value),
+        memPct: Number($('alMem').value), msgFailRatePct: Number($('alMsg').value), offlineMin: Number($('alOff').value) } });
+      toast('已保存');
+    } catch (e) { toast(e.message); }
+  });
+};
+
+/* ---------------- 后台访问白名单（不在名单里一律 404） ---------------- */
+PAGES.whitelist = async () => {
+  const d = await api('/whitelist');
+  const strict = (d.ips || []).length > 0;
+  $('content').innerHTML =
+    '<div class="panel"><h3>后台访问白名单 <span class="hint">'
+    + (strict ? '当前：严格模式（只有名单里的 IP 能进后台）' : '当前：名单为空，退回老规则（局域网 + 只允许国内）')
+    + '</span></h3>'
+    + '<div class="hint">不在名单里的 IP 打开后台页面或接口，一律返回 <b>404</b>——和「随便乱输一个不存在的路径」长得一样，不给任何提示。本机 127.0.0.1 永远放行（服务器上'
+    + '自己的脚本要用）。<b>注意：添加名单后，你自己不在名单里就会被关在门外</b>，所以先把自己当前 IP 加进去。</div>'
+    + '<div class="kv"><b>你现在的 IP</b><span><code>' + esc(d.myIp || '—') + '</code>'
+    + (can('admins') ? ' <button class="btn" id="wlSelf">把我加进白名单</button>' : '') + '</span></div>'
+    + (can('admins') ? '<div class="row" style="margin-top:10px"><input class="wide" id="wlAdd" placeholder="要加入白名单的 IP（如 112.22.85.173）" style="max-width:320px">'
+      + '<button class="btn main" id="wlSave">添加</button></div>' : '<div class="hint">你的角色没有改白名单的权限</div>')
+    + '</div>'
+    + '<div class="panel"><h3>白名单 IP（' + (d.ips || []).length + '）</h3>'
+    + tbl(['IP', '操作'], (d.ips || []).map((ip) => '<tr><td>' + esc(ip) + '</td><td>'
+      + (can('admins') ? '<button class="btn" data-unwl="' + esc(ip) + '">移出</button>' : '—')
+      + '</td></tr>').join('')) + '</div>'
+    + '<div class="panel"><h3>永远放行</h3><div class="hint">'
+    + (d.alwaysAllowed || []).join('、') + '（服务器本机，改不了）</div></div>';
+  const save = async (body) => {
+    try {
+      await api('/whitelist', { method: 'POST', body });
+      toast('已保存（立即生效）');
+      PAGES.whitelist();
+    } catch (e) { toast(e.message); }
+  };
+  if ($('wlSave')) $('wlSave').addEventListener('click', () => {
+    const ip = $('wlAdd').value.trim();
+    if (!ip) return toast('先填 IP');
+    if (!confirm('把 ' + ip + ' 加入白名单？\n\n如果名单里没有你当前用的 IP，你自己也会被关在门外（会看到 404）。')) return;
+    save({ add: ip });
+  });
+  if ($('wlSelf')) $('wlSelf').addEventListener('click', () => save({ add: d.myIp }));
+  $('content').querySelectorAll('[data-unwl]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const ip = b.getAttribute('data-unwl');
+      if (ip === d.myIp && !confirm('你要移出的正是你当前使用的 IP，确认后你会立刻被关在门外（404）。继续？')) return;
+      save({ remove: ip });
     });
   });
 };

@@ -163,7 +163,7 @@ struct TransferView: View {
                     Text("转账给 \(chat.name)")
                         .font(pf(17.5, .semibold))
                         .foregroundColor(C.label)
-                    Text("微信号：\(chat.name)")
+                    Text("账号：\(chat.name)")
                         .font(pf(12))
                         .foregroundColor(C.subLabel)
                 }

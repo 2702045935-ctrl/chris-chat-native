@@ -138,7 +138,7 @@ struct KefuPage: View {
                 .padding(.vertical, 9)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(mine ? Color(hex: 0x95EC69) : C.cardBg)
+                        .fill(mine ? Color(hex: 0xD8F2E4) : C.cardBg)
                 )
                 .fixedSize(horizontal: false, vertical: true)
             if mine { RPAvatar(path: app.me?.avatar ?? "", size: 34) }

@@ -437,7 +437,7 @@ struct PayConfirmPage: View {
                     .disabled(busy)
                     .padding(.horizontal, 8)
 
-                    Text(Tr("付出去的钱当时到对方账上，不能撤回（和微信商家收款一样）。"))
+                    Text(Tr("付出去的钱当时到对方账上，不能撤回。"))
                         .font(pf(12.5))
                         .foregroundColor(C.subLabel)
                         .multilineTextAlignment(.center)

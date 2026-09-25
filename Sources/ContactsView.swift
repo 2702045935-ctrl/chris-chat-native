@@ -356,7 +356,7 @@ struct ContactCardView: View {
     var body: some View {
         if UIConfig.text("cardStyle", "old") == "new" {
             ContactCardNew(name: displayName,
-                           idLine: "微信号 " + (u.username ?? ""),
+                           idLine: "账号 " + (u.username ?? ""),
                            avatarPath: u.avatarPath,
                            isEyes: isEyesBot,
                            remark: meta?.remark ?? "",
@@ -456,7 +456,7 @@ struct ContactCardView: View {
                 if let b = u.bio, !b.isEmpty { Button("简介：\(b)") { } }
             } else {
                 Button("昵称：\(u.name)") { }
-                Button("微信号：\(u.username ?? "—")") { }
+                Button("账号：\(u.username ?? "—")") { }
                 Button("地区：\((u.region?.isEmpty == false) ? u.region! : "未知")") { }
             }
             Button(Tr("取消"), role: .cancel) { }
@@ -535,7 +535,7 @@ struct ContactCardView: View {
                 if isBot {
                     cardLine("简介：" + ((u.bio?.isEmpty == false) ? u.bio! : "您的私人助理"))
                 } else {
-                    cardLine("微信号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
+                    cardLine("账号：" + ((u.username?.isEmpty == false) ? u.username! : "—"))
                     cardLine("地区：" + ((u.region?.isEmpty == false) ? u.region! : "未知"))
                 }
             }

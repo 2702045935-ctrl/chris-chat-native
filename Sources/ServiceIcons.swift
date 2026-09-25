@@ -42,11 +42,11 @@ enum SvcIcon {
 /* 服务器联系不上 / 还没升级时的兜底：内容和参考图一致，图标走上面那套内置的 */
 enum ServiceFallback {
     static let groups: [(String, [(String, String, String)])] = [
-        ("金融理财", [("信用卡还款", "svc.creditcard", "#07C160"), ("理财通", "svc.fund", "#10AEFF"), ("保险服务", "svc.insure", "#FA9D3B")]),
-        ("生活服务", [("手机充值", "svc.phone", "#1180E0"), ("生活缴费", "svc.utility", "#07C160"), ("Q币充值", "svc.qcoin", "#10AEFF"),
-                   ("城市服务", "svc.city", "#07C160"), ("腾讯公益", "svc.charity", "#FA5151"), ("医疗健康", "svc.health", "#FA9D3B")]),
-        ("交通出行", [("出行服务", "svc.travel", "#1180E0"), ("火车票机票", "svc.train", "#07C160"), ("酒店民宿", "svc.hotel", "#FA9D3B"),
-                   ("滴滴出行", "svc.didi", "#07C160")]),
+        ("金融理财", [("信用卡还款", "svc.creditcard", "#19A47A"), ("理财通", "svc.fund", "#10AEFF"), ("保险服务", "svc.insure", "#FA9D3B")]),
+        ("生活服务", [("手机充值", "svc.phone", "#1180E0"), ("生活缴费", "svc.utility", "#19A47A"), ("Q币充值", "svc.qcoin", "#10AEFF"),
+                   ("城市服务", "svc.city", "#19A47A"), ("腾讯公益", "svc.charity", "#FA5151"), ("医疗健康", "svc.health", "#FA9D3B")]),
+        ("交通出行", [("出行服务", "svc.travel", "#1180E0"), ("火车票机票", "svc.train", "#19A47A"), ("酒店民宿", "svc.hotel", "#FA9D3B"),
+                   ("滴滴出行", "svc.didi", "#19A47A")]),
         ("购物消费", [("京东购物", "svc.jd", "#FA5151"), ("美团外卖", "svc.meituan", "#FA9D3B"), ("电影演出", "svc.movie", "#1180E0"),
                    ("拼多多", "svc.pdd", "#FA5151")])
     ]
@@ -92,7 +92,7 @@ enum WalletFallback {
         ])
         let card2 = WalletGroup(id: "wg2", enabled: true, items: [
             item("w06", "支付分", "svc.wscore", "#2BC46E"),
-            item("w07", "客服中心", "svc.wservice", "#07C160", action: "service")
+            item("w07", "客服中心", "svc.wservice", "#19A47A", action: "service")
         ])
         let foot = [
             WalletFoot(id: "wf1", label: "身份信息", action: "identity", enabled: true),

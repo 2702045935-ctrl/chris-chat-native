@@ -28,7 +28,7 @@ struct PhoneChangeSheet: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
                 Text(Tr("更换手机号")).font(.system(size: 20, weight: .semibold))
-                Text(Tr("新手机号要能收短信验证码；手机号一年只能换一次（和微信一样）。"))
+                Text(Tr("新手机号要能收短信验证码；手机号一年只能换一次。"))
                     .font(.system(size: 13)).foregroundColor(C.subLabel)
 
                 HStack(spacing: 10) {

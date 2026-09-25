@@ -2196,6 +2196,27 @@ const saveMomentViews = () => writeJson(path.join(DATA_DIR, 'moment-views.json')
 const saveAnnouncements = () => writeJson(path.join(DATA_DIR, 'announcements.json'), { announcements: db.announcements });
 const saveBranding = () => writeJson(path.join(DATA_DIR, BRANDING_FILE), { branding: db.branding });
 const saveBadges = () => writeJson(path.join(DATA_DIR, 'badges.json'), { badges: db.badges });
+
+/* ---------------- 服务器入口表（App 端的「多线路」） ----------------
+   主入口连不上时，App 会按这张表自动换地址（换完记住），所以线上线路抽风不用等出新包。
+   只写「域名:端口」或「域名」；空行 / 写错的格式自动丢掉。
+   顺序 = 优先级：第一行是主入口，后面是备用。 */
+const ENDPOINTS_FILE = path.join(DATA_DIR, 'endpoints.json');
+const DEFAULT_ENDPOINTS = ['aa.x8iu.com:443', 'aa.x8iu.com:5443', '206.187.208.79:5443'];
+function normalizeEndpoint(v) {
+  let s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  s = s.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (s.length > 80) return '';
+  if (!/^[A-Za-z0-9.\-]+(:\d{1,5})?$/.test(s)) return '';
+  return s;
+}
+function serverEndpoints() {
+  const cfg = readJson(ENDPOINTS_FILE, null);
+  const raw = cfg && Array.isArray(cfg.endpoints) ? cfg.endpoints : [];
+  const list = raw.map(normalizeEndpoint).filter(Boolean);
+  return list.length ? list.slice(0, 6) : DEFAULT_ENDPOINTS.slice();
+}
 const savePlusPanel = () => writeJson(path.join(DATA_DIR, PLUSPANEL_FILE), { items: db.plusPanel });
 const saveGifts = () => writeJson(path.join(DATA_DIR, GIFTS_FILE), { gifts: db.gifts });
 const saveStickers = () => writeJson(path.join(DATA_DIR, STICKER_FILE), { stickers: db.stickers });
@@ -8525,7 +8546,7 @@ async function handleApi(req, res, pathname, query) {
 
   /* 登录前只开放这几个接口（登录页要用的），其它一律要求先登录。
      这样没账号的黑客连「发现页配了什么、我页配了什么、礼物有哪些」都看不到。 */
-  const PUBLIC_API = ['captcha', 'version', 'health', 'lan', 'branding', 'ui', 'badges', 'register', 'login', 'logout', 'session', 'pair', 'unban', 'which', 'qr', 'clientlog'];
+  const PUBLIC_API = ['captcha', 'version', 'health', 'lan', 'branding', 'ui', 'badges', 'endpoints', 'register', 'login', 'logout', 'session', 'pair', 'unban', 'which', 'qr', 'clientlog'];
   if (PUBLIC_API.indexOf(parts[0]) < 0) {
     if (!currentUser(req)) {
       strikeIp(clientInfo(req).ip, '未登录取数据 ' + parts[0]);
@@ -8688,6 +8709,13 @@ async function handleApi(req, res, pathname, query) {
   /* 红点提醒配置（App 底栏和列表行按它显示） */
   if (parts[0] === 'badges' && method === 'GET') {
     ok(res, { badges: db.badges || BADGE_DEFAULT });
+    return;
+  }
+
+  /* 多入口：App 每次进前台拉一次，主入口连不上时按这张表自动换线路。
+     放在公开接口里（还没登录也要能拿到），后台「线路入口」页可以随时改。 */
+  if (parts[0] === 'endpoints' && method === 'GET') {
+    ok(res, { endpoints: serverEndpoints() });
     return;
   }
 
@@ -14640,7 +14668,7 @@ async function handleOps(req, res, parts, query) {
 
   /* 界面配置类（UI 图标 / 发现页 / 我的页 / 界面文字 / 状态面板 / 表情 / 礼物 / +面板 / 应用名 / 图标上传）
      只有「超级管理员」能看能改 —— 客服、审核员、运维这些角色连读都读不到。 */
-  const UI_SUBS = ['icons', 'discover', 'mepage', 'service', 'wallet', 'balance-page', 'bills-page', 'uiconfig', 'statuses', 'stickers', 'gifts', 'plus-panel', 'branding', 'upload', 'loginpage', 'badges'];
+  const UI_SUBS = ['icons', 'discover', 'mepage', 'service', 'wallet', 'balance-page', 'bills-page', 'uiconfig', 'statuses', 'stickers', 'gifts', 'plus-panel', 'branding', 'upload', 'loginpage', 'badges', 'endpoints'];
   if (UI_SUBS.indexOf(sub) >= 0 && admin.role !== 'super') {
     return fail(res, 403, '界面配置只有超级管理员能看和改');
   }
@@ -14895,6 +14923,27 @@ async function handleOps(req, res, parts, query) {
     saveBadges();
     audit(req, admin, '修改红点提醒', '-', JSON.stringify(next));
     ok(res, { badges: next });
+    return;
+  }
+
+  /* 线路入口：App 端的「主入口 + 备用入口」。线上线路被掐时，App 自动按这份列表换地址，
+     后台改完立即生效（App 每次进前台会重新拉一次），不用重新装包。 */
+  if (sub === 'endpoints' && method === 'GET') {
+    const cfg = readJson(ENDPOINTS_FILE, null);
+    ok(res, {
+      endpoints: serverEndpoints(),
+      defaults: DEFAULT_ENDPOINTS.slice(),
+      saved: !!(cfg && Array.isArray(cfg.endpoints) && cfg.endpoints.length)
+    });
+    return;
+  }
+  if (sub === 'endpoints' && method === 'POST') {
+    const body = await readBody(req);
+    const list = (Array.isArray(body.endpoints) ? body.endpoints : [])
+      .map(normalizeEndpoint).filter(Boolean).slice(0, 6);
+    writeJson(ENDPOINTS_FILE, { endpoints: list, updatedAt: new Date().toISOString() });
+    audit(req, admin, '改服务器入口', list.join(' / ') || '(清空)', '');
+    ok(res, { endpoints: list.length ? list : DEFAULT_ENDPOINTS.slice() });
     return;
   }
 

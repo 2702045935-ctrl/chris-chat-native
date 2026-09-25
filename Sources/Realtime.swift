@@ -81,7 +81,7 @@ final class Realtime: ObservableObject {
     /// 这里最多每 0.25 秒往界面发一次，攒着的那条在稍后合并发出去。
     private var pending: PushEvent?
     private var publishTask: Task<Void, Never>?
-    /// 心跳：每 20 秒给服务器发一个 ping，45 秒收不到任何东西就认为断了、重连
+    /// 心跳：每 15 秒给服务器发一个 ping，35 秒收不到任何东西就认为断了、重连
     private var heartbeat: Task<Void, Never>?
     private var lastRx = Date()
 
@@ -133,6 +133,9 @@ final class Realtime: ObservableObject {
                        （见上面 lanOnly 那段）。 */
                     self.failCount += 1
                     if self.failCount % 3 == 0, lanOnly { self.plainFallback.toggle() }
+                    /* 连着断 3 次（差不多十几秒）：多半不是消息问题，是这条线路被掐了，
+                       自动换下一条备用入口再连（换通了以后所有请求都走新的那条）。 */
+                    if self.failCount % 3 == 0 { _ = API.shared.rotateEndpoint() }
                     /* 退避重连：1s → 2s → 3s → 最长 15s，避免疯狂重连刷屏、刷服务器 */
                     let wait = min(15.0, 1.0 + Double(self.failCount))
                     try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
@@ -148,10 +151,10 @@ final class Realtime: ObservableObject {
         heartbeat?.cancel()
         heartbeat = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
                 if Task.isCancelled { return }
                 guard let self = self else { return }
-                if Date().timeIntervalSince(self.lastRx) > 45 {
+                if Date().timeIntervalSince(self.lastRx) > 35 {
                     self.connected = false
                     self.start()
                     return

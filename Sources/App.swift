@@ -164,6 +164,16 @@ final class AppState: ObservableObject {
     }
 
     func boot() async {
+        /* 兜底：不管网络多慢，最多 6 秒一定离开「正在连接…」这一屏。
+           线路被掐的时候让用户盯着「正在连接」干等，是最容易被投诉的那种体验：
+           到点就先放进 App（有缓存资料就用缓存），后台继续连，连上了界面自己会更新。 */
+        let watchdog = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled, booting else { return }
+            if me == nil, let cached = AppState.cachedUser() { me = cached }
+            booting = false
+        }
+        defer { watchdog.cancel() }
         await refreshUI(force: true)
         await loadBadges()
         if API.shared.token.isEmpty {
@@ -211,6 +221,9 @@ final class AppState: ObservableObject {
             defaultChatBackground = b.chatBackground ?? ""
             splashImage = b.splash ?? ""
         }
+        /* 顺手把「线路入口」列表拉一份存起来：后台改了备用地址，用户在下次进前台就生效，
+           不用等出新包。主入口连不上时，下一次请求会自动换到这份列表里的下一条。 */
+        await API.shared.loadEndpointList()
     }
 
     func login(username: String, password: String) async throws {

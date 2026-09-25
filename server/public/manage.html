@@ -383,6 +383,7 @@ const MENUS = [
   { key: 'uiconfig', icon: '🔤', name: '界面文字', perm: 'icons', superOnly: true, group: '界面配置' },
   { key: 'loginpage', icon: '🎨', name: '登录页', perm: 'icons', superOnly: true, group: '界面配置' },
   { key: 'badges', icon: '🔴', name: '红点提醒', perm: 'icons', superOnly: true, group: '界面配置' },
+  { key: 'endpoints', icon: '🛰️', name: '线路入口', perm: 'icons', superOnly: true, group: '系统' },
   { key: 'ops', icon: '⚙️', name: '运维 / 公告', perm: 'ops', group: '系统' },
   { key: 'audit', icon: '📜', name: '审计日志', perm: 'audit', group: '系统' },
   { key: 'admins', icon: '🔑', name: '后台账号', perm: 'admins', group: '系统' }
@@ -2649,6 +2650,39 @@ PAGES.badges = async () => {
   };
   $('bdSave').addEventListener('click', () => save(false));
   $('bdReset').addEventListener('click', () => save(true));
+};
+
+/* ---------------- 线路入口：主入口连不上时，App 自动换备用地址 ----------------
+   上线以后最怕的不是服务器挂，而是「线路被掐」——用户手机连不上，只会骂软件。
+   这里配「主入口 + 备用入口」，App 每次进前台拉一份，连不上就自动往下换，不用重新装包。 */
+PAGES.endpoints = async () => {
+  const d = await api('/endpoints');
+  const writable = can('icons.write');
+  const rows = (d.endpoints || []).join('\n');
+  $('content').innerHTML =
+    '<div class="panel"><h3>线路入口（App 的多线路）</h3>'
+    + '<div class="hint">第一行是主入口，后面是备用。App 连不上主入口时会自动按顺序往下换，换通了就记住；'
+    + '改完立即生效（App 下次进前台重新拉一次），用户不用重装。</div>'
+    + '<div class="hint" style="margin-top:6px">写法：<b>域名:端口</b>。443 和 5443 两个口都开着，'
+    + '两个都写进去就等于多一条命。' + (d.saved ? '' : '（现在用的还是默认值）') + '</div>'
+    + '<textarea id="epList" spellcheck="false" rows="6" style="width:100%;margin-top:12px;'
+    + 'font-family:ui-monospace,Menlo,monospace;font-size:13px">' + esc(rows) + '</textarea>'
+    + '<div class="row" style="margin-top:14px"><button class="btn main" id="epSave">'
+    + (writable ? '保存' : '你没有权限保存') + '</button>'
+    + '<button class="btn" id="epReset" style="margin-left:8px">恢复默认</button>'
+    + '<span class="hint" style="margin-left:10px">默认：' + esc((d.defaults || []).join('  /  ')) + '</span></div>'
+    + '</div>';
+  const save = async (useDefault) => {
+    const lines = useDefault ? (d.defaults || []) : String($('epList').value || '').split(/\s*\n+\s*/);
+    const endpoints = lines.map((s) => String(s).trim()).filter(Boolean);
+    try {
+      const r = await api('/endpoints', { method: 'POST', body: { endpoints } });
+      toast('已保存：' + (r.endpoints || []).join(' / '));
+      PAGES.endpoints();
+    } catch (e) { toast(e.message, true); }
+  };
+  $('epSave').addEventListener('click', () => save(false));
+  $('epReset').addEventListener('click', () => save(true));
 };
 
 PAGES.uiconfig = async () => {

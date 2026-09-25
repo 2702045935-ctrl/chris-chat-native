@@ -408,6 +408,7 @@ private struct MomentsPayload: Decodable {
 }
 private struct BrandingPayload: Decodable { var branding: BrandInfo? }
 private struct BadgesPayload: Decodable { var badges: [String: String]? }
+private struct EndpointsPayload: Decodable { var endpoints: [String]? }
 
 struct BrandInfo: Decodable, Hashable {
     var appName: String?
@@ -1035,6 +1036,10 @@ final class API {
 
     private(set) var token: String = ""
     private(set) var server: String = "aa.x8iu.com"
+    /// 备用入口（服务器 /api/endpoints 下发的；本地缓存着，主入口连不上时按顺序切）
+    private(set) var backups: [String] = []
+    /// 上一次自动换线路的时间：30 秒内只许切一次，免得来回横跳
+    private var lastRotate = Date.distantPast
 
     private init() {
         let cfg = URLSessionConfiguration.default
@@ -1052,12 +1057,82 @@ final class API {
         } else {
             UserDefaults.standard.set(server, forKey: "chris.server")
         }
+        if let list = UserDefaults.standard.array(forKey: "chris.backups") as? [String] {
+            backups = list.filter { !$0.isEmpty }
+        }
         // 令牌优先从钥匙串读（重装 App 也不掉），读不到再看老地方
         if let saved = Keychain.get("token") {
             token = saved
         } else if let saved = UserDefaults.standard.string(forKey: "chris.token") {
             token = saved
             Keychain.set(saved, for: "token")
+        }
+    }
+
+    /* ---------------------------------------------------------- 多入口（自动换线路）
+       上线以后最怕的不是服务器挂，而是「线路被掐」：用户手机连不上，只会骂软件。
+       这里维护一份候选入口（当前地址 + 后台下发的备用地址 + 同域名的另一个端口），
+       连不上就自动换下一个再试一次；换通了就记住，用户不用重装、也不用手动改。 */
+
+    /// 候选入口：当前 → 后台下发的备用 → 同域名的另一个端口（443 / 5443 互备）
+    var candidates: [String] {
+        var list: [String] = [server]
+        list.append(contentsOf: backups)
+        for s in list {
+            let parts = s.split(separator: ":")
+            if parts.count == 2 {
+                let host = String(parts[0])
+                let port = String(parts[1])
+                list.append(host + (port == "5443" ? ":443" : ":5443"))
+            } else if !s.isEmpty {
+                list.append(s + ":5443")
+            }
+        }
+        var seen = Set<String>()
+        return list.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// 服务器下发的入口列表（只认「域名:端口」这种写法，最多留 6 条，本地缓存）
+    func setBackups(_ list: [String]) {
+        var seen = Set<String>()
+        let clean = list.map { API.normalizeServer($0) }.filter { !$0.isEmpty && seen.insert($0).inserted }
+        guard !clean.isEmpty else { return }
+        backups = Array(clean.prefix(6))
+        UserDefaults.standard.set(backups, forKey: "chris.backups")
+    }
+
+    /// 换下一条入口。真换了返回 true（调用方可以拿新地址重试一次）
+    @discardableResult
+    func rotateEndpoint(force: Bool = false) -> Bool {
+        let list = candidates
+        guard list.count > 1 else { return false }
+        let now = Date()
+        if !force, now.timeIntervalSince(lastRotate) < 30 { return false }
+        lastRotate = now
+        let idx = list.firstIndex(of: server) ?? 0
+        let next = list[(idx + 1) % list.count]
+        guard next != server else { return false }
+        server = next
+        UserDefaults.standard.set(next, forKey: "chris.server")
+        return true
+    }
+
+    /// 顺手更新一份备用入口（每次进前台拉一次；老服务器上没这个接口就静默跳过）
+    func loadEndpointList() async {
+        guard let payload: EndpointsPayload = try? await get("/api/endpoints", as: EndpointsPayload.self) else { return }
+        if let list = payload.endpoints { setBackups(list) }
+    }
+
+    /// 是不是「压根连不上」这类错（超时 / 拒绝 / DNS / 断网）——只有这类才换线路
+    static func isConnectivity(_ error: Error) -> Bool {
+        guard let e = error as? URLError else { return false }
+        switch e.code {
+        case .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+             .networkConnectionLost, .notConnectedToInternet, .dataNotAllowed,
+             .secureConnectionFailed, .serverCertificateUntrusted:
+            return true
+        default:
+            return false
         }
     }
 
@@ -1125,7 +1200,7 @@ final class API {
 
     /* ---------------------------------------------------------- 底层请求 */
 
-    private func request(_ method: String, _ path: String, body: [String: Any]? = nil) async throws -> Any {
+    private func request(_ method: String, _ path: String, body: [String: Any]? = nil, retried: Bool = false) async throws -> Any {
         guard let url = URL(string: base + path) else {
             throw APIError.message("服务器地址不正确")
         }
@@ -1149,7 +1224,12 @@ final class API {
         do {
             result = try await session.data(for: req)
         } catch {
-            throw APIError.message("连不上服务器（\(server)），检查手机是不是和电脑同一个 Wi-Fi")
+            /* 连不上（超时 / 拒绝 / DNS / 断网）：自动换一条线路再试一次。
+               上线以后线路抽风是常态，卡在「正在连接」比报个错更让人骂。 */
+            if !retried, API.isConnectivity(error), rotateEndpoint() {
+                return try await request(method, path, body: body, retried: true)
+            }
+            throw APIError.message("连不上服务器（\(server)），正在自动换线路…")
         }
         let data = result.0
         let response = result.1

@@ -255,7 +255,7 @@ struct ChatDetailView: View {
 
     /// 自己在打字 → 每 2 秒上报一次（服务端转给会话里的其他人）
     private func reportTyping() {
-        guard Date().timeIntervalSince(lastTypingSent) > 2 else { return }
+        guard Date().timeIntervalSince(lastTypingSent) > 3.5 else { return }
         lastTypingSent = Date()
         Realtime.shared.sendJSON(["type": "typing", "chatId": chat.id])
     }
@@ -594,7 +594,7 @@ struct ChatDetailView: View {
             await app.loadChats()
             if plusItems.isEmpty { plusItems = (try? await API.shared.plusPanel()) ?? [] }
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
                 if Task.isCancelled { break }
                 await load(initial: false)
             }

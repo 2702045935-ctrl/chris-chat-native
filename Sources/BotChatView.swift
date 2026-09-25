@@ -57,11 +57,12 @@ struct BotChatView: View {
             composer
         }
         .background(C.pageBg.ignoresSafeArea())
-        /* 进页面先拉一次，然后每 2.5 秒兜底轮询一次（长连接偶尔丢事件时也能及时看到回复） */
+        /* 进页面先拉一次；之后靠**实时事件**（服务器一推就拉），只在 8 秒没有任何事件时
+           兜底轮询一次 —— 之前是 2.5 秒无条件轮询，翻聊天时会一直重绘、发烫又费电。 */
         .task {
             await load()
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
                 if Task.isCancelled { return }
                 await load()
             }

@@ -42,6 +42,12 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private(set) var framesScheduled = 0     // 真的排进播放器的帧
     private(set) var framesDropped = 0       // 播放器没起来时丢掉的帧
 
+    /* 抖动缓冲：已经排进播放器、还没播完的帧数。
+       一直保持 3 帧（≈120 毫秒）的缓冲 —— 网络抖一下、主线程忙一下都不会断音。
+       以前是一收到就立刻排、排完就空，任何一点抖动都直接变成「卡」。 */
+    private var inFlight = 0
+    private var pendingFrames: [Data] = []
+
     /// 通话结束时上报给服务器，写进 call-trace.log
     var playDiag: String {
         "播放端 收到=\(framesIn) 排播=\(framesScheduled) 丢=\(framesDropped)"
@@ -83,6 +89,8 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         framesIn = 0
         framesScheduled = 0
         framesDropped = 0
+        inFlight = 0
+        pendingFrames.removeAll()
         startWatchdog()
 
         /* 麦克风经常被「上一通电话 / TRTC 进房 / 铃声引擎」占着，一次抢不到就报错的话，
@@ -126,6 +134,8 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             playerNode.stop()
             player.stop()
             playerReady = false
+            inFlight = 0
+            pendingFrames.removeAll()
         }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
@@ -299,23 +309,41 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             framesDropped += 1
             return
         }
-        let frames = data.count / 2
-        guard frames > 0,
-              let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames)) else {
-            framesDropped += 1
-            return
-        }
-        buf.frameLength = AVAudioFrameCount(frames)
-        guard let ch = buf.int16ChannelData else {
-            framesDropped += 1
-            return
-        }
-        data.withUnsafeBytes { raw in
-            if let base = raw.baseAddress {
-                memcpy(ch[0], base, frames * 2)
-            }
-        }
-        playerNode.scheduleBuffer(buf, completionHandler: nil)
-        framesScheduled += 1
+        pendingFrames.append(data)
+        /* 网络突然灌进来一大堆（比如刚重连）：丢掉最老的，宁可丢一点，
+           也别让延迟越积越大（越积越大听起来就是"对方永远慢半拍"）。 */
+        if pendingFrames.count > 25 { pendingFrames.removeFirst(pendingFrames.count - 25) }
+        drainPending(fmt)
     }
+
+    /// 把待播的帧排进播放器，但**始终保持 3 帧在播/待播**（≈120ms 缓冲）。
+    /// 这样网络抖动、主线程卡顿都被这层缓冲吃掉，声音不会一顿一顿。
+    private func drainPending(_ fmt: AVAudioFormat) {
+        while inFlight < 3, !pendingFrames.isEmpty {
+            let d = pendingFrames.removeFirst()
+            let frames = d.count / 2
+            guard frames > 0,
+                  let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(frames)) else {
+                framesDropped += 1
+                continue
+            }
+            buf.frameLength = AVAudioFrameCount(frames)
+            guard let ch = buf.int16ChannelData else {
+                framesDropped += 1
+                continue
+            }
+            d.withUnsafeBytes { raw in
+                if let base = raw.baseAddress {
+                    memcpy(ch[0], base, frames * 2)
+                }
+            }
+            inFlight += 1
+            playerNode.scheduleBuffer(buf) { [weak self] in
+                guard let self = self else { return }
+                self.playQueue.async { self.inFlight = max(0, self.inFlight - 1) }
+            }
+            framesScheduled += 1
+        }
+    }
+
 }

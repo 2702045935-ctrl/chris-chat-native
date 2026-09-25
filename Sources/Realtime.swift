@@ -54,6 +54,14 @@ struct PushEvent: Equatable {
 
 /// 和服务器保持一条长连接（WebSocket）：别人一发消息，这边立刻就能收到，
 /// 不用轮询。断了会自动重连。
+/// 收包时间戳（带锁，跨线程读写安全）：收包循环在后台线程跑，心跳在主线程看它
+final class RxClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var t = Date()
+    func touch() { lock.lock(); t = Date(); lock.unlock() }
+    var value: Date { lock.lock(); defer { lock.unlock() }; return t }
+}
+
 @MainActor
 final class Realtime: ObservableObject {
     static let shared = Realtime()
@@ -86,7 +94,7 @@ final class Realtime: ObservableObject {
     private var publishTask: Task<Void, Never>?
     /// 心跳：每 15 秒给服务器发一个 ping，35 秒收不到任何东西就认为断了、重连
     private var heartbeat: Task<Void, Never>?
-    private var lastRx = Date()
+    private let rxClock = RxClock()
     /* 投递回执：收到消息先攒着（chatId → 最大 seq），1.5 秒合并发一次。
        后台的「消息投递日志」靠它区分 未送达 / 已送达 / 已读（微信也是这么分的）。 */
     private var ackPending: [String: Int] = [:]
@@ -140,8 +148,15 @@ final class Realtime: ObservableObject {
         let task = API.shared.session.webSocketTask(with: req)
         socket = task
         task.resume()
-        loop = Task { [weak self] in
-            guard let self = self else { return }
+        /* ⚠ 收包这个循环**故意不跑在主线程上**（Task.detached）：
+           这个类是 @MainActor，以前循环就跟着主线程跑 —— 聊天页一卡几百毫秒
+           （线上日志：卡顿 聊天页 最长 628ms），这个 await receive() 就被一起拖住，
+           语音帧读不出来，声音就一顿一顿的（用户说的「语音又卡了」）。
+           现在：循环在后台跑，语音帧在后台直接丢给播放器，只有别的业务事件
+           才回主线程处理（updateRx / handle）。顺带一个好处：通话时每秒 25 帧
+           不再去刷界面状态，主线程也轻了。 */
+        let clock = rxClock          // 在主线程上取出来，交给后台那个循环用
+        loop = Task.detached { [weak self] in
             while !Task.isCancelled {
                 do {
                     let message = try await task.receive()
@@ -151,31 +166,25 @@ final class Realtime: ObservableObject {
                     case .data(let d): text = String(data: d, encoding: .utf8) ?? ""
                     @unknown default: break
                     }
-                    if !text.isEmpty { self.handle(text) }
-                    self.failCount = 0        // 收得到东西就说明这条通道是通的
-                    self.lastRx = Date()
+                    if !text.isEmpty {
+                        clock.touch()
+                        /* 通话音频帧：在这里就地消费掉，绝不经过主线程 */
+                        if Self.consumeCallAudioIfAny(text) { continue }
+                        await self?.handle(text)
+                    } else {
+                        clock.touch()
+                    }
                 } catch {
                     // 断了：3 秒后重连
-                    self.connected = false
                     if Task.isCancelled { break }
-                    /* 连着失败 3 次就换另一种协议再试；但只有内网地址才会真的退到明文口
-                       （见上面 lanOnly 那段）。 */
-                    self.failCount += 1
-                    if self.failCount % 3 == 0, lanOnly { self.plainFallback.toggle() }
-                    /* 连着断 3 次（差不多十几秒）：多半不是消息问题，是这条线路被掐了，
-                       自动换下一条备用入口再连（换通了以后所有请求都走新的那条）。 */
-                    if self.failCount % 3 == 0 { _ = API.shared.rotateEndpoint() }
-                    /* 退避重连：1s → 2s → 3s → 最长 15s，避免疯狂重连刷屏、刷服务器 */
-                    let wait = min(15.0, 1.0 + Double(self.failCount))
-                    try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
-                    if Task.isCancelled { break }
-                    self.start()
+                    guard let self = self else { break }
+                    await self.onSocketDown(lanOnly: lanOnly)
                     return
                 }
             }
         }
         connected = true
-        lastRx = Date()
+        rxClock.touch()
         /* 心跳 + 假死检测：服务器半分钟没动静就重连一次（比一直挂着收不到消息强） */
         heartbeat?.cancel()
         heartbeat = Task { [weak self] in
@@ -183,7 +192,7 @@ final class Realtime: ObservableObject {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 if Task.isCancelled { return }
                 guard let self = self else { return }
-                if Date().timeIntervalSince(self.lastRx) > 35 {
+                if Date().timeIntervalSince(self.rxClock.value) > 35 {
                     self.connected = false
                     self.start()
                     return
@@ -191,6 +200,38 @@ final class Realtime: ObservableObject {
                 self.sendJSON(["type": "ping"])
             }
         }
+    }
+
+    /* ---------------- 收包循环用的几个小工具（后台线程 / 主线程各自需要的部分） ---------------- */
+
+    /// 通话音频帧：在后台**就地**丢给播放器，返回 true 表示这条已经处理掉了。
+    /// 必须在主线程之外调用 —— 主线程一卡（聊天页卡顿几百毫秒），声音就跟着卡。
+    private nonisolated static func consumeCallAudioIfAny(_ text: String) -> Bool {
+        guard text.contains("\"audio\"") else { return false }        // 便宜的前置判断
+        guard let d = text.data(using: .utf8),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              (o["action"] as? String) == "audio",
+              let b64 = o["data"] as? String,
+              let ad = Data(base64Encoded: b64) else { return false }
+        CallAudioPipe.shared.play(ad)
+        return true
+    }
+
+    /// 长连接断了：置位 + 退避重连（要动主线程上的状态，所以单独拿出来）
+    private func onSocketDown(lanOnly: Bool) async {
+        connected = false
+        /* 连着失败 3 次就换另一种协议再试；但只有内网地址才会真的退到明文口
+           （见 start() 里 lanOnly 那段）。 */
+        failCount += 1
+        if failCount % 3 == 0, lanOnly { plainFallback.toggle() }
+        /* 连着断 3 次（差不多十几秒）：多半不是消息问题，是这条线路被掐了，
+           自动换下一条备用入口再连（换通了以后所有请求都走新的那条）。 */
+        if failCount % 3 == 0 { _ = API.shared.rotateEndpoint() }
+        /* 退避重连：1s → 2s → 3s → 最长 15s，避免疯狂重连刷屏、刷服务器 */
+        let wait = min(15.0, 1.0 + Double(failCount))
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+        if Task.isCancelled { return }
+        start()
     }
 
     /// 往长连接里发一条 JSON（通话信令用）

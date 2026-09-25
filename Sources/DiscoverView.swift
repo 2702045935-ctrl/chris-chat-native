@@ -1089,7 +1089,8 @@ struct MomentsView: View {
                     }
                     /* 封面（发出去以后列表里显示那张图）也上传成服务器路径 */
                     var cp = ""
-                    let coverImg = videoCover ?? (await MediaTool.firstFrame(file))
+                    let coverImg: UIImage?
+                    if let c = videoCover { coverImg = c } else { coverImg = await MediaTool.firstFrame(file) }
                     if let c = coverImg { cp = (try? await API.shared.uploadCover(image: c)) ?? "" }
                     let wh = videoWH
                     try await API.shared.postMoment(content: draft, images: [],

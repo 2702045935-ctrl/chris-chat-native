@@ -12,6 +12,8 @@ struct BotChatView: View {
 
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+    /* 服务器一推消息就立刻拉一次（不然机器人回复要等你下一次动作才显示，看着就是「回复慢」） */
+    @ObservedObject private var realtime = Realtime.shared
     @AppStorage("bot.autoRead") private var autoRead = false
     @AppStorage("bot.voice") private var voiceID = ""
     @AppStorage("bot.rate") private var rate = 0.5
@@ -21,6 +23,8 @@ struct BotChatView: View {
     @State private var sending = false
     @State private var showVoice = false
     @State private var spoken = Set<String>()
+    /// 已经发出、还在等机器人回复（这期间显示「正在输入…」）
+    @State private var waitingReply = false
     @FocusState private var focused: Bool
 
     private var myId: String { app.me?.id ?? "" }
@@ -35,6 +39,7 @@ struct BotChatView: View {
                         ForEach(messages) { m in
                             bubble(m).id(m.id)
                         }
+                        if waitingReply { typingRow.id("botTyping") }
                         Color.clear.frame(height: 1).id("botBottom")
                     }
                     .padding(.horizontal, 16)
@@ -45,12 +50,38 @@ struct BotChatView: View {
                 .onChange(of: messages.count) { _ in
                     withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("botBottom", anchor: .bottom) }
                 }
+                .onChange(of: waitingReply) { _ in
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("botBottom", anchor: .bottom) }
+                }
             }
             composer
         }
         .background(C.pageBg.ignoresSafeArea())
-        .task { await load() }
+        /* 进页面先拉一次，然后每 2.5 秒兜底轮询一次（长连接偶尔丢事件时也能及时看到回复） */
+        .task {
+            await load()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                if Task.isCancelled { return }
+                await load()
+            }
+        }
+        .onChange(of: realtime.event) { _ in
+            Task { await load() }
+        }
         .sheet(isPresented: $showVoice) { BotVoiceSettingsView() }
+    }
+
+    /// 「正在输入…」：机器人还没回的时候给个动静，别让页面看着像卡住
+    private var typingRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            JarvisEyesAvatar(size: 26).padding(.top, 2)
+            Text(Tr("正在输入…"))
+                .font(.system(size: 15))
+                .foregroundColor(C.subLabel)
+            Spacer(minLength: 16)
+        }
+        .padding(.bottom, 16)
     }
 
     /* ---------------------------------------------------------- 顶栏 */
@@ -172,6 +203,8 @@ struct BotChatView: View {
     private func load() async {
         if let r = try? await API.shared.messages(chatId: chat.id, limit: 60) {
             messages = r.messages
+            /* 机器人已经回了（最后一条不是我发的）→ 收起「正在输入…」 */
+            if let last = messages.last, last.senderId != myId { waitingReply = false }
             autoReadLatestIfNeeded()
         }
     }
@@ -181,6 +214,7 @@ struct BotChatView: View {
         guard !t.isEmpty else { return }
         input = ""
         sending = true
+        waitingReply = true
         Task {
             _ = try? await API.shared.send(chatId: chat.id, kind: "text", content: t)
             await load()

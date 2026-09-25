@@ -17,15 +17,15 @@ struct SplashView: View {
                 /* 优先用后台配的那张（远端图，带缓存）：换图不用重装 App。
                    没配、或者还没下载完 → 下面用包里那张兜底，保证冷启动/断网都不白屏。 */
                 if !remote.isEmpty {
-                    RemoteImage(path: remote)
+                    /* mode: .fit = **不裁剪**（整张图完整显示，比例不合就留黑边）；
+                       maxSide: 2560 = 解码上限抬高，别把高清图压糊（默认只有 1600）。 */
+                    RemoteImage(path: remote, mode: .fit, maxSide: 2560)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
                 } else if let img = UIImage(named: "splash") {
                     Image(uiImage: img)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()          // 同样不裁剪：整张图完整显示
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "message.fill")

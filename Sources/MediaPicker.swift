@@ -181,9 +181,19 @@ enum MediaTool {
         export.outputURL = out
         export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
+        /* 进度：AVAssetExportSession 的 progress 在有的机型/有的视频上会一直停在 0，
+           用户看到的就是「进度条一直不动」。所以再叠一层**时间估算**兜底：
+           压缩耗时大约跟视频时长成正比，按 0.5 倍时长估，取两者较大的那个，
+           真压完再跳到 1。这样进度条始终在动。 */
+        let t0 = Date()
+        let secs = (try? await asset.load(.duration))?.seconds ?? 10
+        let guessSpan = max(1.5, min(60, secs * 0.5))
         let poll = Task {
             while !Task.isCancelled {
-                onProgress?(Double(export.progress))
+                let real = Double(export.progress)
+                let elapsed = Date().timeIntervalSince(t0)
+                let guess = min(0.95, elapsed / guessSpan)
+                onProgress?(max(real, guess))
                 try? await Task.sleep(nanoseconds: 150_000_000)
             }
         }

@@ -803,11 +803,17 @@ struct MomentsView: View {
             }
             /* ＋ 号：微信是从相册里挑照片或视频，我们这里给一个「照片 / 视频」二选一 */
             .confirmationDialog(Tr("添加照片或视频"), isPresented: $pickMediaMenu, titleVisibility: .visible) {
-                Button(Tr("照片")) { composerPick = true }
-                Button(Tr("视频")) { composerVideoPick = true }
+                /* ⚠ 这个 dialog 还没收完就弹 sheet，SwiftUI 会**直接丢掉**那次弹层
+                   （用户看到的就是「点了视频没反应」）。所以等一下再弹。 */
+                Button(Tr("照片")) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { composerPick = true }
+                }
+                Button(Tr("视频")) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { composerVideoPick = true }
+                }
                 Button(Tr("取消"), role: .cancel) { }
             }
-            .sheet(isPresented: $composerVideoPick) {
+            .sheet(isPresented: $composerVideoPick, onDismiss: { composerVideoPick = false }) {
                 MediaPicker(onImage: { _ in },
                             onVideo: { url in Task { await prepareVideo(url) } },
                             onLive: { _, _ in },
@@ -853,15 +859,15 @@ struct MomentsView: View {
                             if videoProgress > 0.01 {
                                 /* 上传中的那一圈进度（和聊天发视频同一套观感） */
                                 ZStack {
-                                    Circle().stroke(Color.white.opacity(0.35), lineWidth: 3)
-                                        .frame(width: 34, height: 34)
+                                    Circle().stroke(Color.white.opacity(0.30), lineWidth: 4)
+                                        .frame(width: 50, height: 50)
                                     Circle()
                                         .trim(from: 0, to: max(0.04, min(1, videoProgress)))
-                                        .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                        .stroke(Color.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                                         .rotationEffect(.degrees(-90))
-                                        .frame(width: 34, height: 34)
+                                        .frame(width: 50, height: 50)
                                     Text("\(Int(min(1, videoProgress) * 100))%")
-                                        .font(.system(size: 10, weight: .medium))
+                                        .font(.system(size: 12.5, weight: .semibold))
                                         .foregroundColor(.white)
                                 }
                             } else {
@@ -1075,6 +1081,7 @@ struct MomentsView: View {
                   不一样的地方只有：没压过的小视频直接传，服务端也不再重复压） */
             if let v = pickedVideo {
                 do {
+                    DispatchQueue.main.async { videoProgress = 0.02 }   // 点发表立刻出现进度圈
                     var file = v
                     var from = 0.0
                     if await MediaTool.needsCompress(v) {

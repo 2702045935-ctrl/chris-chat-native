@@ -1371,7 +1371,7 @@ struct ChatDetailView: View {
 
         case .video(let url, let preview):
             uploading = true
-            sendProgress = 0
+            sendProgress = 0.02          // 一出现就有一小段弧，不是"卡住的图标"
             sendingPreview = preview
             sendingMedia = Tr("视频发送中…")
             scrollTick += 1                 // 立刻滚到「发送中」的气泡，进度条看得见
@@ -1432,7 +1432,7 @@ struct ChatDetailView: View {
             /* 微信：实况开关没打开 → 就按普通图片发 */
             if !live { sendImage(img); return }
             uploading = true
-            sendProgress = 0
+            sendProgress = 0.02
             sendingPreview = img
             sendingMedia = Tr("实况发送中…")
             scrollTick += 1

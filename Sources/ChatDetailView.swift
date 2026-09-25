@@ -1397,6 +1397,9 @@ struct ChatDetailView: View {
                 }
                 /* ③ 上传视频（真实进度：压缩占前 45%，上传占剩下的） */
                 let secs = await MediaTool.seconds(file)
+                /* 视频本身的宽高一起带上：气泡按这个比例显示（微信逻辑）——
+                   不然横着拍的会被裁成竖的、竖着拍的会被裁成横的 */
+                let wh = await MediaTool.aspect(file)
                 let from = uploadFrom
                 guard let up = await MediaTool.upload(file, onProgress: { p in
                     DispatchQueue.main.async { sendProgress = from + p * (1 - from) }
@@ -1408,6 +1411,7 @@ struct ChatDetailView: View {
                     return
                 }
                 var body: [String: Any] = ["url": up, "seconds": secs]
+                if let wh = wh { body["w"] = wh.w; body["h"] = wh.h }
                 /* 封面必须上传成服务器路径（以前塞的是 dataURL，气泡加载不出来 → 「不显示」） */
                 if let cp = await coverTask.value { body["cover"] = cp }
                 let json = (try? JSONSerialization.data(withJSONObject: body)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

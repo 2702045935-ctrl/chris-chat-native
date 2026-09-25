@@ -16,19 +16,44 @@ private func jsonDict(_ s: String) -> [String: Any] {
    ============================================================ */
 
 /// 视频气泡
+/// 视频气泡的尺寸（和微信一致）：按视频本身的横竖比例等比缩放，**不裁剪**。
+/// 横屏：宽最多 250、高最多 170；竖屏：宽最多 190、高最多 250；太小/太扁兜一个最小边。
+/// 老消息没记过宽高（w/h）就退回原来那个 160×205。
+func videoBubbleSize(w: Int, h: Int) -> CGSize {
+    let fw = CGFloat(w), fh = CGFloat(h)
+    guard fw > 0, fh > 0 else { return CGSize(width: 160, height: 205) }
+    let aspect = fw / fh
+    let maxW: CGFloat = aspect >= 1 ? 250 : 190
+    let maxH: CGFloat = aspect >= 1 ? 170 : 250
+    var cw = maxW
+    var ch = cw / aspect
+    if ch > maxH { ch = maxH; cw = ch * aspect }
+    /* 超宽幅/超窄幅：缩到最小边 110 以上，别成一条线 */
+    if min(cw, ch) < 110 {
+        let k = 110 / min(cw, ch)
+        cw *= k; ch *= k
+        if cw > maxW { let k2 = maxW / cw; cw *= k2; ch *= k2 }
+        if ch > maxH { let k2 = maxH / ch; cw *= k2; ch *= k2 }
+    }
+    return CGSize(width: cw.rounded(), height: ch.rounded())
+}
+
 struct VideoBubble: View {
     let message: Message
     let mine: Bool
     var onOpen: (URL, UIImage?) -> Void = { _, _ in }
 
-    private var info: (url: String, cover: String, seconds: Int) {
+    private var info: (url: String, cover: String, seconds: Int, w: Int, h: Int) {
         let o = jsonDict(message.body)
         return ((o["url"] as? String) ?? "",
                 (o["cover"] as? String) ?? "",
-                (o["seconds"] as? Int) ?? 0)
+                (o["seconds"] as? Int) ?? 0,
+                (o["w"] as? Int) ?? 0,
+                (o["h"] as? Int) ?? 0)
     }
 
-    private var width: CGFloat { min(230, 132 + CGFloat(min(info.seconds, 40)) * 2.2) }
+    /// 气泡尺寸：有视频本身的比例就按比例（微信逻辑），老消息退回 160×205
+    private var size: CGSize { videoBubbleSize(w: info.w, h: info.h) }
 
     var body: some View {
         Button {
@@ -59,7 +84,7 @@ struct VideoBubble: View {
                     .padding(7)
                 }
             }
-            .frame(width: width, height: width * 1.28)
+            .frame(width: size.width, height: size.height)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -152,7 +177,13 @@ struct SendingVideoBubble: View {
     var cover: UIImage?
     var progress: Double          // 0…1
 
-    private let width: CGFloat = 160
+    /// 尺寸和最终那条视频气泡一致（用封面的比例算），发送中→发送完不会跳一下
+    private var size: CGSize {
+        guard let c = cover, c.size.width > 0, c.size.height > 0 else {
+            return videoBubbleSize(w: 0, h: 0)
+        }
+        return videoBubbleSize(w: Int(c.size.width), h: Int(c.size.height))
+    }
 
     var body: some View {
         ZStack {
@@ -186,7 +217,7 @@ struct SendingVideoBubble: View {
                     .foregroundColor(.white)
             }
         }
-        .frame(width: width, height: width * 1.28)
+        .frame(width: size.width, height: size.height)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

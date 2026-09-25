@@ -124,6 +124,21 @@ enum MediaTool {
         return max(1, Int(d.rounded()))
     }
 
+    /// 视频的显示宽高（像素）。注意要带上 preferredTransform ——
+    /// 手机竖着拍的视频 naturalSize 是 1920x1080 + 一个 90° 旋转，
+    /// 不对它做变换就会把竖屏视频当成横屏，气泡尺寸正好反过来。
+    static func aspect(_ url: URL) async -> (w: Int, h: Int)? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let sz = try? await track.load(.naturalSize),
+              let tx = try? await track.load(.preferredTransform) else { return nil }
+        let t = sz.applying(tx)
+        let w = Int(abs(t.width).rounded())
+        let h = Int(abs(t.height).rounded())
+        guard w > 0, h > 0 else { return nil }
+        return (w, h)
+    }
+
     /// 取第一帧当封面（返回图片本身；调用方把它上传掉，拿服务器路径写进消息里）
     static func firstFrame(_ url: URL) async -> UIImage? {
         let asset = AVURLAsset(url: url)

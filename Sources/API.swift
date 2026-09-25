@@ -291,6 +291,12 @@ struct Moment: Decodable, Identifiable, Hashable {
     var author: User?
     var content: String?
     var images: [String]?
+    /// 朋友圈视频（和微信一样：一条动态要么九张图、要么一条视频）
+    var video: String?
+    var videoCover: String?
+    var videoSeconds: Int?
+    var videoW: Int?
+    var videoH: Int?
     /// 发表时选的「所在位置」（微信发表页那一行，不填就是空）
     var location: String?
     /// 我置顶的那条动态（置顶的永远排在朋友圈最上面）
@@ -3316,14 +3322,24 @@ final class API {
 
     /// 发朋友圈：谁可以看（public 公开 / private 仅自己 / partial 部分可见 / exclude 不给谁看）
     func postMoment(content: String, images: [String],
+                    video: String = "", videoCover: String = "",
+                    videoSeconds: Int = 0, videoW: Int = 0, videoH: Int = 0,
                     visibility: String = "public",
                     visibleTo: [String] = [], hiddenFrom: [String] = [],
                     location: String = "") async throws {
-        _ = try await request("POST", "/api/moments", body: [
+        var body: [String: Any] = [
             "content": content, "images": images,
             "visibility": visibility, "visibleTo": visibleTo, "hiddenFrom": hiddenFrom,
             "location": location
-        ])
+        ]
+        if !video.isEmpty {
+            body["video"] = video
+            body["videoCover"] = videoCover
+            body["videoSeconds"] = videoSeconds
+            body["videoW"] = videoW
+            body["videoH"] = videoH
+        }
+        _ = try await request("POST", "/api/moments", body: body)
     }
 
     func updateMe(_ fields: [String: Any]) async {

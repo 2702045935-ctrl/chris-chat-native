@@ -17,10 +17,12 @@ struct MediaPicker: UIViewControllerRepresentable {
     var onImage: (UIImage) -> Void
     var onVideo: (URL) -> Void
     var onLive: (UIImage, URL) -> Void
+    /// 只挑视频（朋友圈发视频用）
+    var videosOnly: Bool = false
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var cfg = PHPickerConfiguration(photoLibrary: .shared())
-        cfg.filter = .any(of: [.images, .videos, .livePhotos])
+        cfg.filter = videosOnly ? .videos : .any(of: [.images, .videos, .livePhotos])
         cfg.selectionLimit = 1
         cfg.preferredAssetRepresentationMode = .current
         let vc = PHPickerViewController(configuration: cfg)

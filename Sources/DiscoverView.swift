@@ -256,6 +256,14 @@ struct MomentsView: View {
     @State private var showCoverCamera = false
     @State private var coverDraft: UIImage?
     @State private var composerPick = false
+    /* 朋友圈发视频（微信：一条动态要么九张图、要么一条视频） */
+    @State private var composerVideoPick = false
+    @State private var pickMediaMenu = false
+    @State private var pickedVideo: URL?
+    @State private var videoCover: UIImage?
+    @State private var videoSeconds = 0
+    @State private var videoWH: (w: Int, h: Int)?
+    @State private var videoProgress = 0.0
     @State private var posting = false
     @State private var draft = ""
     @State private var picked: [UIImage] = []
@@ -266,6 +274,8 @@ struct MomentsView: View {
     /// 点开朋友圈的图片：paths = 这条动态的图片，index = 点的那张
     @State private var viewerPaths: [String] = []
     @State private var viewerIndex: Int?
+    /// 朋友圈里点开的视频（全屏播放）
+    @State private var momentVideo: URL?
     /// 点头像 → 名片
     @State private var cardUser: User?
     /// 朋友圈往下翻页：还有没有更多 / 正在加载 / 一共多少条
@@ -407,6 +417,7 @@ struct MomentsView: View {
                 }
                     .zIndex(40)
             }
+
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
@@ -414,6 +425,12 @@ struct MomentsView: View {
         .hidesTabBar()
         .modifier(TapAvatarCard(cardUser: $cardUser))
         .hidesTabBar()
+        /* 朋友圈视频：点封面 → 全屏播（复用聊天里那个播放器；它的关闭按钮走 dismiss，
+           所以必须当 sheet 弹，不能直接挂在 ZStack 里） */
+        .sheet(isPresented: Binding(get: { momentVideo != nil },
+                                    set: { if !$0 { momentVideo = nil } })) {
+            if let u = momentVideo { VideoPlayerSheet(url: u) }
+        }
         .onAppear {
             baseTop = nil
             baseBlock = nil
@@ -550,6 +567,7 @@ struct MomentsView: View {
         MomentRow(moment: moment,
                   onMore: { actionMoment = moment },
                   onOpenImage: { path in openPhoto(path, in: moment) },
+                  onOpenVideo: { u in momentVideo = u },
                   onOpenAvatar: { u in cardUser = u },
                   onDeleteComment: { cid in deleteComment(moment.id, cid) },
                   myId: app.me?.id ?? "",
@@ -783,6 +801,18 @@ struct MomentsView: View {
                     }
                 }
             }
+            /* ＋ 号：微信是从相册里挑照片或视频，我们这里给一个「照片 / 视频」二选一 */
+            .confirmationDialog(Tr("添加照片或视频"), isPresented: $pickMediaMenu, titleVisibility: .visible) {
+                Button(Tr("照片")) { composerPick = true }
+                Button(Tr("视频")) { composerVideoPick = true }
+                Button(Tr("取消"), role: .cancel) { }
+            }
+            .sheet(isPresented: $composerVideoPick) {
+                MediaPicker(onImage: { _ in },
+                            onVideo: { url in Task { await prepareVideo(url) } },
+                            onLive: { _, _ in },
+                            videosOnly: true)
+            }
             .confirmationDialog(Tr("谁可以看"), isPresented: $showVisibility, titleVisibility: .visible) {
                 Button(Tr("公开（所有好友可见）")) { visibility = "public" }
                 Button(Tr("私密（仅自己可见）")) { visibility = "private" }
@@ -797,7 +827,8 @@ struct MomentsView: View {
     }
 
     private var canPublish: Bool {
-        !uploading && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !picked.isEmpty)
+        !uploading && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                       || !picked.isEmpty || pickedVideo != nil)
     }
 
     /* 九宫格（微信发表页那一块） */
@@ -806,6 +837,67 @@ struct MomentsView: View {
         let side = (L.width - 32 - gap * 2) / 3
         return LazyVGrid(columns: Array(repeating: GridItem(.fixed(side), spacing: gap), count: 3),
                          alignment: .leading, spacing: gap) {
+            /* ① 选了视频：就一格视频封面（微信也是这样，视频和图片不能混着发） */
+            if pickedVideo != nil {
+                ZStack(alignment: .topTrailing) {
+                    ZStack {
+                        if let c = videoCover {
+                            Image(uiImage: c)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            C.searchBg
+                        }
+                        Color.black.opacity(videoProgress > 0.01 ? 0.42 : 0.22)
+                        VStack(spacing: 6) {
+                            if videoProgress > 0.01 {
+                                /* 上传中的那一圈进度（和聊天发视频同一套观感） */
+                                ZStack {
+                                    Circle().stroke(Color.white.opacity(0.35), lineWidth: 3)
+                                        .frame(width: 34, height: 34)
+                                    Circle()
+                                        .trim(from: 0, to: max(0.04, min(1, videoProgress)))
+                                        .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                        .rotationEffect(.degrees(-90))
+                                        .frame(width: 34, height: 34)
+                                    Text("\(Int(min(1, videoProgress) * 100))%")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                            } else {
+                                Image(systemName: "play.circle.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.white.opacity(0.95))
+                            }
+                            if videoSeconds > 0, videoProgress <= 0.01 {
+                                Text(String(format: "%02d:%02d", videoSeconds / 60, videoSeconds % 60))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .frame(width: side, height: side)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    if !uploading {
+                        Button {
+                            pickedVideo = nil
+                            videoCover = nil
+                            videoSeconds = 0
+                            videoWH = nil
+                            videoProgress = 0
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 18, height: 18)
+                                .background(Circle().fill(Color.black.opacity(0.6)))
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: 6, y: -6)
+                    }
+                }
+            }
             ForEach(picked.indices, id: \.self) { i in
                 ZStack(alignment: .topTrailing) {
                     Image(uiImage: picked[i])
@@ -834,8 +926,8 @@ struct MomentsView: View {
                     .offset(x: 6, y: -6)
                 }
             }
-            if picked.count < 9 {
-                Button { composerPick = true } label: {
+            if picked.count < 9 && pickedVideo == nil {
+                Button { pickMediaMenu = true } label: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(C.searchBg)
@@ -979,6 +1071,45 @@ struct MomentsView: View {
     private func publish() {
         uploading = true
         Task {
+            /* ① 视频那条路：压缩 → 带进度上传 → 发动态（和聊天里发视频同一套，
+                  不一样的地方只有：没压过的小视频直接传，服务端也不再重复压） */
+            if let v = pickedVideo {
+                do {
+                    var file = v
+                    var from = 0.0
+                    if await MediaTool.needsCompress(v) {
+                        if let small = await MediaTool.compress(v, onProgress: { p in
+                            DispatchQueue.main.async { videoProgress = min(0.45, p * 0.45) }
+                        }) { file = small; from = 0.45 }
+                    }
+                    guard let up = await MediaTool.upload(file, onProgress: { p in
+                        DispatchQueue.main.async { videoProgress = from + p * (1 - from) }
+                    }, skipServerTranscode: true) else {
+                        throw APIError.message("视频上传失败")
+                    }
+                    /* 封面（发出去以后列表里显示那张图）也上传成服务器路径 */
+                    var cp = ""
+                    let coverImg = videoCover ?? (await MediaTool.firstFrame(file))
+                    if let c = coverImg { cp = (try? await API.shared.uploadCover(image: c)) ?? "" }
+                    let wh = videoWH
+                    try await API.shared.postMoment(content: draft, images: [],
+                                                    video: up, videoCover: cp,
+                                                    videoSeconds: videoSeconds,
+                                                    videoW: wh?.w ?? 0, videoH: wh?.h ?? 0,
+                                                    visibility: visibility,
+                                                    visibleTo: Array(visibleTo),
+                                                    hiddenFrom: Array(hiddenFrom),
+                                                    location: draftLocation)
+                    await remindFriends()
+                    app.show(Tr("已发表"))
+                } catch {
+                    app.show((error as? APIError)?.errorDescription ?? "视频发表失败")
+                }
+                resetComposer()
+                await reload()
+                await app.loadMoments()
+                return
+            }
             var urls: [String] = []
             for image in picked {
                 if let url = try? await API.shared.upload(image: image) { urls.append(url) }
@@ -989,33 +1120,61 @@ struct MomentsView: View {
                                                 visibleTo: Array(visibleTo),
                                                 hiddenFrom: Array(hiddenFrom),
                                                 location: draftLocation)
-                /* 「提醒谁看」：给选中的好友各发一条消息，让他们点进来（微信也是这么提醒的） */
-                if !remindIds.isEmpty {
-                    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let tip = "我在朋友圈提到了你" + (text.isEmpty ? "" : "：" + String(text.prefix(30)))
-                    for fid in remindIds {
-                        if let chat = try? await API.shared.openDirect(userId: fid) {
-                            _ = try? await API.shared.send(chatId: chat.id, text: tip)
-                        }
-                    }
-                    await app.loadChats()
-                }
+                await remindFriends()
                 app.show(Tr("已发表"))
             } catch {
                 app.show((error as? APIError)?.errorDescription ?? "发表失败")
             }
-            draft = ""
-            picked = []
-            visibility = "public"
-            visibleTo = []
-            hiddenFrom = []
-            draftLocation = ""
-            remindIds = []
-            uploading = false
-            posting = false
-            tapLockUntil = Date().addingTimeInterval(0.6)          // 发表弹层收起那一下别误触到图
+            resetComposer()
             await reload()
             await app.loadMoments()
+        }
+    }
+
+    /// 「提醒谁看」：给选中的好友各发一条消息，让他们点进来（微信也是这么提醒的）
+    private func remindFriends() async {
+        guard !remindIds.isEmpty else { return }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tip = "我在朋友圈提到了你" + (text.isEmpty ? "" : "：" + String(text.prefix(30)))
+        for fid in remindIds {
+            if let chat = try? await API.shared.openDirect(userId: fid) {
+                _ = try? await API.shared.send(chatId: chat.id, text: tip)
+            }
+        }
+        await app.loadChats()
+    }
+
+    /// 发表完把这一页的状态收干净（图片和视频两路都用）
+    private func resetComposer() {
+        draft = ""
+        picked = []
+        pickedVideo = nil
+        videoCover = nil
+        videoSeconds = 0
+        videoWH = nil
+        videoProgress = 0
+        visibility = "public"
+        visibleTo = []
+        hiddenFrom = []
+        draftLocation = ""
+        remindIds = []
+        uploading = false
+        posting = false
+        tapLockUntil = Date().addingTimeInterval(0.6)          // 发表弹层收起那一下别误触到图
+    }
+
+    /// 相册里挑好视频：先出封面 + 时长（真正的压缩上传放到点「发表」时做，和微信一样）
+    private func prepareVideo(_ url: URL) async {
+        let cover = await MediaTool.firstFrame(url)
+        let secs = await MediaTool.seconds(url)
+        let wh = await MediaTool.aspect(url)
+        await MainActor.run {
+            pickedVideo = url
+            videoCover = cover
+            videoSeconds = secs
+            videoWH = wh
+            videoProgress = 0
+            picked = []              // 视频和图片不混着发（微信也是这样）
         }
     }
 
@@ -1089,6 +1248,8 @@ struct MomentRow: View {
     var onMore: (() -> Void)? = nil
     /// 点图片 → 看大图
     var onOpenImage: ((String) -> Void)? = nil
+    /// 点视频封面 → 全屏播放（朋友圈视频）
+    var onOpenVideo: ((URL) -> Void)? = nil
     /// 点头像 → 名片
     var onOpenAvatar: ((User) -> Void)? = nil
     /// 点自己发的评论 → 删除（微信那样）
@@ -1226,9 +1387,56 @@ struct MomentRow: View {
     }
 
     private var grid: some View {
-        MomentImageGrid(images: images,
-                        avail: L.width - L.momentPadH * 2 - L.momentAvatar - 9,
-                        onTap: { i in if i < images.count { onOpenImage?(images[i]) } })
+        Group {
+            /* 视频动态：一张封面（微信就是一张封面 + 播放三角 + 时长），点开全屏播 */
+            if let v = moment.video, !v.isEmpty {
+                videoTile(v)
+            } else {
+                MomentImageGrid(images: images,
+                                avail: L.width - L.momentPadH * 2 - L.momentAvatar - 9,
+                                onTap: { i in if i < images.count { onOpenImage?(images[i]) } })
+            }
+        }
+    }
+
+    /// 朋友圈里的视频封面：按视频本身的横竖比例（和聊天里的视频气泡同一套算法）
+    private func videoTile(_ path: String) -> some View {
+        let size = videoBubbleSize(w: moment.videoW ?? 0, h: moment.videoH ?? 0)
+        let cover = moment.videoCover ?? ""
+        let secs = moment.videoSeconds ?? 0
+        return Button {
+            let full = path.hasPrefix("http") ? path : API.shared.base + path
+            if let u = URL(string: full) { onOpenVideo?(u) }
+        } label: {
+            ZStack {
+                if !cover.isEmpty {
+                    RemoteImage(path: cover, mode: .fill, maxSide: 1280)
+                } else {
+                    C.searchBg
+                }
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 42))
+                    .foregroundColor(.white.opacity(0.92))
+                    .shadow(color: .black.opacity(0.32), radius: 6)
+                if secs > 0 {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Text(String(format: "%02d:%02d", secs / 60, secs % 60))
+                                .font(.system(size: 11.5, weight: .medium))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(Capsule().fill(Color.black.opacity(0.45)))
+                        }
+                    }
+                    .padding(7)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     /* 微信那个「赞 | 评论」小横条：深色底、白字白图标，贴着「···」左边 */

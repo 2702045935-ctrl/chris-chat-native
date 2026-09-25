@@ -4642,6 +4642,13 @@ function visibleMoment(m, viewerId) {
     author: memberProfile(findUser(m.authorId), viewerId),
     content: m.content,
     images: m.images || [],
+    /* 朋友圈视频：和微信一样，一条动态要么九张图、要么一条视频。
+       video/videoCover 都是 /uploads/ 下的路径；尺寸给客户端排封面用。 */
+    video: m.video || '',
+    videoCover: m.videoCover || '',
+    videoSeconds: m.videoSeconds || 0,
+    videoW: m.videoW || 0,
+    videoH: m.videoH || 0,
     location: m.location || '',
     pinned: m.pinned === true,
     createdAt: m.createdAt,
@@ -13111,12 +13118,20 @@ async function handleApi(req, res, pathname, query) {
     const content = str(body.content, 1000);
     const images = (Array.isArray(body.images) ? body.images : [])
       .map((x) => safeImageRef(str(x, 2000))).filter(Boolean).slice(0, 9);
-    if (!content && !images.length) return fail(res, 422, '写点什么，或者发张图');
+    /* 视频（微信：一条动态要么九张图，要么一条视频） */
+    const video = safeImageRef(str(body.video, 2000)) || '';
+    const videoCover = safeImageRef(str(body.videoCover, 2000)) || '';
+    if (!content && !images.length && !video) return fail(res, 422, '写点什么，或者发张图/视频');
     const moment = {
       id: uid('mo'),
       authorId: user.id,
       content,
       images,
+      video,
+      videoCover,
+      videoSeconds: Math.min(900, Math.max(0, Number(body.videoSeconds) || 0)),
+      videoW: Math.min(8000, Math.max(0, Number(body.videoW) || 0)),
+      videoH: Math.min(8000, Math.max(0, Number(body.videoH) || 0)),
       /* 所在位置（微信发表页那一行；不填就是空的，不发 */
       location: str(body.location, 40),
       /* 可见范围：public（好友可见，默认）/ private（仅自己）/ partial（只给这些人看）/ exclude（不给这些人看） */

@@ -481,6 +481,8 @@ struct ChatsView: View {
     }
     /// 点会话列表里机器人那几行的头像 → 弹它的名片
     @State private var botCardChat: Chat?
+    /// 点左上角那两只眼睛 → 打开「小星」自己的对话页（元宝那种，不是普通聊天页）
+    @State private var botChat: Chat?
 
     private var list: [Chat] {
         /* 贾维斯从列表里拿掉（它改成左上角那只小脸，点脸进对话） */
@@ -506,16 +508,17 @@ struct ChatsView: View {
                 VStack(spacing: 0) {
                     /* 顶栏固定不动 —— 对着桌面 s 文件夹那两张参考图量的：
                        微信在两张图里都在同一行（y 224~252），动的是搜索框和列表。 */
-                    /* 顶栏左上角：贾维斯的小脸（和微信「小微」一个位置）。
-                       点这张脸 = 直接进贾维斯的对话（列表里那一条已经拿掉）。 */
+                    /* 顶栏左上角：小星的两只眼睛（和微信「小微」一个位置）。
+                       点它 = 进**小星自己的对话页**（元宝那种：AI 不用气泡、旁边就是这双眼睛），
+                       不是普通聊天页 —— 列表里那条也已经拿掉。 */
                     NavBar(title: navTitle,
                            leftExtra: AnyView(
                             Button {
-                                if let jarvis = app.chats.first(where: { $0.botRank == 0 }) {
-                                    path.append(jarvis)
+                                if let bot = app.chats.first(where: { $0.botRank == 0 }) {
+                                    botChat = bot
                                 } else {
                                     Task { await app.loadChats()
-                                        if let j = app.chats.first(where: { $0.botRank == 0 }) { path.append(j) } }
+                                        if let b = app.chats.first(where: { $0.botRank == 0 }) { botChat = b } }
                                 }
                             } label: {
                                 JarvisEyesAvatar(size: 28).padding(.leading, 12)
@@ -674,6 +677,10 @@ struct ChatsView: View {
             Button(Tr("扫一扫")) { showScan = true }
             Button(Tr("收付款")) { showPayCode = true }
             Button(Tr("取消"), role: .cancel) { }
+        }
+        /* 小星对话页：整页打开（点左上角那两只眼睛进来） */
+        .fullScreenCover(item: $botChat) { c in
+            BotChatView(chat: c).environmentObject(app)
         }
         .fullScreenCover(isPresented: $showScan) {
             ScannerView { text in handleScanned(text, app: app) }

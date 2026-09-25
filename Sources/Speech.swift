@@ -8,6 +8,11 @@ final class Speaker {
     static let shared = Speaker()
     private let synth = AVSpeechSynthesizer()
 
+    /// 用户在小星「语音设置」里选的音色（identifier；空 = 系统默认中文音色）
+    static var chosenVoice = ""
+    /// 语速（0.3~0.7，系统默认 0.5）
+    static var chosenRate: Float = 0.5
+
     var isSpeaking: Bool { synth.isSpeaking }
 
     func speak(_ text: String) {
@@ -19,8 +24,13 @@ final class Speaker {
         try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? session.setActive(true)
         let u = AVSpeechUtterance(string: t)
-        u.voice = AVSpeechSynthesisVoice(language: "zh-CN")
-        u.rate = 0.5
+        /* 选了音色就用选的（小星语音设置里换的那款），没选就用系统默认中文音色 */
+        if !Speaker.chosenVoice.isEmpty, let v = AVSpeechSynthesisVoice(identifier: Speaker.chosenVoice) {
+            u.voice = v
+        } else {
+            u.voice = AVSpeechSynthesisVoice(language: "zh-CN")
+        }
+        u.rate = Speaker.chosenRate
         synth.speak(u)
     }
 

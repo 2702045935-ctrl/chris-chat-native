@@ -54,6 +54,8 @@ struct ChannelsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var items: [FeedItem] = []
+    /// 全屏「抖音版」播放页（一屏一条、上下滑切换）
+    @State private var showBigPlayer = false
     @State private var index = 0
     /// 视频号顶部 tab：0=关注 1=朋友 2=推荐（默认推荐）
     @State private var tab = 2
@@ -147,6 +149,10 @@ struct ChannelsView: View {
         .toolbar(.hidden, for: .navigationBar)
         .hidesTabBar()
         .swipeBack { dismiss() }
+        /* 全屏「抖音版」播放页：一屏一条、上下滑切换、滑到哪条自动播 */
+        .fullScreenCover(isPresented: $showBigPlayer) {
+            FeedPlayerView(items: items, start: 0).environmentObject(app)
+        }
         .sheet(item: $commentFor) { item in
             commentSheet(item)
         }
@@ -225,6 +231,15 @@ struct ChannelsView: View {
                         .font(.system(size: 19, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 44, height: L.navH)
+                }
+                .buttonStyle(.plain)
+
+                /* 全屏播放（抖音那种一屏一条）：点这里进去，上下滑切换 */
+                Button { showBigPlayer = true } label: {
+                    Image(systemName: "rectangle.fill")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: L.navH)
                 }
                 .buttonStyle(.plain)
 

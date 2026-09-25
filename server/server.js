@@ -456,7 +456,7 @@ function feedItemOut(it, user) {
     id: it.id,
     video: it.video || '',
     /* 分片地址（有的话客户端优先用它）：先出画面，后面边看边下 */
-    hls: it.hls || '',
+    hls: it.hls || hlsPathFor(it.video),
     cover: it.cover || '',
     desc: it.desc || '',
     music: it.music || '',

@@ -145,6 +145,31 @@ private var funcs: [(String, String, Color, String)] {
                                 .offset(y: -56)
                         }
                     }
+                    /* 点搜索框 → 整页展开成微信那种搜索页（最近搜索 / 搜索范围 / 分组高亮） */
+                    .overlay {
+                        if searchFocused {
+                            ContactsSearchView(
+                                onPickUser: { u in
+                                    searchFocused = false
+                                    keyword = ""
+                                    path.append(u)
+                                },
+                                onPickChat: { c in
+                                    searchFocused = false
+                                    keyword = ""
+                                    app.openChat = c
+                                },
+                                onCancel: {
+                                    searchFocused = false
+                                    keyword = ""
+                                }
+                            )
+                            .environmentObject(app)
+                            .transition(.opacity)
+                            .zIndex(5)
+                        }
+                    }
+                    .animation(.easeOut(duration: 0.18), value: searchFocused)
                 }
             }
             .background(C.pageBg.ignoresSafeArea(edges: .bottom))

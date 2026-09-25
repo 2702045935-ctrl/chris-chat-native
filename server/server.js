@@ -13305,8 +13305,13 @@ async function handleApi(req, res, pathname, query) {
       }
     }
     /* 视频：按视频号同一套规格压一遍（720p / 1.2Mbps / faststart）再落盘。
-       以前「传多大存多大」—— 聊天里一条 10MB 的视频，对方手机上要转十几秒才出画面。 */
-    if (ctype.indexOf('video/') === 0 && size > 2 * 1024 * 1024) {
+       以前「传多大存多大」—— 聊天里一条 10MB 的视频，对方手机上要转十几秒才出画面。
+       2026-09-25：App 端**自己已经压好**的视频（AVFoundation 1280x720）会带
+       x-chris-compressed: 1 —— 这种就别在服务端再压一遍：再压一遍等于让用户
+       白等十几秒（服务端 CPU 还不如手机），画质还要再掉一层。
+       「原图」那种没压过的（客户端不会带这个头）仍然照旧压。 */
+    const clientCompressed = String(req.headers['x-chris-compressed'] || '').trim() === '1';
+    if (!clientCompressed && ctype.indexOf('video/') === 0 && size > 2 * 1024 * 1024) {
       const before = size;
       try {
         const tmpIn = path.join(os.tmpdir(), 'chris-up-' + crypto.randomBytes(6).toString('hex') + '.' + ext);

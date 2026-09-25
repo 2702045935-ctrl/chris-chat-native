@@ -99,10 +99,22 @@ struct MediaPicker: UIViewControllerRepresentable {
 enum MediaTool {
     /// 上传一个本地文件（走 /api/upload/raw 那条二进制通道，比 base64 省内存）
     static func upload(_ url: URL) async -> String? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
         let ext = url.pathExtension.lowercased()
         let mime = (ext == "mov") ? "video/quicktime" : "video/mp4"
-        return try? await API.shared.uploadBinary(data, mime: mime)
+        /* 直接读文件会先把整段视频塞进内存（几十 MB 就很容易被系统杀掉），
+           走 URLSession 的文件流上传 + 进度回调，内存友好还能出进度条。 */
+        return try? await API.shared.uploadBinaryFile(url, mime: mime) { _ in }
+    }
+
+    /// 带进度的上传（视频发送时那个转圈进度条）。
+    /// skipServerTranscode：这条已经在手机上压好了，让服务器别再压第二遍。
+    static func upload(_ url: URL, onProgress: @escaping (Double) -> Void,
+                       skipServerTranscode: Bool = false) async -> String? {
+        let ext = url.pathExtension.lowercased()
+        let mime = (ext == "mov") ? "video/quicktime" : "video/mp4"
+        return try? await API.shared.uploadBinaryFile(url, mime: mime,
+                                                     skipTranscode: skipServerTranscode,
+                                                     onProgress: onProgress)
     }
 
     /// 视频时长（秒）
@@ -122,8 +134,28 @@ enum MediaTool {
         return UIImage(cgImage: cg)
     }
 
-    /// 压缩视频（微信默认就会压）：720p，压完再发；「原图」开关打开就跳过这一步
-    static func compress(_ url: URL) async -> URL? {
+    /// 这个视频还需不需要压？
+    /// 重编码是把整段视频一秒一秒重新算一遍，几十秒的视频要等十几秒 —— 用户感觉就是"发视频很慢"。
+    /// 已经够小够清楚的（≤8MB、≤60 秒、长边 ≤1280）就直接发，不压；微信也是这么干的。
+    static func needsCompress(_ url: URL) async -> Bool {
+        let size = ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? 0
+        let asset = AVURLAsset(url: url)
+        let secs = (try? await asset.load(.duration))?.seconds ?? 0
+        var longSide = 0
+        if let tracks = try? await asset.loadTracks(withMediaType: .video),
+           let track = tracks.first,
+           let sz = try? await track.load(.naturalSize) {
+            longSide = Int(max(abs(sz.width), abs(sz.height)))
+        }
+        if size > 0, size <= 8 * 1024 * 1024, secs > 0, secs <= 60, longSide > 0, longSide <= 1280 {
+            return false
+        }
+        return true
+    }
+
+    /// 压缩视频（微信默认就会压）：720p，压完再发；「原图」开关打开就跳过这一步。
+    /// onProgress：0…1。AVAssetExportSession 自己不通知进度，只能轮询它的 progress。
+    static func compress(_ url: URL, onProgress: ((Double) -> Void)? = nil) async -> URL? {
         let asset = AVURLAsset(url: url)
         guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else { return nil }
         let out = FileManager.default.temporaryDirectory
@@ -132,9 +164,17 @@ enum MediaTool {
         export.outputURL = out
         export.outputFileType = .mp4
         export.shouldOptimizeForNetworkUse = true
+        let poll = Task {
+            while !Task.isCancelled {
+                onProgress?(Double(export.progress))
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+        }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             export.exportAsynchronously { cont.resume() }
         }
+        poll.cancel()
+        onProgress?(1)
         return export.status == .completed ? out : nil
     }
 }

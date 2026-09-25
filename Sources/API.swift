@@ -1070,6 +1070,27 @@ final class TrustAllDelegate: NSObject, URLSessionDelegate {
     }
 }
 
+/// 上传进度代理：URLSession 每传一段就回调一次，换算成 0…1 的百分比。
+/// 挂在单个上传任务上（session.upload(for:fromFile:delegate:)），不影响别的请求。
+final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate {
+    private let onProgress: (Double) -> Void
+    private var last = -1.0
+
+    init(_ onProgress: @escaping (Double) -> Void) { self.onProgress = onProgress }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    didSendBodyData bytesSent: Int64,
+                    totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        let p = min(1, max(0, Double(totalBytesSent) / Double(totalBytesExpectedToSend)))
+        /* 每 2% 报一次就够：报太密会把主线程刷爆（大视频一秒能回调几十次） */
+        if p >= 1 || p - last >= 0.02 {
+            last = p
+            onProgress(p)
+        }
+    }
+}
+
 final class API {
     static let shared = API()
 
@@ -3187,10 +3208,37 @@ final class API {
         guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.message("上传失败（HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)）")
         }
+        return try Self.rawUploadURL(from: d)
+    }
+
+    /// 视频这种大文件：**从磁盘流式上传**（不整段读进内存，几十 MB 的视频也不会顶内存），
+    /// 并且把真实上传进度回调出来 —— 聊天页那个「发送中」的转圈进度条就是靠它。
+    func uploadBinaryFile(_ file: URL, mime: String,
+                          skipTranscode: Bool = false,
+                          onProgress: @escaping (Double) -> Void) async throws -> String {
+        guard let url = URL(string: base + "/api/upload/raw") else { throw APIError.message("服务器地址不正确") }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        /* 大视频 + 移动网络：给足时间，别传到一半自己超时 */
+        req.timeoutInterval = 600
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(mime, forHTTPHeaderField: "Content-Type")
+        /* 告诉服务器「这条已经在手机上压好了，别再压一遍」——
+           服务端跟着再压一遍要十几秒，用户感觉就是"发视频很慢"。 */
+        if skipTranscode { req.setValue("1", forHTTPHeaderField: "x-chris-compressed") }
+        let delegate = UploadProgressDelegate(onProgress)
+        let (d, resp) = try await session.upload(for: req, fromFile: file, delegate: delegate)
+        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.message("上传失败（HTTP \((resp as? HTTPURLResponse)?.statusCode ?? 0)）")
+        }
+        return try Self.rawUploadURL(from: d)
+    }
+
+    /// /api/upload/raw 的返回值：可能直接是 {url}，也可能裹一层 {ok,data:{url}}
+    private static func rawUploadURL(from d: Data) throws -> String {
         struct RawUpload: Decodable { var url: String? }
-        let parsed = try? JSONDecoder().decode(RawUpload.self, from: d)
-        if let u = parsed?.url, !u.isEmpty { return u }
-        /* 服务器返回的是 {ok,data:{url}} 这种包装，兜底再解一层 */
+        if let parsed = try? JSONDecoder().decode(RawUpload.self, from: d),
+           let u = parsed.url, !u.isEmpty { return u }
         struct Wrapper: Decodable { struct D: Decodable { var url: String? }; var data: D? }
         if let w = try? JSONDecoder().decode(Wrapper.self, from: d), let u = w.data?.url, !u.isEmpty { return u }
         throw APIError.message("上传返回异常")

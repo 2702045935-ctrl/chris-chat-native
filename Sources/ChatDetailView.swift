@@ -239,6 +239,9 @@ struct ChatDetailView: View {
     @State private var lastTypingSent = Date.distantPast
     /// 视频/实况正在压缩上传时显示的提示（微信也是先出一个「发送中」）
     @State private var sendingMedia = ""
+    /// 发送中的视频/实况：封面 + 进度（0…1）—— 微信那种气泡里转圈带百分比
+    @State private var sendingPreview: UIImage?
+    @State private var sendProgress: Double = 0
     @State private var voiceMode = false         // 输入区是不是「按住说话」模式（微信：左边那个语音/键盘切换）
 
     private var myId: String { app.me?.id ?? "" }
@@ -676,9 +679,12 @@ struct ChatDetailView: View {
                     if !sendingMedia.isEmpty {
                         HStack(spacing: 8) {
                             Spacer(minLength: 0)
-                            ProgressView().scaleEffect(0.75)
-                            Text(sendingMedia).font(pf(13)).foregroundColor(C.subLabel)
+                            /* 微信那样：立刻出一个视频气泡（封面），中间转圈 + 百分比 */
+                            SendingVideoBubble(cover: sendingPreview,
+                                               progress: sendProgress,
+                                               text: sendingMedia)
                         }
+                        .id("__sending")          // 发视频时滚到它（见 scrollToEnd）
                         .padding(.bottom, 12)
                         .padding(.trailing, 6)
                     }
@@ -716,11 +722,13 @@ struct ChatDetailView: View {
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let last = messages.last else { return }
+        /* 视频正在发送时，最下面是那个「发送中」的气泡：滚到它，用户才看得见进度条 */
+        let target = (!sendingMedia.isEmpty) ? "__sending" : (messages.last?.id ?? "")
+        guard !target.isEmpty else { return }
         if animated {
-            withAnimation(.easeOut(duration: 0.22)) { proxy.scrollTo(last.id, anchor: .bottom) }
+            withAnimation(.easeOut(duration: 0.22)) { proxy.scrollTo(target, anchor: .bottom) }
         } else {
-            proxy.scrollTo(last.id, anchor: .bottom)
+            proxy.scrollTo(target, anchor: .bottom)
         }
     }
 
@@ -1369,27 +1377,57 @@ struct ChatDetailView: View {
                 await app.loadChats()
             }
 
-        case .video(let url, _):
+        case .video(let url, let preview):
             uploading = true
+            sendProgress = 0
+            sendingPreview = preview
             sendingMedia = Tr("视频发送中…")
+            scrollTick += 1                 // 立刻滚到「发送中」的气泡，进度条看得见
             Task {
-                let file = original ? url : (await MediaTool.compress(url) ?? url)
-                guard let up = await MediaTool.upload(file) else {
+                /* ① 封面：预览页那张现成的先用（本来就有），没有再抽第一帧 ——
+                      这样"发送中"的气泡立刻就有画面，不用等处理完（微信也是马上出封面）。 */
+                let cover = preview ?? (await MediaTool.firstFrame(url))
+                if cover != nil { sendingPreview = cover }
+                /* 封面很小，和视频上传**并行**传掉，省掉最后那一下等待 */
+                let coverTask = Task { () -> String? in
+                    guard let c = cover else { return nil }
+                    return try? await API.shared.upload(image: c)
+                }
+                /* ② 压缩：小视频直接跳过（重编码最费时间，跳掉能快十几秒）；
+                      真要压就把进度映射到 0～45%，边压边看得到动 */
+                var file = url
+                /* 上传这一段在整条进度里从哪开始算：压过就是 45% 起，没压直接从 0 起 */
+                var uploadFrom = 0.0
+                if !original, await MediaTool.needsCompress(url) {
+                    sendingMedia = Tr("视频压缩中…")
+                    uploadFrom = 0.45
+                    file = (await MediaTool.compress(url) { p in
+                        DispatchQueue.main.async { sendProgress = min(0.45, p * 0.45) }
+                    }) ?? url
+                    sendingMedia = Tr("视频发送中…")
+                }
+                /* ③ 上传视频（真实进度：压缩占前 45%，上传占剩下的） */
+                let secs = await MediaTool.seconds(file)
+                let from = uploadFrom
+                guard let up = await MediaTool.upload(file, onProgress: { p in
+                    DispatchQueue.main.async { sendProgress = from + p * (1 - from) }
+                }, skipServerTranscode: !original) else {
                     uploading = false
                     sendingMedia = ""
+                    sendingPreview = nil
                     app.show(Tr("视频上传失败"))
                     return
                 }
-                var body: [String: Any] = ["url": up, "seconds": await MediaTool.seconds(file)]
+                var body: [String: Any] = ["url": up, "seconds": secs]
                 /* 封面必须上传成服务器路径（以前塞的是 dataURL，气泡加载不出来 → 「不显示」） */
-                if let img = await MediaTool.firstFrame(file),
-                   let cp = try? await API.shared.upload(image: img) { body["cover"] = cp }
+                if let cp = await coverTask.value { body["cover"] = cp }
                 let json = (try? JSONSerialization.data(withJSONObject: body)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
                 if let m = try? await API.shared.send(chatId: chat.id, kind: "video", content: json) {
                     messages.append(m)
                 }
                 uploading = false
                 sendingMedia = ""
+                sendingPreview = nil
                 await app.loadChats()
             }
 
@@ -1397,13 +1435,29 @@ struct ChatDetailView: View {
             /* 微信：实况开关没打开 → 就按普通图片发 */
             if !live { sendImage(img); return }
             uploading = true
+            sendProgress = 0
+            sendingPreview = img
             sendingMedia = Tr("实况发送中…")
+            scrollTick += 1
             Task {
                 do {
                     let iurl = original ? try await API.shared.uploadOriginal(image: img)
                                         : try await API.shared.upload(image: img)
-                    let file = original ? url : (await MediaTool.compress(url) ?? url)
-                    guard let vurl = await MediaTool.upload(file) else { throw APIError.message("实况上传失败") }
+                    DispatchQueue.main.async { sendProgress = 0.25 }
+                    var file = url
+                    var uploadFrom = 0.25
+                    if !original, await MediaTool.needsCompress(url) {
+                        sendingMedia = Tr("实况压缩中…")
+                        file = (await MediaTool.compress(url) { p in
+                            DispatchQueue.main.async { sendProgress = 0.25 + p * 0.15 }
+                        }) ?? url
+                        uploadFrom = 0.4
+                        sendingMedia = Tr("实况发送中…")
+                    }
+                    let from = uploadFrom
+                    guard let vurl = await MediaTool.upload(file, onProgress: { p in
+                        DispatchQueue.main.async { sendProgress = from + p * (1 - from) }
+                    }, skipServerTranscode: !original) else { throw APIError.message("实况上传失败") }
                     let body: [String: Any] = ["image": iurl, "video": vurl]
                     let json = (try? JSONSerialization.data(withJSONObject: body)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
                     if let m = try await API.shared.send(chatId: chat.id, kind: "livephoto", content: json) {
@@ -1412,6 +1466,7 @@ struct ChatDetailView: View {
                 } catch { app.show((error as? APIError)?.errorDescription ?? "实况发送失败") }
                 uploading = false
                 sendingMedia = ""
+                sendingPreview = nil
                 await app.loadChats()
             }
         }

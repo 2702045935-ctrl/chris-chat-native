@@ -98,11 +98,27 @@ struct BalancePageView: View {
                 .foregroundColor(Color.dyn(0x000000, 0xEDEDED))
                 .padding(.top, st.gapTitleV)
 
-            MoneyLabel(text: money(cfg?.balance ?? app.me?.balance ?? 0),
+            /* 没实名：服务端不下发真数字，这里直接显示 ¥****（连 0.00 都不给看） */
+            MoneyLabel(text: (cfg?.isLocked ?? false) ? "¥****" : money(cfg?.balance ?? app.me?.balance ?? 0),
                        size: st.amountFont, curSize: st.curFont, topAlign: true,
                        color: Color.dyn(0x000000, 0xEDEDED))
                 .padding(.top, st.gapAmountV)
 
+            if cfg?.isLocked ?? false {
+                Button {
+                    app.show(Tr("请先完成实名认证"))
+                    RealNameGate.shared.prompt()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(Tr("按国家规定，完成实名认证后才能查看和使用零钱"))
+                            .font(pf(max(12, st.noteFont - 1)))
+                            .foregroundColor(Color(hex: 0xE6A23C))
+                        Text(Tr("去认证")).font(pf(max(12, st.noteFont - 1), .medium)).foregroundColor(C.green)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.top, st.gapNoteV)
+            }
             if let note = cfg?.note, !note.isEmpty {
                 HStack(spacing: 4) {
                     Text(note).font(pf(st.noteFont)).foregroundColor(st.noteColorV)

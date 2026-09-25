@@ -838,6 +838,10 @@ struct WalletConfig: Decodable, Hashable {
     var footer: [WalletFoot]?
     var style: WalletStyle?
     var balance: Double?
+    /// 没实名：金额被服务端打成 ¥****，钱的动作也全拦着（和微信一样）
+    var locked: Bool?
+    var needRealName: Bool?
+    var isLocked: Bool { (locked ?? false) || (needRealName ?? false) }
 }
 
 /* ---------------- 账单（钱包页右上角「账单」进来，数据来自 /api/bills） ---------------- */
@@ -1019,6 +1023,10 @@ struct BalancePageConfig: Decodable, Hashable {
     var style: BalanceStyle?
     var balance: Double?
     var frozen: Double?
+    /// 没实名：金额被服务端藏起来了（显示 ¥**** + 去实名认证），钱的动作也全拦着
+    var locked: Bool?
+    var needRealName: Bool?
+    var isLocked: Bool { (locked ?? false) || (needRealName ?? false) }
 }
 
 private struct PlusPayload: Decodable { var items: [PlusItem]? }

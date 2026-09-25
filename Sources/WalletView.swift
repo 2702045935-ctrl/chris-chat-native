@@ -67,6 +67,29 @@ struct WalletView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     Color.clear.frame(height: 6)
+                    /* 没实名：顶部挂一条提示（金额已经被服务端藏成 ¥****），点一下去实名 */
+                    if cfg?.isLocked ?? false {
+                        Button {
+                            RealNameGate.shared.prompt()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("⚠️").font(pf(14))
+                                Text(Tr("按国家规定，完成实名认证后才能查看和使用钱包金额"))
+                                    .font(pf(13))
+                                    .foregroundColor(Color(hex: 0xB06A12))
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Text(Tr("去认证")).font(pf(13, .medium)).foregroundColor(C.green)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.dyn(0xFFF7E6, 0x3A2E17)))
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 6)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     ForEach(groups) { g in
                         card(g).padding(.top, g.id == groups.first?.id ? 0 : st.gap)
                     }

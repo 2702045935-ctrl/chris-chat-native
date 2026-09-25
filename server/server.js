@@ -9519,9 +9519,10 @@ async function handleApi(req, res, pathname, query) {
     defs.forEach((d) => { builtin[d.key] = d.svg || ''; });
     const svgOf = (icon, own) => own || overrides[icon] || builtin[icon] || '';
     const me = currentUser(req);
-    /* 用钱包必须实名（和微信一样：没实名进不了零钱）。
-       App 收到 needRealName 会自动弹实名认证页，不用出新包。 */
-    if (blockedByRealName(res, me)) return;
+    /* 钱包页：配置照常给（App 拿不到配置会退回自己的默认样式 → 看着就"字变大了"）。
+       未实名的把金额藏掉（¥****）+ 打 needRealName 标记，页面自己提示去实名；
+       真正的钱动作（转账/红包/收付款/提现/充值/账单/银行卡/零钱页数值）仍然硬拦。 */
+    const walletRn = !!(me && (!me.realName || !me.idCardHash));
     const cfg = db.wallet || normalizeWallet(null);
     /* 后台把「点一下能看」也关了的话，连数值都不下发（只给 ¥****），前端想看也没有 */
     const hardMask = !!(cfg.style && cfg.style.maskAmount !== false && cfg.style.maskReveal === false);
@@ -9532,8 +9533,10 @@ async function handleApi(req, res, pathname, query) {
     };
     const pick = (it) => {
       let value = it.valueKind === 'balance'
-        ? ('¥' + (Number(me && me.balance) || 0).toFixed(2))
+        ? (walletRn ? '¥****' : ('¥' + (Number(me && me.balance) || 0).toFixed(2)))
         : (it.value || '');
+      /* 没实名：只要是"钱"的数值一律打掉（后台配的静态文字不动） */
+      if (walletRn && value && /^¥?\s?[\d,]+(\.\d+)?$/.test(String(value).trim())) value = '¥****';
       if (hardMask && value && it.mask !== false) value = maskMoney(value);
       return Object.assign({}, it, { value: value, svg: svgOf(it.icon, it.svg) });
     };
@@ -9549,7 +9552,9 @@ async function handleApi(req, res, pathname, query) {
       groups: groups,
       footer: (cfg.footer || []).filter((f) => f.enabled !== false),
       style: cfg.style || normalizeWallet(null).style,
-      balance: Number(me && me.balance) || 0,
+      balance: walletRn ? 0 : (Number(me && me.balance) || 0),
+      locked: walletRn,
+      needRealName: walletRn,
       version: assetVersion()
     });
     return;
@@ -9678,11 +9683,16 @@ async function handleApi(req, res, pathname, query) {
      余额是这个人的真实零钱（冻结金额目前恒为 0，等有冻结逻辑再接）。 */
   if (parts[0] === 'balance-page' && method === 'GET') {
     const me = currentUser(req);
-    if (blockedByRealName(res, me)) return;      // 零钱页要实名
+    /* 零钱页：配置照常给（不然 App 拿不到样式，会退回它自己的默认字号 → 看着像"钱的字变大了"）。
+       未实名的：余额给 0 + needRealName 标记，页面自己弹实名认证；真钱的动作（转账/红包/收付款/
+       提现/充值/账单/银行卡）仍然被硬拦。 */
+    const rn = !!(me && (!me.realName || !me.idCardHash));
     const cfg = db.balancePage || normalizeBalancePage(null);
     ok(res, Object.assign({}, cfg, {
-      balance: Number(me && me.balance) || 0,
+      balance: rn ? 0 : (Number(me && me.balance) || 0),
       frozen: 0,
+      locked: rn,
+      needRealName: rn,
       version: assetVersion()
     }));
     return;

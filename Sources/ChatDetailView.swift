@@ -589,6 +589,7 @@ struct ChatDetailView: View {
             if case .success(let urls) = result, let url = urls.first { sendFile(url) }
         }
         .task(id: chat.id) {
+            HitchWatch.shared.start("聊天页")
             await load(initial: true)
             await API.shared.markRead(chatId: chat.id)
             await app.loadChats()

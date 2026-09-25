@@ -693,6 +693,7 @@ struct ChatsView: View {
                 .environmentObject(app)
         }
         .task {
+            HitchWatch.shared.start("会话列表")
             // 进页面先拉一次，之后每 4 秒自动刷新一次（这样别人发消息不用切页就能看到）
             while !Task.isCancelled {
                 await app.loadChats()

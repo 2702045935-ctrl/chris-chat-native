@@ -858,19 +858,55 @@ struct ChatDetailView: View {
                 .background(C.tabBg)
             }
             HStack(spacing: 6) {
-                Button {
-                    /* 微信的规矩：这个按钮是「语音 / 键盘」切换 ——
-                       切到语音，整条输入框变成「按住 说话」（打字内容存成草稿，切回来还在）。 */
-                    if recorder.recording { return }
-                    voiceMode.toggle()
-                    if voiceMode { focused = false; panel = .none }
-                } label: {
-                    Image(systemName: voiceMode ? "keyboard" : "mic")
-                        .font(.system(size: 21, weight: .regular))
-                        .foregroundColor(recorder.recording ? C.green : C.chatBarIcon)
-                        .frame(width: L.composerIconBox, height: L.composerIconBox)
-                }
-                .buttonStyle(.plain)
+                /* 这个键两种用法（微信也是这样，同时照顾老习惯）：
+                   轻点 = 切「语音 / 键盘」模式；**按住 = 直接开始录音** ——
+                   靠「按了多久」区分。上一版只保留了切换，按住毫无反应，
+                   用户就以为「浮层没了」（线上真被这么反馈过）。 */
+                Image(systemName: voiceMode ? "keyboard" : "mic")
+                    .font(.system(size: 21, weight: .regular))
+                    .foregroundColor(recorder.recording ? C.green : C.chatBarIcon)
+                    .frame(width: L.composerIconBox, height: L.composerIconBox)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { v in
+                                if pressStart == nil { pressStart = Date() }
+                                if recorder.recording {
+                                    recorder.drag(v.translation.height)
+                                    return
+                                }
+                                if !voiceStarting, Date().timeIntervalSince(pressStart ?? Date()) > 0.22 {
+                                    voiceStarting = true
+                                    focused = false
+                                    panel = .none
+                                    Task { _ = await recorder.begin(); voiceStarting = false }
+                                }
+                            }
+                            .onEnded { _ in
+                                let held = Date().timeIntervalSince(pressStart ?? Date())
+                                pressStart = nil
+                                voiceStarting = false
+                                if recorder.recording {
+                                    if recorder.willCancel { recorder.cancel(); return }
+                                    if recorder.willTranscribe {
+                                        guard let got = recorder.end() else { return }
+                                        FileSpeech.requestAuth()
+                                        Task {
+                                            let text = await FileSpeech.recognize(url: got.url)
+                                            if text.isEmpty { app.show(Tr("没听清，再说一次或者直接发语音")) }
+                                            else { input = text }
+                                        }
+                                        return
+                                    }
+                                    finishVoice()
+                                    return
+                                }
+                                if held < 0.22 {                 // 轻点 = 切「语音 / 键盘」
+                                    voiceMode.toggle()
+                                    if voiceMode { focused = false; panel = .none }
+                                }
+                            }
+                    )
 
                 HStack(spacing: 0) {
                     if voiceMode {

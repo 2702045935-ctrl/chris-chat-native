@@ -123,6 +123,19 @@ final class PushCenter: NSObject, ObservableObject, UIApplicationDelegate, UNUse
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let info = response.notification.request.content.userInfo
+        /* 来电通知上的按钮：不用先进 App 再点一遍（微信在外面也能直接接） */
+        if response.actionIdentifier == "call.answer" {
+            CallCenter.shared.accept()
+            completionHandler()
+            return
+        }
+        if response.actionIdentifier == "call.reject" {
+            CallCenter.shared.reject()
+            completionHandler()
+            return
+        }
+        /* 点通知本体：如果是来电，把通话界面调出来（App 一进前台就能看到来电页） */
+        if (info["kind"] as? String) == "call" { CallCenter.shared.restore() }
         if let chatId = info["chatId"] as? String, !chatId.isEmpty {
             NotificationCenter.default.post(name: .chrisOpenChat, object: nil, userInfo: ["chatId": chatId])
         }

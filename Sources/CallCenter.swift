@@ -370,6 +370,10 @@ final class CallCenter: NSObject, ObservableObject {
             tip = isVideo ? "邀请你视频通话…" : "邀请你语音通话…"
             phase = .incoming
             startRingTimeout()
+            /* App 不在前台：发一条本地通知，锁屏/主屏也能看到并能接（方案 2） */
+            if UIApplication.shared.applicationState != .active {
+                LocalNotify.incomingCall(callId: callId, peerName: peerName, video: isVideo)
+            }
             Ringtone.shared.startIncoming()    // 来电铃声响起来（重复放到接/挂）
             UINotification.buzz()          // 震动提醒
 
@@ -704,6 +708,8 @@ final class CallCenter: NSObject, ObservableObject {
     private func finish(tip: String) {
         let wasIdle = (phase == .idle)
         let secs = seconds
+        /* 通话结束：把锁屏上那条来电通知撤掉（不然会一直挂在那儿） */
+        LocalNotify.clearCall(callId: callId)
         /* 通话结束：如果这时候人在后台，就把「保活」接回来（通话期间是关掉的） */
         if UIApplication.shared.applicationState != .active {
             Task { @MainActor in

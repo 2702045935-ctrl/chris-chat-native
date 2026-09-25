@@ -14,6 +14,43 @@ enum LocalNotify {
 
     static func prepare() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+        prepareCallCategory()      // 顺手把来电通知上的「接听 / 拒绝」按钮注册上
+    }
+
+    /* ---------------- 来电通知（方案 2：App 在外面也能看到、能接）----------------
+       WeChat 那种「锁屏直接全屏来电」要 CallKit + VoIP 推送（需要付费开发者账号 + 带 VoIP
+       权限的签名），我们先用本地通知这条：App 在后台/锁屏时，来电会弹一条**带铃声、
+       不会自动消失**的通知，上面有「接听 / 拒绝」两个按钮，点一下就能接。 */
+
+    static let callCategory = "chris.call"
+
+    static func prepareCallCategory() {
+        let answer = UNNotificationAction(identifier: "call.answer", title: "接听", options: [.foreground])
+        let reject = UNNotificationAction(identifier: "call.reject", title: "拒绝", options: [.destructive])
+        let cat = UNNotificationCategory(identifier: callCategory, actions: [answer, reject],
+                                         intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([cat])
+    }
+
+    /// 来电：发一条带铃声的本地通知（锁屏/主屏都能看到）。同一次通话只留一条。
+    static func incomingCall(callId: String, peerName: String, video: Bool) {
+        let c = UNMutableNotificationContent()
+        c.title = video ? "视频通话" : "语音通话"
+        c.body = (peerName.isEmpty ? "有人" : peerName) + "邀请你" + (video ? "视频" : "语音") + "通话"
+        c.sound = .default
+        c.categoryIdentifier = callCategory
+        c.userInfo = ["callId": callId, "kind": "call"]
+        if #available(iOS 15.0, *) { c.interruptionLevel = .timeSensitive }
+        let req = UNNotificationRequest(identifier: "call-" + callId, content: c, trigger: nil)
+        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+    }
+
+    /// 通话结束 / 被取消：把那条来电通知撤掉，别在锁屏上留残影
+    static func clearCall(callId: String) {
+        guard !callId.isEmpty else { return }
+        let ids = ["call-" + callId]
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     static func refresh() async {

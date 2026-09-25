@@ -822,15 +822,25 @@ struct ChatDetailView: View {
             if !mine { Spacer(minLength: 0) }
         }
         .padding(.bottom, gapAfter(message))
-        .onLongPressGesture { openActions(message) }
-        /* 微信那样：点一下这条通话记录 = 直接回拨（视频记录就回拨视频） */
+        /* 关键：整行都要能点（以前只给气泡加了点击，点左右留白没反应 → 看着像"点不了"）。
+           微信那样：点一下这条通话记录 = 直接回拨（视频记录就回拨视频），长按才是菜单。 */
+        .contentShape(Rectangle())
         .onTapGesture { redial(from: message) }
+        .onLongPressGesture { openActions(message) }
     }
 
     /// 点通话记录回拨：对方 = 这条记录的双方里「不是我」的那个。
     /// 严格校验（空的、等于我自己都不拨），免得又出现「不能给自己打电话」那种误拨。
     private func redial(from message: Message) {
-        let peer = (message.callFrom == myId) ? (message.call?.to ?? "") : message.callFrom
+        /* 对方是谁，三种来源依次兜底：
+           ① 记录里写了 from/to（新记录）② 我自己发的就看 call.to ③ 再不行用这个会话的对方。
+           以前只认 ①，老记录（没带 from/to）点了没反应，用户以为"不能回拨"。 */
+        var peer = (message.callFrom == myId) ? (message.call?.to ?? "") : message.callFrom
+        if peer.isEmpty || peer == myId {
+            if let other = message.call?.to, !other.isEmpty, other != myId { peer = other }
+            else if let other = message.call?.from, !other.isEmpty, other != myId { peer = other }
+            else if let other = peerUserId { peer = other }
+        }
         guard !peer.isEmpty, peer != myId else { app.show(Tr("这条记录里找不到对方账号")); return }
         if CallCenter.shared.phase != .idle { app.show(Tr("正在通话中")); return }
         CallCenter.shared.resetIfStale()

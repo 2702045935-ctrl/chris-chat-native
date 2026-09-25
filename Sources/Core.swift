@@ -976,6 +976,70 @@ struct TapAvatarCard: ViewModifier {
     }
 }
 
+/* 能缩放的单张图（图片浏览器用）：双指放大 / 双击放大缩小 / 放大后单指拖拽。
+   没放大时不抢手势 → TabView 的左右翻页照旧能用。 */
+struct ZoomableRemoteImage: View {
+    var path: String
+    @State private var scale: CGFloat = 1
+    @State private var baseScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var baseOffset: CGSize = .zero
+    @State private var dragStart: CGSize = .zero
+
+    private var magnify: some Gesture {
+        MagnificationGesture()
+            .onChanged { v in scale = min(4, max(1, baseScale * v)) }
+            .onEnded { _ in
+                baseScale = scale
+                if scale <= 1.02 {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
+                    }
+                }
+            }
+    }
+    private var doubleTap: some Gesture {
+        TapGesture(count: 2).onEnded {
+            withAnimation(.easeOut(duration: 0.22)) {
+                if scale > 1.02 {
+                    scale = 1; baseScale = 1; offset = .zero; baseOffset = .zero
+                } else {
+                    scale = 2.5; baseScale = 2.5
+                }
+            }
+        }
+    }
+    private var pan: some Gesture {
+        DragGesture()
+            .onChanged { v in
+                guard scale > 1.02 else { return }
+                offset = CGSize(width: dragStart.width + v.translation.width,
+                                height: dragStart.height + v.translation.height)
+            }
+            .onEnded { _ in
+                baseOffset = offset
+                dragStart = offset
+            }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            RemoteImage(path: path, mode: .fit)
+                .frame(width: geo.size.width, height: geo.size.height)
+                .scaleEffect(scale)
+                .offset(offset)
+        }
+        .contentShape(Rectangle())
+        .gesture(magnify)                 // 双指放大 / 缩小
+        .simultaneousGesture(doubleTap)   // 双击：放大到 2.5 倍 / 再双击回到原样
+        .simultaneousGesture(pan)         // 放大后拖拽看图（没放大时它什么都不做）
+        .onChange(of: scale) { s in
+            if s <= 1.02 { dragStart = .zero; baseOffset = .zero }
+            else { dragStart = baseOffset }
+        }
+    }
+}
+
 struct PhotoPager: View {
     let paths: [String]
     let startIndex: Int
@@ -999,7 +1063,8 @@ struct PhotoPager: View {
 
             TabView(selection: $index) {
                 ForEach(paths.indices, id: \.self) { i in
-                    RemoteImage(path: paths[i], mode: .fit)
+                    /* 每张图都能双指放大 / 双击放大 / 放大后拖拽（和微信一样） */
+                    ZoomableRemoteImage(path: paths[i])
                         .tag(i)
                 }
             }

@@ -9519,10 +9519,9 @@ async function handleApi(req, res, pathname, query) {
     defs.forEach((d) => { builtin[d.key] = d.svg || ''; });
     const svgOf = (icon, own) => own || overrides[icon] || builtin[icon] || '';
     const me = currentUser(req);
-    /* 钱包页：配置照常给（App 拿不到配置会退回自己的默认样式 → 看着就"字变大了"）。
-       未实名的把金额藏掉（¥****）+ 打 needRealName 标记，页面自己提示去实名；
-       真正的钱动作（转账/红包/收付款/提现/充值/账单/银行卡/零钱页数值）仍然硬拦。 */
-    const walletRn = !!(me && (!me.realName || !me.idCardHash));
+    /* 强制实名：没实名进不了钱包页（和微信一样）。
+       App 收到 needRealName 会弹实名认证 + 显示「请先实名」的页面。 */
+    if (blockedByRealName(res, me)) return;
     const cfg = db.wallet || normalizeWallet(null);
     /* 后台把「点一下能看」也关了的话，连数值都不下发（只给 ¥****），前端想看也没有 */
     const hardMask = !!(cfg.style && cfg.style.maskAmount !== false && cfg.style.maskReveal === false);
@@ -9533,10 +9532,8 @@ async function handleApi(req, res, pathname, query) {
     };
     const pick = (it) => {
       let value = it.valueKind === 'balance'
-        ? (walletRn ? '¥****' : ('¥' + (Number(me && me.balance) || 0).toFixed(2)))
+        ? ('¥' + (Number(me && me.balance) || 0).toFixed(2))
         : (it.value || '');
-      /* 没实名：只要是"钱"的数值一律打掉（后台配的静态文字不动） */
-      if (walletRn && value && /^¥?\s?[\d,]+(\.\d+)?$/.test(String(value).trim())) value = '¥****';
       if (hardMask && value && it.mask !== false) value = maskMoney(value);
       return Object.assign({}, it, { value: value, svg: svgOf(it.icon, it.svg) });
     };
@@ -9552,9 +9549,7 @@ async function handleApi(req, res, pathname, query) {
       groups: groups,
       footer: (cfg.footer || []).filter((f) => f.enabled !== false),
       style: cfg.style || normalizeWallet(null).style,
-      balance: walletRn ? 0 : (Number(me && me.balance) || 0),
-      locked: walletRn,
-      needRealName: walletRn,
+      balance: Number(me && me.balance) || 0,
       version: assetVersion()
     });
     return;
@@ -9683,18 +9678,153 @@ async function handleApi(req, res, pathname, query) {
      余额是这个人的真实零钱（冻结金额目前恒为 0，等有冻结逻辑再接）。 */
   if (parts[0] === 'balance-page' && method === 'GET') {
     const me = currentUser(req);
-    /* 零钱页：配置照常给（不然 App 拿不到样式，会退回它自己的默认字号 → 看着像"钱的字变大了"）。
-       未实名的：余额给 0 + needRealName 标记，页面自己弹实名认证；真钱的动作（转账/红包/收付款/
-       提现/充值/账单/银行卡）仍然被硬拦。 */
-    const rn = !!(me && (!me.realName || !me.idCardHash));
+    /* 强制实名：没实名进不了零钱页（和微信一样）。
+       App 收到 needRealName 会弹实名认证 + 显示「请先实名」的页面，不会再退回默认字号。 */
+    if (blockedByRealName(res, me)) return;
     const cfg = db.balancePage || normalizeBalancePage(null);
     ok(res, Object.assign({}, cfg, {
-      balance: rn ? 0 : (Number(me && me.balance) || 0),
+      balance: Number(me && me.balance) || 0,
       frozen: 0,
-      locked: rn,
-      needRealName: rn,
       version: assetVersion()
     }));
+    return;
+  }
+
+  /* 看一看（和微信一样两块）：①「朋友在看」= 视频号里朋友看过的；
+     ② 兜底 = 朋友最近点赞过的朋友圈动态（视频号没内容时也有东西看）。
+     内容源：data/feed.json（视频号）+ data/feed-views.json（谁看过哪条）+ moments.json */
+  if (parts[0] === 'lookaround' && method === 'GET') {
+    const me = currentUser(req);
+    if (!me) return fail(res, 401, '请先登录');
+    const nmx = (id) => { const u = findUser(String(id || '')); return u ? (u.nickname || u.username || '') : ''; };
+    const friends = new Set(friendIds(me.id));
+    const f = readJson(path.join(DATA_DIR, 'feed.json'), { items: [], posts: [] });
+    const allVideos = (f.items || []).concat(f.posts || []).filter((v) => v && v.id);
+    const views = readJson(path.join(DATA_DIR, 'feed-views.json'), {}) || {};
+    const videos = allVideos.map((v) => {
+      const watchers = Object.keys(views).filter((uid) => friends.has(uid) && ((views[uid] || {})[v.id] || {}).count > 0);
+      const total = Object.keys(views).filter((uid) => ((views[uid] || {})[v.id] || {}).count > 0).length;
+      return {
+        id: v.id, title: v.title || v.caption || '', cover: v.cover || v.thumb || '', video: v.url || v.src || '',
+        authorId: v.authorId || '', author: v.authorId ? nmx(v.authorId) : (v.author || ''),
+        createdAt: v.createdAt || '', dur: Number(v.dur) || 0, likes: Number(v.likes) || 0,
+        watched: total, friendsCount: watchers.length,
+        friends: watchers.slice(0, 3).map((uid) => ({ id: uid, name: nmx(uid), avatar: (findUser(uid) || {}).avatar || '' }))
+      };
+    });
+    const friendVideos = videos.filter((v) => v.friendsCount > 0)
+      .sort((a, b) => b.friendsCount - a.friendsCount || String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 30);
+    const hotVideos = videos.slice()
+      .sort((a, b) => (b.watched - a.watched) || (b.likes - a.likes) || String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 30);
+    const friendMoments = (db.moments || [])
+      .filter((m) => m && m.authorId !== me.id && Array.isArray(m.likes) && m.likes.some((id) => friends.has(id)))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 20)
+      .map((m) => ({
+        id: m.id, authorId: m.authorId, author: nmx(m.authorId),
+        content: String(m.content || '').slice(0, 80),
+        images: (m.images || []).slice(0, 3),
+        createdAt: m.createdAt, likeCount: (m.likes || []).length,
+        whoLiked: (m.likes || []).filter((id) => friends.has(id)).slice(0, 3)
+          .map((id) => ({ id, name: nmx(id), avatar: (findUser(id) || {}).avatar || '' }))
+      }));
+    /* 视频号被清空 / 没人点赞过时，用「大家都在看」和「朋友最近发的」兜底，
+       保证这一页不会是一片空白（微信的看一看也总有内容）。 */
+    const pick = (m) => ({
+      id: m.id, authorId: m.authorId, author: nmx(m.authorId),
+      content: String(m.content || '').slice(0, 80),
+      images: (m.images || []).slice(0, 3),
+      createdAt: m.createdAt, likeCount: (m.likes || []).length,
+      commentCount: (m.comments || []).length
+    });
+    const visible = (db.moments || []).filter((m) => m && momentVisibleTo(m, me.id));
+    const hotMoments = visible.slice()
+      .sort((a, b) => ((b.likes || []).length + (b.comments || []).length) - ((a.likes || []).length + (a.comments || []).length)
+        || String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 20).map(pick);
+    const friendRecent = visible.filter((m) => m.authorId !== me.id && friends.has(m.authorId))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 20).map(pick);
+    ok(res, {
+      videos: friendVideos, hot: hotVideos, moments: friendMoments,
+      hotMoments: hotMoments, friendRecent: friendRecent
+    });
+    return;
+  }
+
+  /* 搜一搜：一次搜完 联系人 / 群聊 / 朋友圈 / 视频号 / 聊天记录（和微信那个搜索页一样分组给）。
+     scope 可以是 people / groups / moments / videos / messages / all */
+  if (parts[0] === 'search' && method === 'GET') {
+    const me = currentUser(req);
+    if (!me) return fail(res, 401, '请先登录');
+    const nmx = (id) => { const u = findUser(String(id || '')); return u ? (u.nickname || u.username || '') : ''; };
+    const q = String(query.get('q') || '').trim().slice(0, 40);
+    const scope = String(query.get('scope') || 'all');
+    if (!q) return ok(res, { people: [], groups: [], moments: [], videos: [], messages: [] });
+    const lower = q.toLowerCase();
+    const want = (k) => scope === 'all' || scope === k;
+    const out = { people: [], groups: [], moments: [], videos: [], messages: [] };
+    if (want('people')) {
+      out.people = friendIds(me.id).map(findUser).filter(Boolean)
+        .filter((u) => displayNameFor(me.id, u).toLowerCase().includes(lower)
+          || String(u.username || '').toLowerCase().includes(lower))
+        .slice(0, 20)
+        .map((u) => ({ id: u.id, name: displayNameFor(me.id, u), username: u.username || '', avatar: u.avatar || '' }));
+    }
+    if (want('groups')) {
+      out.groups = db.chats
+        .filter((c) => c.type === 'group' && (c.memberIds || []).includes(me.id)
+          && String(c.name || '').toLowerCase().includes(lower))
+        .slice(0, 20)
+        .map((c) => ({ id: c.id, name: c.name || '', avatar: c.avatar || '', members: (c.memberIds || []).length }));
+    }
+    if (want('moments')) {
+      out.moments = (db.moments || [])
+        .filter((m) => m && momentVisibleTo(m, me.id) && String(m.content || '').toLowerCase().includes(lower))
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, 20)
+        .map((m) => ({
+          id: m.id, authorId: m.authorId, author: nmx(m.authorId),
+          content: String(m.content || '').slice(0, 120),
+          images: (m.images || []).slice(0, 3), createdAt: m.createdAt
+        }));
+    }
+    if (want('videos')) {
+      const f = readJson(path.join(DATA_DIR, 'feed.json'), { items: [], posts: [] });
+      out.videos = (f.items || []).concat(f.posts || [])
+        .filter((v) => v && (String(v.title || '') + String(v.caption || '')).toLowerCase().includes(lower))
+        .slice(0, 20)
+        .map((v) => ({ id: v.id, title: v.title || v.caption || '', cover: v.cover || '', authorId: v.authorId || '', author: v.authorId ? nmx(v.authorId) : '' }));
+    }
+    if (want('messages')) {
+      const hits = [];
+      for (const c of chatsOf(me.id)) {
+        if (hits.length >= 30) break;
+        const msgs = loadMessages(c.id);
+        for (let i = msgs.length - 1; i >= 0 && hits.length < 30; i -= 1) {
+          const m = msgs[i];
+          if (!m || m.recalled) continue;
+          if (!String(m.content || '').toLowerCase().includes(lower)) continue;
+          const peerId = (c.memberIds || []).find((id) => id !== me.id) || '';
+          hits.push({
+            chatId: c.id, isGroup: c.type === 'group',
+            chatTitle: c.type === 'group' ? (c.name || '群聊') : nmx(peerId),
+            peerId, messageId: m.id, senderId: m.senderId, sender: nmx(m.senderId),
+            text: String(m.content || '').slice(0, 120), at: m.createdAt
+          });
+        }
+      }
+      out.messages = hits.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 30);
+    }
+    /* 临时调试：确认搜索内部到底扫了多少会话/消息（排查完就删） */
+    out._dbg = {
+      scope: scope, q: q,
+      chats: chatsOf(me.id).length,
+      scanned: chatsOf(me.id).reduce((n, c) => n + loadMessages(c.id).length, 0)
+    };
+    ok(res, out);
     return;
   }
 

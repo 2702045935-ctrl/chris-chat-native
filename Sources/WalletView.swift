@@ -36,6 +36,8 @@ struct WalletView: View {
     @State private var needGesture = false
     @State private var pendingAction = ""
     @State private var pendingLabel = ""
+    /// 没实名 → 整页显示「请先实名认证」（服务端强制拦，不给看金额）
+    @State private var needReal = false
 
     private var st: WalletStyle { cfg?.style ?? WalletStyle() }
 
@@ -50,6 +52,9 @@ struct WalletView: View {
     }
 
     var body: some View {
+        if needReal {
+            NeedRealNameView { dismiss() }
+        } else {
         VStack(spacing: 0) {
             NavBar(title: cfg?.title ?? "钱包", back: { dismiss() }) {
                 Button {
@@ -113,6 +118,7 @@ struct WalletView: View {
         .sheet(isPresented: $showIdentity) { IdentityView().environmentObject(app) }
         .sheet(isPresented: $showPaySettings) { PaySettingsView().environmentObject(app) }
         .sheet(isPresented: $showPayScore) { PayScoreView().environmentObject(app) }
+        }
         .sheet(isPresented: $needGesture) {
             GestureLockView { openAfterLock(pendingAction, pendingLabel) }
         }
@@ -255,11 +261,18 @@ struct WalletView: View {
 
     private func load() async {
         revealed = []          // 进来先全部打星号
-        if let got = try? await API.shared.walletConfig() {
-            cfg = got
-        } else if cfg == nil {
-            // 服务器连不上 / 还没升级：用内置那份兜底，别开天窗
-            cfg = WalletFallback.config(balance: app.me?.balance ?? 0)
+        do {
+            cfg = try await API.shared.walletConfig()
+        } catch let e as APIError {
+            /* 没实名：服务端硬拦（强制实名）。这里显示「请先实名」的页面，
+               不能用内置兜底配置 —— 那看着就像"金额字变大了"（以前踩过这个坑）。 */
+            if case .needRealName = e {
+                needReal = true
+                return
+            }
+            if cfg == nil { cfg = WalletFallback.config(balance: app.me?.balance ?? 0) }
+        } catch {
+            if cfg == nil { cfg = WalletFallback.config(balance: app.me?.balance ?? 0) }
         }
         /* 钱包里配了「安全分」那一行的话，把真实分数读出来填上 */
         let wantScore = (cfg?.groups ?? []).contains { g in

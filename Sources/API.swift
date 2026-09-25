@@ -1173,6 +1173,20 @@ final class API {
         return (payload.app, payload.notice)
     }
 
+    /* ---------------- 看一看 / 搜一搜 ---------------- */
+
+    /// 看一看：朋友在看的（视频）+ 朋友点赞的动态 + 大家都在看
+    func lookAround() async throws -> LookAroundData {
+        try await get("/api/lookaround", as: LookAroundData.self)
+    }
+
+    /// 搜一搜：一次搜完 联系人 / 群聊 / 朋友圈 / 视频号 / 聊天记录
+    func searchAll(_ q: String, scope: String = "all") async throws -> SearchAllData {
+        let path = "/api/search?q=" + (q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")
+            + "&scope=" + scope
+        return try await get(path, as: SearchAllData.self)
+    }
+
     /// 是不是「压根连不上」这类错（超时 / 拒绝 / DNS / 断网）——只有这类才换线路
     static func isConnectivity(_ error: Error) -> Bool {
         guard let e = error as? URLError else { return false }

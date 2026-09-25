@@ -66,6 +66,10 @@ struct DiscoverView: View {
                     GamesPageView()
                 } else if key == "channels" {
                     ChannelsView()
+                } else if key == "look" {
+                    LookView()
+                } else if key == "search" {
+                    SearchAllView()
                 } else if key == "news" {
                     ComingSoonView(title: "腾讯新闻")
                 } else if key.hasPrefix("soon:") {
@@ -117,8 +121,10 @@ struct DiscoverView: View {
         case "nearby": path.append("nearby")
         case "shake": path.append("shake")
         case "live": path.append("live")
-    case "games": path.append("games")
+        case "games": path.append("games")
     case "channels": path.append("channels")
+    case "look": path.append("look")
+    case "search": path.append("search")
     case "scan": showScan = true
     default: path.append("soon:" + item.label)
         }
@@ -148,9 +154,9 @@ extension DiscoverItem {
             DiscoverItem(id: "d05", label: "摇一摇", icon: "i.shake", svg: I.shake,
                          color: "#4489EA", action: "soon", group: 3, enabled: true),
             DiscoverItem(id: "d06", label: "看一看", icon: "i.look", svg: I.look,
-                         color: "#7275E9", action: "soon", group: 4, enabled: true),
+                         color: "#7275E9", action: "look", group: 4, enabled: true),
             DiscoverItem(id: "d07", label: "搜一搜", icon: "i.searchRow", svg: I.searchRow,
-                         color: "#59C47E", action: "soon", group: 4, enabled: true),
+                         color: "#59C47E", action: "search", group: 4, enabled: true),
             DiscoverItem(id: "d08", label: "附近", icon: "i.nearby", svg: I.nearby,
                          color: "#3D83E7", action: "soon", group: 5, enabled: true),
             DiscoverItem(id: "d10", label: "游戏", icon: "i.game", svg: I.game,

@@ -26,10 +26,15 @@ struct BalancePageView: View {
     @State private var showFaqPage = false
     @State private var showUpgrade = false
     @State private var faqAnswer: String?
+    /// 没实名 → 整页显示「请先实名认证」（服务端强制拦，不显示任何金额）
+    @State private var needReal = false
 
     private var st: BalanceStyle { cfg?.style ?? BalanceStyle() }
 
     var body: some View {
+        if needReal {
+            NeedRealNameView { dismiss() }
+        } else {
         VStack(spacing: 0) {
             // 顶部导航：左边返回箭头 + 中间「零钱明细」（和参考代码一致）
             NavBar(title: cfg?.navTitle ?? "零钱明细", back: { dismiss() })
@@ -196,8 +201,13 @@ struct BalancePageView: View {
     private func money(_ v: Double) -> String { "¥" + String(format: "%.2f", v) }
 
     private func load() async {
-        if let got = try? await API.shared.balancePage() {
-            cfg = got
-        }
+        do {
+            cfg = try await API.shared.balancePage()
+        } catch let e as APIError {
+            /* 没实名：服务端硬拦（强制实名）→ 整页给「请先实名」，
+               不用默认配置兜底（那样金额字号会变成默认的 64，看着像"字变大了"）。 */
+            if case .needRealName = e { needReal = true; return }
+        } catch { }
     }
+        }
 }

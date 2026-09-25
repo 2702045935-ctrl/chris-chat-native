@@ -228,6 +228,11 @@ struct ChatDetailView: View {
     @State private var pendingMedia: MediaSendSheet.Payload?
     /// 点视频气泡 / 长按实况 → 全屏播放这个视频
     @State private var videoToPlay: URL?
+    /* 「对方正在输入…」（微信那种感知）：收到打字事件就显示，4 秒没有新事件就收起 */
+    @State private var peerTyping = ""
+    @State private var typingClear: Task<Void, Never>?
+    /// 自己打字时上报的节流（最多 2 秒发一次，别刷屏）
+    @State private var lastTypingSent = Date.distantPast
     @State private var voiceMode = false         // 输入区是不是「按住说话」模式（微信：左边那个语音/键盘切换）
 
     private var myId: String { app.me?.id ?? "" }
@@ -238,6 +243,19 @@ struct ChatDetailView: View {
         guard isGroup else { return chat.name }
         let n = chat.memberCount ?? (chat.memberIds?.count ?? 0)
         return n > 0 ? chat.name + "(" + String(n) + ")" : chat.name
+    }
+
+    /// 顶栏标题：对方正在打字时显示「对方正在输入…」（和微信一样，一眼能感知）
+    private var navTitleShown: String {
+        guard !peerTyping.isEmpty else { return navTitle }
+        return isGroup ? "有人正在输入…" : "对方正在输入…"
+    }
+
+    /// 自己在打字 → 每 2 秒上报一次（服务端转给会话里的其他人）
+    private func reportTyping() {
+        guard Date().timeIntervalSince(lastTypingSent) > 2 else { return }
+        lastTypingSent = Date()
+        Realtime.shared.sendJSON(["type": "typing", "chatId": chat.id])
     }
 
     /// 一对一会话里的对方 id（真人语音/视频通话要用它去呼叫）
@@ -355,7 +373,7 @@ struct ChatDetailView: View {
                以前两个视图并列塞进 safeAreaInset，SwiftUI 会把它们叠在一起，
                绿条的背景就盖到导航栏/屏幕上（线上反馈的「一根绿条遮盖屏幕」）。 */
             VStack(spacing: 0) {
-            NavBar(title: navTitle, back: { dismiss() }, leftExtra: leftUnreadBadge) {
+            NavBar(title: navTitleShown, back: { dismiss() }, leftExtra: leftUnreadBadge) {
                 Button {
                     /* 微信逻辑：右上「⋯」不是弹菜单，而是进聊天信息页
                        —— 群聊进「群聊信息」，单聊进「聊天信息」 */
@@ -581,6 +599,17 @@ struct ChatDetailView: View {
         }
         // 服务器一推消息，立刻拉一次（不用等轮询）
         .onChange(of: realtime.event) { _ in
+            let ev = realtime.event
+            /* 对方正在打字（服务端只把 typing 转给会话里的其他人，所以这里收到的一定是对面）：
+               顶栏显示「对方正在输入…」，4 秒没有新事件就收起 —— 和微信一样能感知到。 */
+            if ev.type == "typing", ev.chatId == chat.id {
+                peerTyping = "对方"
+                typingClear?.cancel()
+                typingClear = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    if !Task.isCancelled { peerTyping = "" }
+                }
+            }
             // 一下子来很多条时合并成一次刷新，别把手机刷爆
             pushTask?.cancel()
             pushTask = Task {
@@ -1012,11 +1041,13 @@ struct ChatDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                     } else {
                         HStack(spacing: 4) {
-                            TextField("", text: $input)
-                                .focused($focused)
-                                .font(pf(17))
-                                .foregroundColor(C.label)
-                                .onTapGesture { panel = .none }
+                        TextField("", text: $input)
+                            .focused($focused)
+                            .font(pf(17))
+                            .foregroundColor(C.label)
+                            .onTapGesture { panel = .none }
+                            /* 自己在打字 → 顺手告诉对面「正在输入」（每 2 秒最多一次） */
+                            .onChange(of: input) { _ in reportTyping() }
                             /* 「听声出字」：只在**点进输入框、键盘起来**的时候才出现（微信就是这个时机），
                                点一下开始听，说的字直接落进输入框，可以改完再发 */
                             if focused {

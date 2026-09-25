@@ -355,14 +355,10 @@ struct ChatDetailView: View {
                     .transaction { $0.animation = nil }
                 }
 
-            if uploading {
-                ZStack {
-                    Color.black.opacity(0.18).ignoresSafeArea()
-                    ProgressView("正在上传…")
-                        .padding(18)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(C.cardBg))
-                }
-            }
+            /* 以前发视频时会在整屏盖一层「正在上传…」的遮罩 ——
+               它把底下那个带进度的视频气泡整个挡住了（用户看到的就是"没有进度条，
+               只有一行正在上传"）。微信不会盖住聊天页，进度就在气泡里，
+               所以这里彻底去掉这层遮罩。 */
 
             /* 按住说话时中间那个浮层：麦克风 + 音量条 + 提示 */
             if recorder.recording {
@@ -674,8 +670,7 @@ struct ChatDetailView: View {
                             Spacer(minLength: 0)
                             /* 微信那样：立刻出一个视频气泡（封面），中间转圈 + 百分比 */
                             SendingVideoBubble(cover: sendingPreview,
-                                               progress: sendProgress,
-                                               text: sendingMedia)
+                                               progress: sendProgress)
                         }
                         .id("__sending")          // 发视频时滚到它（见 scrollToEnd）
                         .padding(.bottom, 12)

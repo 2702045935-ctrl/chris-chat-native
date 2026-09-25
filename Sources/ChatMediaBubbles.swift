@@ -151,47 +151,42 @@ struct VideoPlayerSheet: View {
 struct SendingVideoBubble: View {
     var cover: UIImage?
     var progress: Double          // 0…1
-    var text: String
 
     private let width: CGFloat = 160
 
     var body: some View {
-        VStack(spacing: 5) {
-            ZStack {
-                if let c = cover {
-                    Image(uiImage: c)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Color.dyn(0xDDDDDD, 0x333333)
-                }
-                Color.black.opacity(0.42)
-                VStack(spacing: 6) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white.opacity(0.35), lineWidth: 3)
-                            .frame(width: 38, height: 38)
-                        if progress > 0.01 {
-                            Circle()
-                                .trim(from: 0, to: min(1, progress))
-                                .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: 38, height: 38)
-                        }
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.95))
-                    }
-                    Text(progress > 0.01 ? "\(Int(min(1, progress) * 100))%" : "…")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white)
-                }
+        ZStack {
+            if let c = cover {
+                Image(uiImage: c)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.dyn(0xDDDDDD, 0x333333)
             }
-            .frame(width: width, height: width * 1.28)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            Text(text)
-                .font(pf(12))
-                .foregroundColor(C.subLabel)
+            Color.black.opacity(0.42)
+            /* 就一圈进度 + 中间那个百分比，**不写任何字**（微信就是这样，
+               不出现"正在上传"这类文字）。 */
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.35), lineWidth: 3)
+                        .frame(width: 38, height: 38)
+                    /* 一开始也给一小段白弧：一出现就能看出"这是在传"，不是卡住的图标 */
+                    Circle()
+                        .trim(from: 0, to: max(0.04, min(1, progress)))
+                        .stroke(Color.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.95))
+                }
+                Text(progress > 0.01 ? "\(Int(min(1, progress) * 100))%" : "…")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white)
+            }
         }
+        .frame(width: width, height: width * 1.28)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

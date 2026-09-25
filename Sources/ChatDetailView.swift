@@ -347,6 +347,10 @@ struct ChatDetailView: View {
         }
         /* 顶栏：超薄毛玻璃（浅色模式下就是 iOS 那种浅浅的磨砂），背景图/消息从底下透过去 */
         .safeAreaInset(edge: .top, spacing: 0) {
+            /* 必须显式 VStack：导航栏和下面那条「通话中」绿条要**上下排**。
+               以前两个视图并列塞进 safeAreaInset，SwiftUI 会把它们叠在一起，
+               绿条的背景就盖到导航栏/屏幕上（线上反馈的「一根绿条遮盖屏幕」）。 */
+            VStack(spacing: 0) {
             NavBar(title: navTitle, back: { dismiss() }, leftExtra: leftUnreadBadge) {
                 Button {
                     /* 微信逻辑：右上「⋯」不是弹菜单，而是进聊天信息页
@@ -393,6 +397,7 @@ struct ChatDetailView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

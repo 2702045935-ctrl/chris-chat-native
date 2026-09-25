@@ -173,7 +173,13 @@ final class Realtime: ObservableObject {
                         clock.touch()
                         /* 通话音频帧：在这里就地消费掉，绝不经过主线程 */
                         if Self.consumeCallAudioIfAny(text) { continue }
-                        await self?.handle(text)
+                        /* ⚠ 别的业务事件**丢给主线程异步处理，这里绝不等**：
+                           主线程一卡（聊天页那种一两秒的停顿），一等就把后面排队的语音帧
+                           全堵在 socket 里；等它回来时几十帧一起灌进来，声音就一顿一顿。
+                           语音帧的实时性比"事件顺序"重要得多。 */
+                        if let self = self {
+                            Task { @MainActor in self.handle(text) }
+                        }
                     } else {
                         clock.touch()
                     }

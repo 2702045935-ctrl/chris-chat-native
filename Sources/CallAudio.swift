@@ -42,15 +42,18 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
     private(set) var framesScheduled = 0     // 真的排进播放器的帧
     private(set) var framesDropped = 0       // 播放器没起来时丢掉的帧
 
-    /* 抖动缓冲：已经排进播放器、还没播完的帧数。
-       一直保持 3 帧（≈120 毫秒）的缓冲 —— 网络抖一下、主线程忙一下都不会断音。
-       以前是一收到就立刻排、排完就空，任何一点抖动都直接变成「卡」。 */
-    private var inFlight = 0
+    /* 抖动/延迟守卫：pendingFrames = 还没排进播放器的帧；
+       queuedUntil = 播放器里已经排到的时间点（40ms 一帧，纯时间推算，不靠 completion 回调 ——
+       回调漏一次就会算错，上一版就是被这个拖成"排播比收到少一大截"，声音一顿一顿）。 */
     private var pendingFrames: [Data] = []
+    private var queuedUntil = Date.distantPast
+    /// 这一通里排得最长的一次延迟（>1.5 秒就会被丢帧压回来），上报出来看得见
+    private var latencyPeak = 0.0
 
     /// 通话结束时上报给服务器，写进 call-trace.log
     var playDiag: String {
         "播放端 收到=\(framesIn) 排播=\(framesScheduled) 丢=\(framesDropped)"
+            + " 延迟峰值=\(String(format: "%.1f", latencyPeak))s"
             + " 引擎=\(player.isRunning ? "跑" : "停")"
             + " 播放器=\(playerReady ? (playerNode.isPlaying ? "跑" : "停") : "没起")"
     }
@@ -89,7 +92,8 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
         framesIn = 0
         framesScheduled = 0
         framesDropped = 0
-        inFlight = 0
+        queuedUntil = Date.distantPast
+        latencyPeak = 0
         pendingFrames.removeAll()
         startWatchdog()
 
@@ -134,7 +138,7 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             playerNode.stop()
             player.stop()
             playerReady = false
-            inFlight = 0
+            queuedUntil = Date.distantPast
             pendingFrames.removeAll()
         }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -310,16 +314,25 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
             return
         }
         pendingFrames.append(data)
-        /* 网络突然灌进来一大堆（比如刚重连）：丢掉最老的，宁可丢一点，
-           也别让延迟越积越大（越积越大听起来就是"对方永远慢半拍"）。 */
-        if pendingFrames.count > 25 { pendingFrames.removeFirst(pendingFrames.count - 25) }
         drainPending(fmt)
     }
 
-    /// 把待播的帧排进播放器，但**始终保持 3 帧在播/待播**（≈120ms 缓冲）。
-    /// 这样网络抖动、主线程卡顿都被这层缓冲吃掉，声音不会一顿一顿。
+    /// 把待播的帧排进播放器：**排多少播多少**（中间不会断），
+    /// 再用「排到什么时候」这个时间推算兜住延迟 —— 排得超过 1.5 秒就丢最老的压回 ~0.35 秒。
+    /// 上一版是"只保留 3 帧"，结果播放端被拖慢（日志里 收到=286 排播=200），听着就是一顿一顿。
     private func drainPending(_ fmt: AVAudioFormat) {
-        while inFlight < 3, !pendingFrames.isEmpty {
+        var until = max(Date(), queuedUntil)
+        let queued = until.timeIntervalSinceNow
+        if queued > 1.5, pendingFrames.count > 4 {
+            var remain = queued
+            while pendingFrames.count > 4, remain > 0.35 {
+                pendingFrames.removeFirst()
+                remain -= 0.04
+                framesDropped += 1
+            }
+            until = Date().addingTimeInterval(max(0.04, remain))
+        }
+        while !pendingFrames.isEmpty {
             let d = pendingFrames.removeFirst()
             let frames = d.count / 2
             guard frames > 0,
@@ -337,13 +350,13 @@ final class CallAudioPipe: NSObject, AVCaptureAudioDataOutputSampleBufferDelegat
                     memcpy(ch[0], base, frames * 2)
                 }
             }
-            inFlight += 1
-            playerNode.scheduleBuffer(buf) { [weak self] in
-                guard let self = self else { return }
-                self.playQueue.async { self.inFlight = max(0, self.inFlight - 1) }
-            }
+            playerNode.scheduleBuffer(buf, completionHandler: nil)
             framesScheduled += 1
+            until = until.addingTimeInterval(0.04)
         }
+        queuedUntil = until
+        let now = queuedUntil.timeIntervalSinceNow
+        if now > latencyPeak { latencyPeak = now }
     }
 
 }

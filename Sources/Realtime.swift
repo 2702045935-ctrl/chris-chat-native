@@ -219,6 +219,9 @@ final class Realtime: ObservableObject {
         ev.chatId = (obj["chatId"] as? String) ?? ""
         if let m = obj["message"] as? [String: Any] {
             ev.fromId = (m["senderId"] as? String) ?? ""
+            /* 消息推送里 chatId 是包在 message 里面的（顶层没有）——补上，
+               聊天页/列表判断「这条是不是我正开着的会话」才准。 */
+            if ev.chatId.isEmpty { ev.chatId = (m["chatId"] as? String) ?? "" }
             /* 收到推送就回执：这条已经到我手机上了 */
             if let cid = m["chatId"] as? String ?? obj["chatId"] as? String,
                let sq = (m["seq"] as? NSNumber)?.intValue {

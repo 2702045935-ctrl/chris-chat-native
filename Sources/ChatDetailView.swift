@@ -224,6 +224,10 @@ struct ChatDetailView: View {
     @State private var loadingOlder = false
     @State private var holdScroll = false        // 上翻加载时不要自动跳到底部
     @State private var atBottom = true           // 列表是不是已经到底（没到底就别跟着新消息硬滚）
+    /// 分页用的滚动代理（加载完更早的记录要把「原来第一条」钉回原位，位置不跳）
+    @State private var scroller: ScrollViewProxy?
+    /// 上滑自动加载的节流：0.4 秒内只触发一次，免得一屏里反复触发
+    @State private var lastOlderLoad = Date.distantPast
     /// 刚选好的照片/视频/实况：先出预览页（原图、实况开关），点发送才真发
     @State private var pendingMedia: MediaSendSheet.Payload?
     /// 点视频气泡 / 长按实况 → 全屏播放这个视频
@@ -253,9 +257,10 @@ struct ChatDetailView: View {
         return isGroup ? "有人正在输入…" : "对方正在输入…"
     }
 
-    /// 自己在打字 → 每 2 秒上报一次（服务端转给会话里的其他人）
+    /// 自己在打字 → 每 2 秒上报一次（服务端只转给会话里的其他人）
+    /// 对面收到就显示「对方正在输入…」，2 秒的上报间隔刚好把那个提示一直续着。
     private func reportTyping() {
-        guard Date().timeIntervalSince(lastTypingSent) > 3.5 else { return }
+        guard Date().timeIntervalSince(lastTypingSent) > 2.0 else { return }
         lastTypingSent = Date()
         Realtime.shared.sendJSON(["type": "typing", "chatId": chat.id])
     }
@@ -604,14 +609,21 @@ struct ChatDetailView: View {
         .onChange(of: realtime.event) { _ in
             let ev = realtime.event
             /* 对方正在打字（服务端只把 typing 转给会话里的其他人，所以这里收到的一定是对面）：
-               顶栏显示「对方正在输入…」，4 秒没有新事件就收起 —— 和微信一样能感知到。 */
+               顶栏显示「对方正在输入…」，5 秒没有新事件就收起 —— 和微信一样能感知到。
+               （对面每隔 2 秒会再报一次，所以只要还在打字就一直亮着。） */
             if ev.type == "typing", ev.chatId == chat.id {
                 peerTyping = "对方"
                 typingClear?.cancel()
                 typingClear = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 4_000_000_000)
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
                     if !Task.isCancelled { peerTyping = "" }
                 }
+            }
+            /* 对面的消息到了：立刻把「正在输入…」收起来 —— 微信也是消息一到就没了，
+               以前会一直挂到 4 秒超时，看着像对面还在打字。 */
+            if ev.type == "message", ev.chatId == chat.id {
+                typingClear?.cancel()
+                peerTyping = ""
             }
             // 一下子来很多条时合并成一次刷新，别把手机刷爆
             pushTask?.cancel()
@@ -629,11 +641,12 @@ struct ChatDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    /* 上面还有更早的记录时，顶部给一个「查看更早的消息」 */
+                    /* 上面还有更早的记录时，顶部给一行提示；**滑到顶会自动加载**（微信就是这样，
+                       不用手点），点它也能加载 —— 网络慢的时候手点更踏实。 */
                     if hasOlder {
                         HStack(spacing: 6) {
                             if loadingOlder { ProgressView().scaleEffect(0.7) }
-                            Text(loadingOlder ? Tr("加载中…") : Tr("查看更早的消息"))
+                            Text(loadingOlder ? Tr("正在加载…") : Tr("查看更早的消息"))
                                 .font(pf(13))
                                 .foregroundColor(C.subLabel)
                         }
@@ -641,10 +654,16 @@ struct ChatDetailView: View {
                         .padding(.vertical, 10)
                         .contentShape(Rectangle())
                         .onTapGesture { Task { await loadOlder() } }
+                        .onAppear { autoLoadOlder() }
                     }
                     ForEach(messages) { message in
                         messageBlock(message)
                             .id(message.id)
+                            /* 最早的那条露出来了 = 用户已经把列表滑到顶：
+                               自动把更早的一页续上（和微信一样，往上滑就是无限的历史） */
+                            .onAppear {
+                                if message.id == messages.first?.id { autoLoadOlder() }
+                            }
                     }
                     /* 底部哨兵：它在屏幕上就说明「已经到底了」。
                        只有到底了才允许跟着新消息自动滚 —— 不然你正往上翻旧消息时
@@ -681,8 +700,19 @@ struct ChatDetailView: View {
                 atBottom = true                       // 用户自己点的「回到底部」
                 scrollToEnd(proxy, animated: true)
             }
-            .onAppear { scrollToEnd(proxy, animated: false) }
+            .onAppear {
+                scroller = proxy          // 上翻加载完要靠它把位置钉住
+                scrollToEnd(proxy, animated: false)
+            }
         }
+    }
+
+    /// 滑到顶了：自动加载更早的记录（微信也是滑到顶就自动续，不用点）
+    private func autoLoadOlder() {
+        guard hasOlder, !loadingOlder, !loading else { return }
+        guard Date().timeIntervalSince(lastOlderLoad) > 0.4 else { return }
+        lastOlderLoad = Date()
+        Task { await loadOlder() }
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy, animated: Bool) {
@@ -1507,19 +1537,35 @@ struct ChatDetailView: View {
             /* 不能只看条数和最后一条的 id：对方收款以后转账卡片还是同一条消息，
                只是 body 里的 status 从 pending 变成 received —— 以前这种情况会被
                当成「没变化」跳过，气泡就一直停在「待对方确认收款」。 */
-            let same = result.messages.count == messages.count
+            /* ⚠ 「有没有变化」只比最近这一页：用户往上翻过历史以后，本地条数本来就比
+               这一页多，拿总数比会永远判成"变了"（列表跟着反复重画、位置乱跳）。 */
+            let n = min(result.messages.count, messages.count)
+            let same = n > 0
                 && result.messages.last?.id == messages.last?.id
-                && zip(result.messages, messages).allSatisfy { $0.id == $1.id && $0.body == $1.body }
+                && zip(result.messages.suffix(n), messages.suffix(n))
+                    .allSatisfy { $0.id == $1.id && $0.body == $1.body }
             if initial || !same {
                 /* 左上角未读数字：首次进来带上列表里的未读；之后只要多出别人的新消息就往上加 */
                 if initial {
                     unreadHere = chat.unreadCount
-                } else if result.messages.count > messages.count, !messages.isEmpty {
-                    let fresh = result.messages.suffix(result.messages.count - messages.count)
-                    let incoming = fresh.filter { $0.senderId != myId && $0.kindName != "system" }.count
+                } else if !messages.isEmpty {
+                    /* 用 seq 比，别看条数差 —— 上面翻过历史以后条数本来就对不上 */
+                    let oldLastSeq = messages.last?.seq ?? 0
+                    let incoming = result.messages.filter {
+                        ($0.seq ?? 0) > oldLastSeq && $0.senderId != myId && $0.kindName != "system"
+                    }.count
                     if incoming > 0 { unreadHere += incoming }
                 }
-                messages = result.messages
+                if messages.count > result.messages.count {
+                    /* 用户已经往上看过更早的记录：这一刷新只换「最近一页」，
+                       上面翻出来的历史原样留着（微信也是——看着老消息来了新消息，位置不动，
+                       更不会把看过的历史弄丢）。 */
+                    let oldestFresh = result.messages.first?.seq ?? 0
+                    let older = messages.filter { ($0.seq ?? 0) < oldestFresh }
+                    messages = older + result.messages
+                } else {
+                    messages = result.messages
+                }
                 if initial { hasOlder = result.hasMore }
                 /* 回执：这些消息已经到我手机上了（后台投递日志按这个算"已送达"） */
                 if let last = result.messages.last, let sq = last.seq {
@@ -1537,13 +1583,21 @@ struct ChatDetailView: View {
     private func loadOlder() async {
         guard !loadingOlder, let first = messages.first, let seq = first.seq else { return }
         loadingOlder = true
+        lastOlderLoad = Date()
         defer { loadingOlder = false }
         do {
             let r = try await API.shared.messages(chatId: chat.id, limit: 40, before: seq)
             hasOlder = r.hasMore
-            guard !r.messages.isEmpty else { return }
+            /* 一页都没有 = 上面确实没有更早的了：把入口收掉，别让用户一直滑一直等 */
+            guard !r.messages.isEmpty else { hasOlder = false; return }
+            let keep = first.id
             holdScroll = true
             messages = r.messages + messages
+            /* 把「原来第一条」钉回原来的位置：往上看的时候内容不会跳，
+               也不会把用户手上正在拖的列表拽走（之前「划不动」就是这个坑）。 */
+            if let proxy = scroller {
+                DispatchQueue.main.async { proxy.scrollTo(keep, anchor: .top) }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { holdScroll = false }
         } catch {
             app.show(Tr("聊天记录加载失败"))

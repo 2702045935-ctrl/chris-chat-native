@@ -1511,6 +1511,10 @@ struct ChatDetailView: View {
                 }
                 messages = result.messages
                 if initial { hasOlder = result.hasMore }
+                /* 回执：这些消息已经到我手机上了（后台投递日志按这个算"已送达"） */
+                if let last = result.messages.last, let sq = last.seq {
+                    Realtime.shared.ackDelivery(chatId: chat.id, seq: sq)
+                }
             }
         } catch {
             if initial { app.show(Tr("聊天记录加载失败")) }

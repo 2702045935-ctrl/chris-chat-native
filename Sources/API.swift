@@ -410,6 +410,28 @@ private struct BrandingPayload: Decodable { var branding: BrandInfo? }
 private struct BadgesPayload: Decodable { var badges: [String: String]? }
 private struct EndpointsPayload: Decodable { var endpoints: [String]? }
 
+/* ---------------- 版本更新 + 弹窗公告（服务端 /api/version 下发） ---------------- */
+struct AppUpdateInfo: Decodable, Equatable {
+    var version: String?
+    var notes: String?
+    var force: Bool?
+    var url: String?
+    var downloadPage: String?
+}
+struct NoticeInfo: Decodable, Equatable {
+    var title: String?
+    var content: String?
+    var kind: String?          // popup=每次打开 / daily=每天一次 / once=只弹一次
+    var startAt: String?
+    var endAt: String?
+    var minVersion: String?
+    var maxVersion: String?
+}
+private struct VersionPayload: Decodable {
+    var app: AppUpdateInfo?
+    var notice: NoticeInfo?
+}
+
 struct BrandInfo: Decodable, Hashable {
     var appName: String?
     var logo: String?
@@ -1133,6 +1155,14 @@ final class API {
     func loadEndpointList() async {
         guard let payload: EndpointsPayload = try? await get("/api/endpoints", as: EndpointsPayload.self) else { return }
         if let list = payload.endpoints { setBackups(list) }
+    }
+
+    /// 版本信息 + 弹窗公告（App 启动/回前台各拉一次；老服务器上没有就整段跳过）
+    func versionInfo() async -> (app: AppUpdateInfo?, notice: NoticeInfo?) {
+        guard let payload: VersionPayload = try? await get("/api/version", as: VersionPayload.self) else {
+            return (nil, nil)
+        }
+        return (payload.app, payload.notice)
     }
 
     /// 是不是「压根连不上」这类错（超时 / 拒绝 / DNS / 断网）——只有这类才换线路

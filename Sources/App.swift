@@ -26,6 +26,122 @@ final class AppState: ObservableObject {
     /// 后台配的红点规则（哪个位置该不该亮）
     @Published var badges: [String: String] = [:]
 
+    /* ---------------- 版本更新 / 弹窗公告（后台「运营配置」里配） ---------------- */
+    /// 必须更新：盖住整个 App，不给用（和微信一样）
+    @Published var forcedUpdate: AppUpdateInfo? = nil
+    /// 可选更新：可以「以后再说」
+    @Published var optionalUpdate: AppUpdateInfo? = nil
+    /// 弹窗公告
+    @Published var noticeAlert: NoticeInfo? = nil
+
+    /// 当前包的构建号（"B533 · 09-25 08:45" → 533）
+    static var buildNumber: Int {
+        let s = AppInfo.build
+        guard let r = s.range(of: "B") else { return 0 }
+        let digits = s[r.upperBound...].prefix { $0.isNumber }
+        return Int(digits) ?? 0
+    }
+    /// 后台配的版本号（"B534" → 534；写别的格式就当 0，不弹更新）
+    static func buildNumberOf(_ v: String?) -> Int {
+        let s = String(v ?? "")
+        guard let r = s.range(of: "B") else { return 0 }
+        let digits = s[r.upperBound...].prefix { $0.isNumber }
+        return Int(digits) ?? 0
+    }
+    /// "2026-10-01 00:00" / "2026-10-01" → Date（空 = 不限）
+    private static func parseTime(_ s: String?) -> Date? {
+        let t = String(s ?? "").trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        for fmt in ["yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"] {
+            f.dateFormat = fmt
+            if let d = f.date(from: t) { return d }
+        }
+        return nil
+    }
+    /// 公告在不在生效时间内
+    private static func inWindow(start: String?, end: String?) -> Bool {
+        let now = Date()
+        if let s = parseTime(start), now < s { return false }
+        if let e = parseTime(end), now > e { return false }
+        return true
+    }
+    /// 公告的版本范围（B533 ~ B540 这种；留空 = 不限）
+    private static func versionInRange(_ n: NoticeInfo) -> Bool {
+        let mine = buildNumber
+        let lo = buildNumberOf(n.minVersion)
+        let hi = buildNumberOf(n.maxVersion)
+        if lo > 0 && mine < lo { return false }
+        if hi > 0 && mine > hi { return false }
+        return true
+    }
+    /// 公告的稳定标识（做"弹过没"的标记用；不能用 hashValue，每次启动都不一样）
+    private static func noticeKey(_ n: NoticeInfo) -> String {
+        let s = (n.title ?? "") + "|" + (n.content ?? "")
+        return String(s.prefix(40)) + "-" + String(s.count)
+    }
+    private static func dayKey() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    /// 拉一次版本 + 公告（启动时、回到前台各一次；失败就静默跳过）
+    func checkVersionAndNotice() async {
+        let (info, notice) = await API.shared.versionInfo()
+        if let info = info {
+            let want = Self.buildNumberOf(info.version)
+            if want > Self.buildNumber {
+                if info.force == true {
+                    forcedUpdate = info                       // 强制：盖住整个 App
+                } else {
+                    let key = "chris.update.seen." + String(want)
+                    if !UserDefaults.standard.bool(forKey: key) { optionalUpdate = info }
+                }
+            }
+        }
+        if let n = notice, !(n.content ?? "").isEmpty,
+           Self.inWindow(start: n.startAt, end: n.endAt), Self.versionInRange(n) {
+            let kind = n.kind ?? "popup"
+            let key = "chris.notice.seen." + Self.noticeKey(n)
+            switch kind {
+            case "once":
+                if !UserDefaults.standard.bool(forKey: key) { noticeAlert = n }
+            case "daily":
+                if UserDefaults.standard.string(forKey: key) != Self.dayKey() { noticeAlert = n }
+            default:
+                noticeAlert = n                                    // 每次打开都弹
+            }
+        }
+    }
+
+    func dismissNotice() {
+        if let n = noticeAlert {
+            let kind = n.kind ?? "popup"
+            let key = "chris.notice.seen." + Self.noticeKey(n)
+            // popup 类型不落标记（下次打开还要弹）
+            if kind == "once" { UserDefaults.standard.set(true, forKey: key) }
+            if kind == "daily" { UserDefaults.standard.set(Self.dayKey(), forKey: key) }
+        }
+        noticeAlert = nil
+    }
+
+    func dismissOptionalUpdate() {
+        if let u = optionalUpdate {
+            let want = Self.buildNumberOf(u.version)
+            if want > 0 { UserDefaults.standard.set(true, forKey: "chris.update.seen." + String(want)) }
+        }
+        optionalUpdate = nil
+    }
+
+    /// 点「立即更新」：直接开下载页（自签包不能走 App Store，跳浏览器下载）
+    func openUpdate(_ u: AppUpdateInfo) {
+        let s = (u.downloadPage?.isEmpty == false ? u.downloadPage! : (u.url ?? ""))
+        if let url = URL(string: s) { UIApplication.shared.open(url) }
+        dismissOptionalUpdate()
+    }
+
     /// 这个位置要不要显示红点：auto = 看真实数据；on = 一直亮；off = 不显示
     func showDot(_ key: String, auto: Bool) -> Bool {
         switch badges[key] ?? "auto" {
@@ -176,6 +292,8 @@ final class AppState: ObservableObject {
         defer { watchdog.cancel() }
         await refreshUI(force: true)
         await loadBadges()
+        /* 版本更新 / 弹窗公告：不阻塞启动（失败了也不影响进 App） */
+        await checkVersionAndNotice()
         if API.shared.token.isEmpty {
             booting = false
             return
@@ -494,6 +612,30 @@ struct CHRISApp: App {
                     SplashView(remote: app.splashImage)
                         .transition(.opacity)
                         .zIndex(9)
+                }
+                /* 弹窗公告 / 可选更新 / 强制更新：一层层盖上去（和微信一样，强制更新盖在最上面） */
+                if let n = app.noticeAlert {
+                    CenterCard(title: (n.title?.isEmpty == false ? n.title! : Tr("公告")),
+                               text: n.content ?? "",
+                               primary: Tr("我知道了"),
+                               onPrimary: { app.dismissNotice() })
+                        .transition(.opacity)
+                        .zIndex(12)
+                }
+                if let u = app.optionalUpdate {
+                    CenterCard(title: Tr("发现新版本") + " " + (u.version ?? ""),
+                               text: u.notes ?? "",
+                               primary: Tr("立即更新"),
+                               onPrimary: { app.openUpdate(u) },
+                               secondary: Tr("以后再说"),
+                               onSecondary: { app.dismissOptionalUpdate() })
+                        .transition(.opacity)
+                        .zIndex(13)
+                }
+                if let u = app.forcedUpdate {
+                    ForceUpdateView(info: u)
+                        .transition(.opacity)
+                        .zIndex(20)
                 }
             }
         }

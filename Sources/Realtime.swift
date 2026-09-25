@@ -84,6 +84,32 @@ final class Realtime: ObservableObject {
     /// 心跳：每 15 秒给服务器发一个 ping，35 秒收不到任何东西就认为断了、重连
     private var heartbeat: Task<Void, Never>?
     private var lastRx = Date()
+    /* 投递回执：收到消息先攒着（chatId → 最大 seq），1.5 秒合并发一次。
+       后台的「消息投递日志」靠它区分 未送达 / 已送达 / 已读（微信也是这么分的）。 */
+    private var ackPending: [String: Int] = [:]
+    private var ackTask: Task<Void, Never>?
+
+    /// 收到某条消息 → 记一笔回执（攒着批量发，省流量）
+    func ackDelivery(chatId: String, seq: Int) {
+        guard !chatId.isEmpty, seq > 0 else { return }
+        if let cur = ackPending[chatId], cur >= seq { return }
+        ackPending[chatId] = seq
+        if ackTask != nil { return }
+        ackTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self = self else { return }
+            self.flushAcks()
+            self.ackTask = nil
+        }
+    }
+
+    private func flushAcks() {
+        let batch = ackPending
+        ackPending.removeAll()
+        for (chatId, seq) in batch {
+            sendJSON(["type": "ack", "chatId": chatId, "seq": seq])
+        }
+    }
 
     func start() {
         /* 已经在连着就别再重建 —— 以前每调一次 start() 都会先 stop() 再新建，
@@ -188,7 +214,14 @@ final class Realtime: ObservableObject {
         var ev = PushEvent()
         ev.type = (obj["type"] as? String) ?? ""
         ev.chatId = (obj["chatId"] as? String) ?? ""
-        if let m = obj["message"] as? [String: Any] { ev.fromId = (m["senderId"] as? String) ?? "" }
+        if let m = obj["message"] as? [String: Any] {
+            ev.fromId = (m["senderId"] as? String) ?? ""
+            /* 收到推送就回执：这条已经到我手机上了 */
+            if let cid = m["chatId"] as? String ?? obj["chatId"] as? String,
+               let sq = (m["seq"] as? NSNumber)?.intValue {
+                ackDelivery(chatId: cid, seq: sq)
+            }
+        }
         if let b = obj["balance"] as? Double { ev.balance = b }
         else if let b = obj["balance"] as? Int { ev.balance = Double(b) }
         // 资料变动（换封面 / 换头像 / 改昵称 / 改状态）：服务器推的是 profile

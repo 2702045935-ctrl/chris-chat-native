@@ -728,6 +728,7 @@ struct ChatDetailView: View {
                    onOpenAvatar: { id in openAvatar(id) },
                    onOpenWeb: { url in web = WebURL(url: url) },
                    onOpenLocation: { p in openLocation = p },
+                   onOpenVideo: { u in videoToPlay = u },
                    onTapRedPacket: { info in tapRedPacket(info) })
             .padding(.bottom, gapAfter(message))
             /* 长按一条消息：弹微信那套动作条（复制/转发/收藏/引用/撤回/删除/多选） */
@@ -1583,6 +1584,8 @@ struct MessageRow: View {
     var onOpenWeb: ((URL) -> Void)? = nil
     /// 点位置气泡 → 打开大地图
     var onOpenLocation: ((LocationPoint) -> Void)? = nil
+    /// 点视频气泡 / 长按实况 → 交给聊天页去全屏播放
+    var onOpenVideo: ((URL) -> Void)? = nil
     /// 点红包卡片 → 拆红包 / 看详情
     var onTapRedPacket: ((RedPacketInfo) -> Void)? = nil
 
@@ -1705,10 +1708,10 @@ struct MessageRow: View {
             audioBubble
 
         case "video":
-            VideoBubble(message: message, mine: mine) { url, _ in videoToPlay = url }
+            VideoBubble(message: message, mine: mine) { url, _ in onOpenVideo?(url) }
 
         case "livephoto":
-            LivePhotoBubble(message: message) { url in videoToPlay = url }
+            LivePhotoBubble(message: message) { url in onOpenVideo?(url) }
 
         default:
             Group {

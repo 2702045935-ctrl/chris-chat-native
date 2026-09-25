@@ -523,6 +523,18 @@ struct MyStatus: Decodable {
 
 /// 状态配色：后台配了就用，没配就用分类色，第二个色自动调亮一点做渐变
 enum MoodColor {
+    /// 这个颜色偏暗吗？顶部铺状态色时，用它决定名字/文字用白还是黑（微信也是这么处理的）
+    static func isDark(_ hex: String) -> Bool {
+        let c = clean(hex)
+        guard !c.isEmpty, let v = UInt32(c.dropFirst(), radix: 16) else { return false }
+        let r = Double((v >> 16) & 0xFF) / 255
+        let g = Double((v >> 8) & 0xFF) / 255
+        let b = Double(v & 0xFF) / 255
+        func lin(_ x: Double) -> Double { x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4) }
+        let l = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+        return l < 0.45
+    }
+
     /// "#6f8a38" / "6f8a38" → "#6F8A38"；拿不准就给空串
     static func clean(_ raw: String?) -> String {
         var s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

@@ -281,6 +281,8 @@ enum C {
     static var chatRowBg   : Color { UIConfig.color("chatRowBg", 0xFFFFFF, 0x2A2A2A) }
     static var pinnedBg    : Color { UIConfig.color("pinnedBg", 0xF2F2F2, 0x333335) }
     static var searchBg    : Color { UIConfig.color("searchBg", 0xFFFFFF, 0x2A2A2C) }
+    /// 输入框内底色（状态面板那种"说点什么"的输入框）：后台也能改
+    static var fieldBg     : Color { UIConfig.color("fieldBg", 0xF2F2F2, 0x2C2C2E) }
     static var searchIcon  : Color { UIConfig.color("searchIcon", 0xB2B2B2, 0x9A9A9E) }
     static var searchIcon2 : Color { UIConfig.color("searchIcon2", 0x8C8C8C, 0x9A9A9E) }
     static let searchBorder = Color(UIColor { t in
@@ -325,7 +327,6 @@ enum C {
             ? UIColor(red: 1, green: 1, blue: 1, alpha: 0.78)
             : UIColor(red: 25 / 255, green: 25 / 255, blue: 26 / 255, alpha: 0.62)
     })
-    static let fieldBg     = Color.dyn(0xF2F2F2, 0x2C2C2E)
     static let iconGray    = Color.dyn(0x6F6F6F, 0x9A9A9A)
     /// 聊天页底部那一排按钮（麦克风 / 喇叭 / 表情 / ＋）的颜色，后台「界面文字」里能改：
     /// 写「#浅色|#深色」两份，比如浅色模式想深一点就写 "#333333|#9A9A9A"

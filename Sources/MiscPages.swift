@@ -530,9 +530,31 @@ struct StatusView: View {
             }
         }
         .padding(14)
-        .background(C.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        /* 这张卡也带上状态自己的颜色：淡淡的同色底 + 左侧一道色条，
+           比纯白卡更像「我的状态」该有的样子 */
+        .background(
+            ZStack {
+                C.cardBg
+                if !statusTint.isEmpty {
+                    Color(hexString: statusTint).opacity(0.10)
+                }
+            }
+        )
+        .overlay(alignment: .leading) {
+            if !statusTint.isEmpty {
+                Capsule().fill(Color(hexString: statusTint)).frame(width: 3).padding(.vertical, 12)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
         .padding(.horizontal, 12)
+    }
+
+    /// 我的状态色（没设就空）
+    private var statusTint: String {
+        let c = MoodColor.clean(app.me?.moodColor)
+        if !c.isEmpty { return c }
+        return MoodColor.clean(myStatus?.moodColor)
     }
 
     private var composeRow: some View {
@@ -543,12 +565,18 @@ struct StatusView: View {
                 .foregroundColor(C.label)
                 .focused($typing)
                 .padding(.horizontal, 14)
-                .frame(height: 40)
-                .background(Capsule().fill(C.cardBg))
+                .frame(height: 44)
+                .background(Capsule().fill(C.fieldBg))
                 .onChange(of: caption) { v in
                     if v.count > 30 { caption = String(v.prefix(30)) }
                 }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        /* 整条做成一张卡片：比散着摆更整齐（高级感来自留白和成组） */
+        .background(C.cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 3)
         .padding(.horizontal, 12)
     }
 
@@ -574,21 +602,29 @@ struct StatusView: View {
         let title = c.name ?? ""
         let items = c.items ?? []
         let catColor = MoodColor.clean(c.color)
-        return VStack(alignment: .leading, spacing: 9) {
-            Text(Tr(title))
-                .font(pf(13))
-                .foregroundColor(C.subLabel)
-                .padding(.leading, 15)
-            LazyVGrid(columns: cols, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 12) {
+            /* 标题前面加一个小色点：一眼看出这一组是什么色系（高级感主要来自这种细节） */
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hexString: catColor.isEmpty ? "#8A8F99" : catColor))
+                    .frame(width: 6, height: 6)
+                Text(Tr(title))
+                    .font(pf(13, .medium))
+                    .foregroundColor(C.subLabel)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 16)
+            LazyVGrid(columns: cols, spacing: 10) {
                 ForEach(items, id: \.self) { it in
                     tile(it, fallback: catColor)
                 }
             }
             .padding(.horizontal, 12)
         }
-        .padding(.vertical, 12)
+        .padding(.top, 14)
+        .padding(.bottom, 16)
         .background(C.cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 12)
     }
 
@@ -597,19 +633,35 @@ struct StatusView: View {
         let base = own.isEmpty ? (fallback.isEmpty ? "#6F8A38" : fallback) : own
         let on = (picked?.id ?? "-") == (it.id ?? "?")
         return Button { pick(it, base: base) } label: {
-            VStack(spacing: 4) {
-                Text(it.icon ?? "🙂").font(pf(24))
+            VStack(spacing: 7) {
+                /* 图标放一个半透明白圆里，比直接摆在渐变上有质感 */
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.22)).frame(width: 34, height: 34)
+                    Text(it.icon ?? "🙂").font(pf(19))
+                }
                 Text(Tr(it.label ?? "状态"))
-                    .font(pf(12))
+                    .font(pf(12.5, .medium))
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 68)
+            .frame(height: 86)
             .background(tileGradient(base))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            /* 选中：白描边 + 右上角一个小勾，比单纯加粗描边更像成品 */
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white, lineWidth: on ? 2 : 0))
+            .overlay(alignment: .topTrailing) {
+                if on {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .background(Circle().fill(Color.black.opacity(0.18)).frame(width: 15, height: 15))
+                        .padding(6)
+                }
+            }
+            .shadow(color: Color.black.opacity(0.10), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)
     }
@@ -619,7 +671,10 @@ struct StatusView: View {
         let c1 = MoodColor.clean(raw)
         let base = c1.isEmpty ? "#6F8A38" : c1
         let c2 = MoodColor.shift(base, to: true)
-        return LinearGradient(colors: [Color(hexString: base),
+        let c3 = MoodColor.shift(base, to: false)
+        /* 三格渐变（深 → 本色 → 亮）：比两格更有体积感 */
+        return LinearGradient(colors: [Color(hexString: c3.isEmpty ? base : c3),
+                                       Color(hexString: base),
                                        Color(hexString: c2.isEmpty ? base : c2)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
     }

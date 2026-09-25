@@ -142,6 +142,45 @@ struct MeView: View {
 
     /* ---------------------------------------------------------- 顶部资料卡 */
 
+    /* 有状态色的时候，顶部整条（含系统状态栏那一条）都铺状态色 —— 和微信一样。
+       文字自动黑/白：状态色偏暗就用白字，偏亮就用黑字，保证怎么选都看得清。 */
+    private var moodOn: Bool {
+        !((app.me?.moodText ?? "").isEmpty && (app.me?.moodIcon ?? "").isEmpty)
+            && !MoodColor.clean(app.me?.moodColor).isEmpty
+    }
+    private var moodC1: String { MoodColor.clean(app.me?.moodColor) }
+    private var moodC2: String {
+        let c2 = MoodColor.clean(app.me?.moodColor2)
+        if !c2.isEmpty { return c2 }
+        let s = MoodColor.shift(moodC1, to: true)
+        return s.isEmpty ? moodC1 : s
+    }
+    /// 顶部主文字颜色：跟着状态色走
+    private var topInk: Color { moodOn && MoodColor.isDark(moodC1) ? .white : C.label }
+    /// 顶部副文字颜色：比主文字淡一档
+    private var topInk2: Color {
+        if moodOn { return MoodColor.isDark(moodC1) ? Color.white.opacity(0.82) : C.label.opacity(0.55) }
+        return Color.dyn(0x737373, 0x8F8F8F)
+    }
+
+    /// 顶部整条背景：有状态色 → 斜向渐变 + 顶部一层薄薄的压暗（状态栏图标才看得清）
+    @ViewBuilder private var profileTopBg: some View {
+        if moodOn {
+            ZStack(alignment: .top) {
+                LinearGradient(colors: [Color(hexString: moodC1, fallback: 0xD8F2E4),
+                                        Color(hexString: moodC2, fallback: 0x1DC9BD)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                /* 顶部薄压暗：状态栏那一条的图标/时间保证看得清（微信的状态色也这么做） */
+                LinearGradient(colors: [Color.black.opacity(0.10), Color.clear],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: L.safeTop + 44)
+            }
+            .ignoresSafeArea(edges: .top)
+        } else {
+            C.cardBg
+        }
+    }
+
     private var profileTop: some View {
         VStack(spacing: 0) {
             // 白色的顶：从状态栏最上面就开始铺白（和微信一样）
@@ -162,10 +201,10 @@ struct MeView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             Text(app.me?.name ?? "")
                                 .font(pf(L.v(17, 4.8, 19.5)))
-                                .foregroundColor(C.label)
+                                .foregroundColor(topInk)
                             Text(Tr("星言号") + "：" + (app.me?.username ?? "-"))
                                 .font(pf(16))
-                                .foregroundColor(Color.dyn(0x737373, 0x8F8F8F))
+                                .foregroundColor(topInk2)
                                 .padding(.top, L.v(4, 1.8, 8))
                         }
                         .padding(.leading, 21.5)
@@ -180,7 +219,7 @@ struct MeView: View {
                 Button {
                     showMyQR = true
                 } label: {
-                    SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: C.arrow)
+                    SVGIcon(markup: I.qr, size: L.v(19, 5.4, 21), color: moodOn ? topInk2 : C.arrow)
                         .frame(width: 44, height: 44)      // 微信标准点击区
                         .contentShape(Rectangle())
                 }
@@ -215,7 +254,7 @@ struct MeView: View {
             .padding(.trailing, L.v(14, 4, 18))
             .padding(.bottom, 22)
         }
-        .background(C.cardBg)
+        .background(profileTopBg)
     }
 
     /// 状态那一条：选了状态就跟着状态的颜色走（两个色就是渐变），没选就是普通白条
@@ -240,15 +279,18 @@ struct MeView: View {
             .foregroundColor(hasColor ? .white : Color.dyn(0x191919, 0xF2F2F7))
             .padding(.horizontal, L.v(10, 3.2, 13))
             .frame(height: L.v(28, 8, 32))
+            /* 顶部已经铺了状态色：状态条本身改成「磨砂白胶囊」才压得住，
+               不然两个渐变叠在一起会显得很脏（微信也是这么处理的） */
             .background(
                 Capsule().fill(hasColor
-                    ? AnyShapeStyle(LinearGradient(colors: [Color(hexString: c1),
-                                                            Color(hexString: c2.isEmpty ? c1 : c2)],
-                                                   startPoint: .leading, endPoint: .trailing))
+                    ? AnyShapeStyle(moodOn ? Color.white.opacity(0.24)
+                                           : LinearGradient(colors: [Color(hexString: c1),
+                                                                     Color(hexString: c2.isEmpty ? c1 : c2)],
+                                                            startPoint: .leading, endPoint: .trailing))
                     : AnyShapeStyle(Color.clear))
             )
             .overlay(
-                Capsule().stroke(hasColor ? Color.white.opacity(0.25)
+                Capsule().stroke(hasColor ? Color.white.opacity(moodOn ? 0.55 : 0.25)
                                           : Color.dyn(0xE5E5E5, 0x333335), lineWidth: 0.5)
             )
         }

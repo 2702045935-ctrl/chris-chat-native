@@ -14,6 +14,9 @@ on:
     paths:
       - 'Sources/**'
       - 'Info.plist'
+      # 启动图也在包里（CI 会把它拷进 App），换了图必须重新打包
+      - 'splash.png'
+      - 'splash.jpg'
   workflow_dispatch:
 
 jobs:

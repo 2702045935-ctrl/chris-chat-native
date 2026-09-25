@@ -1,6 +1,13 @@
 import SwiftUI
 import AVFoundation
 
+/// 解析气泡里的 JSON（图片/视频消息的内容都是一小段 JSON）
+private func jsonDict(_ s: String) -> [String: Any] {
+    guard let d = s.data(using: .utf8),
+          let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
+    return o
+}
+
 /* ============================================================
    聊天里的两种新气泡（和微信一致）：
    · 视频消息：封面 + 播放三角 + 时长；点一下全屏播放
@@ -15,7 +22,7 @@ struct VideoBubble: View {
     var onOpen: (URL, UIImage?) -> Void = { _, _ in }
 
     private var info: (url: String, cover: String, seconds: Int) {
-        let o = dict(message.body)
+        let o = jsonDict(message.body)
         return ((o["url"] as? String) ?? "",
                 (o["cover"] as? String) ?? "",
                 (o["seconds"] as? Int) ?? 0)
@@ -67,7 +74,7 @@ struct LivePhotoBubble: View {
     @State private var pressed = false
 
     private var info: (image: String, video: String) {
-        let o = dict(message.body)
+        let o = jsonDict(message.body)
         return ((o["image"] as? String) ?? "", (o["video"] as? String) ?? "")
     }
 
